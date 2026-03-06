@@ -10,7 +10,11 @@ dotenv.config()
 const app = express()
 
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: [
+        'http://localhost:5173',
+        'https://levellog-frontend.onrender.com'
+        // ↑ we will update this after frontend is deployed
+    ],
     credentials: true
 }))
 app.use(express.json())
