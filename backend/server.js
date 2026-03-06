@@ -3,7 +3,8 @@ import mongoose from 'mongoose'
 import dotenv from 'dotenv'
 import cors from 'cors'
 import gamesRouter from './routes/games.js'
-import authRouter from './routes/auth.js'   // ← ADD THIS
+import authRouter from './routes/auth.js'  
+import igdbRouter from './routes/igdb.js'
 
 dotenv.config()
 
@@ -19,8 +20,9 @@ app.use(cors({
 app.use(express.json())
 
 // ── ROUTES ──
-app.use('/api/auth', authRouter)     // ← ADD THIS
+app.use('/api/auth', authRouter)     
 app.use('/api/games', gamesRouter)
+app.use('/api/igdb', igdbRouter)
 
 app.get('/', (req, res) => {
     res.json({ message: '🎮 LevelLog API is running!' })
