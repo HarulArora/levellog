@@ -12,11 +12,8 @@ function App() {
         <BrowserRouter>
             <div className="bg-[#0a0a0f] min-h-screen">
                 <Routes>
-                    {/* Login and Signup don't show Navbar */}
                     <Route path="/login" element={<Login />} />
                     <Route path="/signup" element={<Signup />} />
-
-                    {/* All other pages show Navbar */}
                     <Route path="/*" element={
                         <>
                             <Navbar />

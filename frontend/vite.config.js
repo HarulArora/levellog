@@ -7,4 +7,6 @@ export default defineConfig({
         react(),
         tailwindcss(),
     ],
+    // This fixes blank page on refresh in production
+    base: '/',
 })
