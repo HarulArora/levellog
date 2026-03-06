@@ -1,10 +1,8 @@
 // GameCard.jsx
 // ONE single game card shown in the grid
-// UPDATED: now accepts onDelete prop for the remove button
+// Updated to support IGDB cover images
 
 function GameCard({ game, onDelete }) {
-    // ↑ we added onDelete here — this is a function passed from Library.jsx
-    // When user clicks Remove — this function runs and deletes the game
 
     // Status config — each status has a color and label
     const statusConfig = {
@@ -27,28 +25,46 @@ function GameCard({ game, onDelete }) {
     // Get the status config for this game
     const sc = statusConfig[game.status] || statusConfig.planned
 
-    // Steam CDN image URL
-    const imageUrl = `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
+    // ── IMAGE URL ──
+    // Use IGDB cover if available
+    // Fall back to Steam CDN if steamId exists
+    // Show nothing if neither exists
+    const imageUrl = game.cover
+        ? game.cover
+        : game.steamId
+            ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
+            : null
 
     return (
-        // group → allows child elements to react to hover on the parent card
-        <div className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden 
-                    cursor-pointer group
-                    hover:border-[#c8ff57] hover:-translate-y-1 
-                    transition-all duration-200
-                    hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
-            style={{ animation: 'fadeUp 0.3s ease backwards' }}>
+        // group → allows child elements to react to hover on parent card
+        <div
+            className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden
+                 cursor-pointer group
+                 hover:border-[#c8ff57] hover:-translate-y-1
+                 transition-all duration-200
+                 hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
+            style={{ animation: 'fadeUp 0.3s ease backwards' }}
+        >
 
-            {/* ── Game Cover Image ── */}
-            <div className="h-[110px] bg-cover bg-top bg-[#18181f] relative overflow-hidden"
-                style={{ backgroundImage: `url(${imageUrl})` }}>
+            {/* ── Game Cover Image (Banner) ── */}
+            <div
+                className="h-[110px] bg-cover bg-top bg-[#18181f] relative overflow-hidden"
+                style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}
+            >
+
+                {/* Show emoji if no image available */}
+                {!imageUrl && (
+                    <div className="w-full h-full flex items-center justify-center text-4xl">
+                        🎮
+                    </div>
+                )}
 
                 {/* Dark gradient at bottom of image */}
-                <div className="absolute bottom-0 left-0 right-0 h-10 
+                <div className="absolute bottom-0 left-0 right-0 h-10
                         bg-gradient-to-t from-[#111118] to-transparent" />
 
                 {/* Status badge on top left of image */}
-                <div className={`absolute top-2 left-2 font-mono text-[10px] uppercase 
+                <div className={`absolute top-2 left-2 font-mono text-[10px] uppercase
                         tracking-wider px-2 py-[2px] rounded-sm ${sc.bg} ${sc.color}`}>
                     {sc.label}
                 </div>
@@ -59,7 +75,7 @@ function GameCard({ game, onDelete }) {
             <div className="p-3">
 
                 {/* Game title */}
-                {/* group-hover:text-[#c8ff57] → title turns green when card is hovered */}
+                {/* group-hover → title turns green when card is hovered */}
                 <div className="font-semibold text-sm mb-2 truncate
                         group-hover:text-[#c8ff57] transition-colors">
                     {game.title}
@@ -70,8 +86,8 @@ function GameCard({ game, onDelete }) {
                     {game.platforms.map(platform => (
                         <span
                             key={platform}
-                            className={`font-mono text-[9px] px-1 py-[1px] rounded 
-                         border bg-[#18181f] 
+                            className={`font-mono text-[9px] px-1 py-[1px] rounded
+                         border bg-[#18181f]
                          ${platformConfig[platform] || 'text-[#7a7a90] border-[#2a2a35]'}`}
                         >
                             {platform}
@@ -79,7 +95,7 @@ function GameCard({ game, onDelete }) {
                     ))}
                 </div>
 
-                {/* Bottom row — genre on left, rating on right */}
+                {/* Bottom row — genre left, rating right */}
                 <div className="flex justify-between items-center">
 
                     {/* Genre */}
@@ -87,12 +103,16 @@ function GameCard({ game, onDelete }) {
                         {game.genre}
                     </span>
 
-                    {/* Rating — only show if game has been rated */}
+                    {/* Rating — only show if rated */}
                     {game.rating > 0 ? (
-                        <span className="font-black text-lg text-[#c8ff57] leading-none tracking-wide"
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        <span
+                            className="font-black text-lg text-[#c8ff57] leading-none tracking-wide"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                        >
                             {game.rating}
-                            <small className="font-mono text-[10px] text-[#7a7a90] font-normal">/10</small>
+                            <small className="font-mono text-[10px] text-[#7a7a90] font-normal">
+                                /10
+                            </small>
                         </span>
                     ) : (
                         <span className="text-[#7a7a90] font-mono text-xs">—</span>
@@ -102,28 +122,23 @@ function GameCard({ game, onDelete }) {
 
                 {/* Hours tracked — only show if hours > 0 */}
                 {game.hours > 0 && (
-                    <div className="mt-2 pt-2 border-t border-[#2a2a35] 
+                    <div className="mt-2 pt-2 border-t border-[#2a2a35]
                           text-[#7a7a90] font-mono text-[10px]">
                         ⏱ {game.hours}h tracked
                     </div>
                 )}
 
                 {/* ── Delete Button ── */}
-                {/* opacity-0 → hidden by default */}
-                {/* group-hover:opacity-100 → visible when card is hovered */}
-                {/* This is why we added "group" to the parent div above */}
+                {/* Hidden by default */}
+                {/* Appears when card is hovered */}
                 <button
                     onClick={(e) => {
-                        // stopPropagation → stops the click from bubbling up to the card
-                        // Without this, clicking Remove would also trigger the card click
                         e.stopPropagation()
                         onDelete()
-                        // onDelete() is the function passed from Library.jsx
-                        // It calls handleDeleteGame(game._id, game.title)
                     }}
                     className="mt-2 w-full py-1 text-[10px] font-mono uppercase tracking-wider
                      text-[#ff5c5c] border border-[#ff5c5c]/20 rounded
-                     hover:bg-[#ff5c5c]/10 transition-all 
+                     hover:bg-[#ff5c5c]/10 transition-all
                      opacity-0 group-hover:opacity-100"
                 >
                     Remove

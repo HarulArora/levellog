@@ -61,7 +61,21 @@ const gameSchema = new mongoose.Schema(
         notes: {
             type: String,
             default: ''
-        }
+        },
+        cover: {
+            type: String,
+            default: ''
+        },
+
+        summary: {
+            type: String,
+            default: ''
+        },
+
+        igdbId: {
+            type: Number,
+            default: null
+        },
     },
     {
         // timestamps: true automatically adds createdAt and updatedAt fields

@@ -1,21 +1,38 @@
+// GameSearch.jsx
+// Search bar that shows IGDB results as user types
+// When user clicks a result — form fills automatically
+
 import { useState, useEffect, useRef } from 'react'
 import api from '../../api/axios'
 
+// onSelect → called when user picks a game from results
 function GameSearch({ onSelect }) {
 
     const [query, setQuery] = useState('')
     const [results, setResults] = useState([])
     const [loading, setLoading] = useState(false)
     const [showResults, setShowResults] = useState(false)
+
+    // useRef → keeps a reference to the timer
+    // Used for debouncing — explained below
     const timerRef = useRef(null)
 
+
     useEffect(() => {
+        // Don't search if query is too short
         if (query.length < 2) {
             setResults([])
             setShowResults(false)
             return
         }
 
+        // ── DEBOUNCING ──
+        // Don't search on every single keystroke
+        // Wait 400ms after user stops typing then search
+        // This prevents too many API calls
+        // Example: user types "elden ring"
+        // Without debounce → 9 API calls
+        // With debounce    → 1 API call
         clearTimeout(timerRef.current)
         timerRef.current = setTimeout(async () => {
             setLoading(true)
@@ -30,15 +47,20 @@ function GameSearch({ onSelect }) {
             }
         }, 400)
 
+        // Cleanup timer on unmount
         return () => clearTimeout(timerRef.current)
     }, [query])
 
+
     const handleSelect = (game) => {
+        // Pass selected game data up to parent (AddGameModal)
         onSelect(game)
+        // Clear search
         setQuery('')
         setResults([])
         setShowResults(false)
     }
+
 
     return (
         <div className="relative">
@@ -56,7 +78,7 @@ function GameSearch({ onSelect }) {
                    placeholder:text-[#7a7a90] transition-colors"
             />
 
-            {/* Loading */}
+            {/* Loading indicator */}
             {loading && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2
                         text-[#7a7a90] font-mono text-xs">
@@ -64,7 +86,7 @@ function GameSearch({ onSelect }) {
                 </div>
             )}
 
-            {/* Results Dropdown */}
+            {/* Search Results Dropdown */}
             {showResults && results.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1
                         bg-[#18181f] border border-[#2a2a35] rounded-lg
@@ -77,7 +99,7 @@ function GameSearch({ onSelect }) {
                          hover:bg-[#c8ff57]/05 transition-colors
                          border-b border-[#2a2a35] last:border-0"
                         >
-                            {/* Cover image */}
+                            {/* Game cover */}
                             {game.cover ? (
                                 <img
                                     src={game.cover}
