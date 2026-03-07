@@ -28,6 +28,28 @@ const userSchema = new mongoose.Schema(
             default: '',
             maxlength: 200,
         },
+
+        // ── PRIVACY ──
+        // public  → anyone can see profile and games
+        // private → only followers can see games
+        isPrivate: {
+            type: Boolean,
+            default: false
+        },
+
+        // ── FOLLOWERS / FOLLOWING ──
+        // Array of userIds who follow this user
+        followers: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }],
+
+        // Array of userIds this user follows
+        following: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User'
+        }],
+
         gamesCount: {
             type: Number,
             default: 0,
@@ -38,21 +60,16 @@ const userSchema = new mongoose.Schema(
     }
 )
 
-
-// ── HASH PASSWORD BEFORE SAVING ──
-// No "next" parameter needed in modern Mongoose
-// async/await handles the flow automatically
+// ── HASH PASSWORD ──
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return
     this.password = await bcrypt.hash(this.password, 12)
 })
 
-
-// ── COMPARE PASSWORD ON LOGIN ──
+// ── COMPARE PASSWORD ──
 userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password)
 }
-
 
 const User = mongoose.model('User', userSchema)
 

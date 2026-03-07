@@ -55,7 +55,7 @@ function Library() {
             <div className="flex flex-wrap items-center gap-3 mb-6 pb-4 border-b border-[#2a2a35]">
 
                 <h2
-                    className="font-black text-2xl md:text-3xl tracking-widest uppercase"
+                    className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                 >
                     My Library

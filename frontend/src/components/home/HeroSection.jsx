@@ -23,7 +23,7 @@ function HeroSection() {
 
                 {/* Heading */}
                 <h1
-                    className="font-black uppercase leading-none tracking-wide mb-5"
+                    className="font-black uppercase leading-none tracking-wide mb-5 text-white"
                     style={{ fontSize: 'clamp(2.5rem, 7vw, 5.5rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                 >
                     Track Every <br />
@@ -125,7 +125,7 @@ function HeroGameCard({ game, index }) {
                 style={{ backgroundImage: `url(${imageUrl})` }}
             />
             <div className="flex-1 py-2">
-                <div className="font-semibold text-sm mb-1">{game.title}</div>
+                <div className="font-semibold text-sm mb-1 text-white">{game.title}</div>
                 <div className="flex gap-2 items-center">
                     <span className={`font-mono text-[10px] uppercase tracking-wider
                            px-2 py-[2px] rounded-sm ${sc.bg} ${sc.text}`}>

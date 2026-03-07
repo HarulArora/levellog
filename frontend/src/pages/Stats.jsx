@@ -108,7 +108,7 @@ function Stats() {
             {/* ── Page Header ── */}
             <div className="flex items-baseline gap-4 mb-8 pb-4 border-b border-[#2a2a35]">
                 <h2
-                    className="font-black text-2xl md:text-3xl tracking-widest uppercase"
+                    className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                 >
                     My Stats
@@ -175,7 +175,7 @@ function Stats() {
                 <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
 
                     <h3
-                        className="font-black text-lg tracking-widest uppercase mb-6"
+                        className="font-black text-lg tracking-widest uppercase mb-6 text-white"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                     >
                         Games by Status
@@ -233,7 +233,7 @@ function Stats() {
                 <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
 
                     <h3
-                        className="font-black text-lg tracking-widest uppercase mb-6"
+                        className="font-black text-lg tracking-widest uppercase mb-6 text-white"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                     >
                         Top Genres
@@ -302,7 +302,7 @@ function Stats() {
                 <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
 
                     <h3
-                        className="font-black text-lg tracking-widest uppercase mb-5"
+                        className="font-black text-lg tracking-widest uppercase mb-5 text-white"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                     >
                         Top Rated Games

@@ -6,7 +6,10 @@ import Lists from './pages/Lists'
 import Activity from './pages/Activity'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
-import Stats from './pages/Stats'     
+import Stats from './pages/Stats'
+import Profile from './pages/Profile'
+import Notifications from './pages/Notifications'
+import Search from './pages/Search'
 
 function App() {
     return (
@@ -24,6 +27,9 @@ function App() {
                                 <Route path="/lists" element={<Lists />} />
                                 <Route path="/activity" element={<Activity />} />
                                 <Route path="/stats" element={<Stats />} />
+                                <Route path="/user/:username" element={<Profile />} />
+                                <Route path="/notifications" element={<Notifications />} />
+                                <Route path="/search" element={<Search />} />
                             </Routes>
                         </>
                     } />

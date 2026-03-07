@@ -4,7 +4,8 @@ import dotenv from 'dotenv'
 import cors from 'cors'
 import gamesRouter from './routes/games.js'
 import authRouter from './routes/auth.js'
-import igdbRouter from './routes/igdb.js'      // ← add this
+import igdbRouter from './routes/igdb.js'
+import notificationsRouter from './routes/notifications.js'
 
 dotenv.config()
 
@@ -20,10 +21,10 @@ app.use(cors({
 
 app.use(express.json())
 
-// ── ROUTES ──
 app.use('/api/auth', authRouter)
 app.use('/api/games', gamesRouter)
-app.use('/api/igdb', igdbRouter)               // ← add this
+app.use('/api/igdb', igdbRouter)
+app.use('/api/notifications', notificationsRouter)
 
 app.get('/', (req, res) => {
     res.json({ message: '🎮 LevelLog API is running!' })

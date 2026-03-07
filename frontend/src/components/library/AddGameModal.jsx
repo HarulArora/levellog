@@ -85,7 +85,7 @@ function AddGameModal({ onClose, onAdd }) {
                 <div className="flex items-center justify-between p-5
                         border-b border-[#2a2a35]">
                     <h3
-                        className="font-black text-lg tracking-widest uppercase"
+                        className="font-black text-lg tracking-widest uppercase text-white"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                     >
                         Log a Game
