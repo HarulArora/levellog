@@ -1,12 +1,17 @@
 import express from 'express'
 import Game from '../models/Game.js'
+import { protect } from '../middleware/auth.js'
 
 const router = express.Router()
 
 // ── GET /api/games ──
-router.get('/', async (req, res) => {
+// Only return games for the logged in user
+router.get('/', protect, async (req, res) => {
     try {
-        const games = await Game.find().sort({ createdAt: -1 })
+        const games = await Game.find({
+            userId: req.user._id
+        }).sort({ createdAt: -1 })
+
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({
@@ -18,11 +23,13 @@ router.get('/', async (req, res) => {
 })
 
 // ── GET /api/games/user/:userId ──
+// Public profile games — only show if profile is public or own profile
 router.get('/user/:userId', async (req, res) => {
     try {
         const games = await Game.find({
             userId: req.params.userId
         }).sort({ createdAt: -1 })
+
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({
@@ -34,7 +41,7 @@ router.get('/user/:userId', async (req, res) => {
 })
 
 // ── GET /api/games/activity/:userId ──
-router.get('/activity/:userId', async (req, res) => {
+router.get('/activity/:userId', protect, async (req, res) => {
     try {
         const games = await Game.find({
             userId: req.params.userId
@@ -101,12 +108,12 @@ router.get('/activity/:userId', async (req, res) => {
 })
 
 // ── POST /api/games ──
-router.post('/', async (req, res) => {
+router.post('/', protect, async (req, res) => {
     try {
         const {
             title, genre, status, rating,
             hours, platforms, steamId,
-            notes, cover, summary, igdbId, userId
+            notes, cover, summary, igdbId
         } = req.body
 
         if (!title) {
@@ -117,7 +124,7 @@ router.post('/', async (req, res) => {
         }
 
         const newGame = new Game({
-            userId: userId || null,
+            userId: req.user._id,
             title, genre, status, rating,
             hours, platforms, steamId,
             notes, cover, summary, igdbId
@@ -141,10 +148,11 @@ router.post('/', async (req, res) => {
 })
 
 // ── PUT /api/games/:id ──
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, async (req, res) => {
     try {
-        const game = await Game.findByIdAndUpdate(
-            req.params.id,
+        // Make sure the game belongs to the logged in user
+        const game = await Game.findOneAndUpdate(
+            { _id: req.params.id, userId: req.user._id },
             req.body,
             { new: true }
         )
@@ -152,7 +160,7 @@ router.put('/:id', async (req, res) => {
         if (!game) {
             return res.status(404).json({
                 success: false,
-                message: 'Game not found'
+                message: 'Game not found or not authorized'
             })
         }
 
@@ -168,14 +176,18 @@ router.put('/:id', async (req, res) => {
 })
 
 // ── DELETE /api/games/:id ──
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
     try {
-        const game = await Game.findByIdAndDelete(req.params.id)
+        // Make sure the game belongs to the logged in user
+        const game = await Game.findOneAndDelete({
+            _id: req.params.id,
+            userId: req.user._id
+        })
 
         if (!game) {
             return res.status(404).json({
                 success: false,
-                message: 'Game not found'
+                message: 'Game not found or not authorized'
             })
         }
 
