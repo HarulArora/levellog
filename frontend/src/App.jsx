@@ -6,6 +6,7 @@ import Lists from './pages/Lists'
 import Activity from './pages/Activity'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import Stats from './pages/Stats'     
 
 function App() {
     return (
@@ -22,6 +23,7 @@ function App() {
                                 <Route path="/library" element={<Library />} />
                                 <Route path="/lists" element={<Lists />} />
                                 <Route path="/activity" element={<Activity />} />
+                                <Route path="/stats" element={<Stats />} />
                             </Routes>
                         </>
                     } />

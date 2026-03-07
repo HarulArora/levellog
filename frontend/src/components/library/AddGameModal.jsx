@@ -1,6 +1,5 @@
 // AddGameModal.jsx
-// Updated to use IGDB game search
-// When user picks a game — form fills automatically
+// Updated with IGDB game search and hours hint text
 
 import { useState } from 'react'
 import GameSearch from './GameSearch'
@@ -18,7 +17,6 @@ function AddGameModal({ onClose, onAdd }) {
         summary: '',
     })
 
-    // Track if game was selected from IGDB
     const [gameSelected, setGameSelected] = useState(false)
     const [submitting, setSubmitting] = useState(false)
 
@@ -39,18 +37,15 @@ function AddGameModal({ onClose, onAdd }) {
         }))
     }
 
-
     // ── WHEN USER SELECTS A GAME FROM IGDB ──
     // Auto fill the form with game data
     const handleGameSelect = (game) => {
         setFormData(prev => ({
             ...prev,
             title: game.title,
-            // Take first genre
             genre: game.genres[0] || '',
             cover: game.cover || '',
             summary: game.summary || '',
-            // Map IGDB platform names to our short names
             platforms: game.platforms
                 .map(p => {
                     if (p.includes('PC')) return 'PC'
@@ -61,12 +56,10 @@ function AddGameModal({ onClose, onAdd }) {
                     return null
                 })
                 .filter(Boolean)
-                // Remove duplicates
                 .filter((v, i, a) => a.indexOf(v) === i)
         }))
         setGameSelected(true)
     }
-
 
     const handleSubmit = async () => {
         if (!formData.title.trim()) return
@@ -76,21 +69,25 @@ function AddGameModal({ onClose, onAdd }) {
         if (result.success) onClose()
     }
 
-
     return (
+        // Overlay
         <div
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50
                  flex items-center justify-center p-4"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
+
+            {/* Modal box */}
             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg
                       w-full max-w-md max-h-[90vh] overflow-y-auto">
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-5
                         border-b border-[#2a2a35]">
-                    <h3 className="font-black text-lg tracking-widest uppercase"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                    <h3
+                        className="font-black text-lg tracking-widest uppercase"
+                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                    >
                         Log a Game
                     </h3>
                     <button
@@ -101,6 +98,7 @@ function AddGameModal({ onClose, onAdd }) {
                     </button>
                 </div>
 
+                {/* Form Body */}
                 <div className="p-5 flex flex-col gap-4">
 
                     {/* ── IGDB Search ── */}
@@ -112,7 +110,7 @@ function AddGameModal({ onClose, onAdd }) {
                         <GameSearch onSelect={handleGameSelect} />
                     </div>
 
-                    {/* Show selected game preview */}
+                    {/* Selected game preview */}
                     {gameSelected && formData.cover && (
                         <div className="flex items-center gap-3 bg-[#18181f]
                             border border-[#c8ff57]/20 rounded-lg p-3">
@@ -122,7 +120,9 @@ function AddGameModal({ onClose, onAdd }) {
                                 className="w-12 h-16 object-cover rounded"
                             />
                             <div>
-                                <div className="font-semibold text-sm">{formData.title}</div>
+                                <div className="font-semibold text-sm">
+                                    {formData.title}
+                                </div>
                                 <div className="font-mono text-[10px] text-[#7a7a90] mt-1">
                                     {formData.genre}
                                 </div>
@@ -133,7 +133,7 @@ function AddGameModal({ onClose, onAdd }) {
                         </div>
                     )}
 
-                    {/* Manual title if no game selected */}
+                    {/* Manual title if no game selected from IGDB */}
                     {!gameSelected && (
                         <div>
                             <label className="block font-mono text-xs uppercase tracking-wider
@@ -164,7 +164,8 @@ function AddGameModal({ onClose, onAdd }) {
                             onChange={e => handleChange('status', e.target.value)}
                             className="w-full bg-[#18181f] border border-[#2a2a35] rounded
                          px-3 py-2 text-sm text-white
-                         focus:outline-none focus:border-[#c8ff57] transition-colors"
+                         focus:outline-none focus:border-[#c8ff57]
+                         transition-colors"
                         >
                             {statuses.map(s => (
                                 <option key={s} value={s}>
@@ -182,7 +183,7 @@ function AddGameModal({ onClose, onAdd }) {
                         </label>
                         <input
                             type="number"
-                            placeholder="0"
+                            placeholder="e.g. 45"
                             min="0"
                             value={formData.hours}
                             onChange={e => handleChange('hours', e.target.value)}
@@ -191,6 +192,10 @@ function AddGameModal({ onClose, onAdd }) {
                          focus:outline-none focus:border-[#c8ff57]
                          placeholder:text-[#7a7a90] transition-colors"
                         />
+                        {/* Hint text — makes users feel comfortable entering estimates */}
+                        <p className="text-[#7a7a90] font-mono text-[10px] mt-1">
+                            💡 Your estimate is fine — this is your personal diary
+                        </p>
                     </div>
 
                     {/* Rating */}
@@ -243,7 +248,7 @@ function AddGameModal({ onClose, onAdd }) {
                         </div>
                     </div>
 
-                    {/* Submit */}
+                    {/* Submit button */}
                     <button
                         onClick={handleSubmit}
                         disabled={submitting || !formData.title.trim()}
