@@ -1,92 +1,95 @@
-import { useState, useEffect, useCallback } from 'react'
-import api from '../api/axios.js'
+import { useState, useEffect } from 'react'
+import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
 
-function useGames() {
+const useGames = () => {
 
-    const [games, setGames] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState(null)
+  const { user } = useAuth()
+  const [games, setGames] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-    const fetchGames = useCallback(async () => {
-        setLoading(true)
-        setError(null)
-        try {
-            const response = await api.get('/games')
-            setGames(response.data.games)
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to fetch games')
-        } finally {
-            setLoading(false)
-        }
-    }, [])
-
-    const addGame = async (gameData) => {
-        try {
-            // Get userId from JWT token stored in localStorage
-            const token = localStorage.getItem('levellog_token')
-            let userId = null
-
-            if (token) {
-                // Decode JWT payload to get userId
-                // JWT = header.payload.signature
-                // We only need the payload (middle part)
-                const payload = JSON.parse(atob(token.split('.')[1]))
-                userId = payload.userId
-            }
-
-            const response = await api.post('/games', {
-                ...gameData,
-                userId
-            })
-
-            setGames(prev => [response.data.game, ...prev])
-            return { success: true, game: response.data.game }
-
-        } catch (err) {
-            const message = err.response?.data?.message || 'Failed to add game'
-            return { success: false, message }
-        }
+  const fetchGames = async () => {
+    // If not logged in — clear games and stop
+    if (!user) {
+      setGames([])
+      return
     }
 
-    const updateGame = async (id, updateData) => {
-        try {
-            const response = await api.put(`/games/${id}`, updateData)
-            setGames(prev =>
-                prev.map(game =>
-                    game._id === id ? response.data.game : game
-                )
-            )
-            return { success: true, game: response.data.game }
-        } catch (err) {
-            const message = err.response?.data?.message || 'Failed to update game'
-            return { success: false, message }
-        }
-    }
+    try {
+      setLoading(true)
+      setError(null)
 
-    const deleteGame = async (id) => {
-        try {
-            await api.delete(`/games/${id}`)
-            setGames(prev => prev.filter(game => game._id !== id))
-            return { success: true }
-        } catch (err) {
-            const message = err.response?.data?.message || 'Failed to delete game'
-            return { success: false, message }
-        }
-    }
+      const token = localStorage.getItem('levellog_token')
+      const res = await api.get('/games', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
 
-    useEffect(() => {
-        fetchGames()
-    }, [fetchGames])
-
-    return {
-        games,
-        loading,
-        error,
-        fetchGames,
-        addGame,
-        updateGame,
-        deleteGame,
+      setGames(res.data.games || [])
+    } catch (err) {
+      console.error('Fetch games error:', err)
+      setError(err.message)
+      setGames([])
+    } finally {
+      setLoading(false)
     }
+  }
+
+  // Fetch games whenever user changes (login/logout)
+  useEffect(() => {
+    if (user) {
+      fetchGames()
+    } else {
+      // User logged out — immediately clear games
+      setGames([])
+    }
+  }, [user])
+
+  const addGame = async (gameData) => {
+    try {
+      const token = localStorage.getItem('levellog_token')
+      const res = await api.post('/games', gameData, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setGames(prev => [res.data.game, ...prev])
+      return { success: true, game: res.data.game }
+    } catch (err) {
+      console.error('Add game error:', err)
+      return { success: false, error: err.message }
+    }
+  }
+
+  const updateGame = async (id, updates) => {
+    try {
+      const token = localStorage.getItem('levellog_token')
+      const res = await api.put(`/games/${id}`, updates, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setGames(prev =>
+        prev.map(g => g._id === id ? res.data.game : g)
+      )
+      return { success: true, game: res.data.game }
+    } catch (err) {
+      console.error('Update game error:', err)
+      return { success: false, error: err.message }
+    }
+  }
+
+  const deleteGame = async (id) => {
+    try {
+      const token = localStorage.getItem('levellog_token')
+      await api.delete(`/games/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setGames(prev => prev.filter(g => g._id !== id))
+      return { success: true }
+    } catch (err) {
+      console.error('Delete game error:', err)
+      return { success: false, error: err.message }
+    }
+  }
+
+  return { games, loading, error, fetchGames, addGame, updateGame, deleteGame }
 }
 
 export default useGames

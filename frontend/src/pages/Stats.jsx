@@ -1,374 +1,632 @@
-// Stats.jsx
-// Shows user's gaming statistics with charts
-// Uses Recharts library for visualization
-
-import { useMemo } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import useGames from '../hooks/useGames'
-import {
-    PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-    BarChart, Bar, XAxis, YAxis, CartesianGrid
-} from 'recharts'
 
 function Stats() {
 
-    const { games, loading } = useGames()
+  const { user } = useAuth()
+  const { games } = useGames()
+  const navigate = useNavigate()
 
-    // ── CALCULATE ALL STATS ──
-    // useMemo → only recalculates when games changes
-    const stats = useMemo(() => {
-
-        if (games.length === 0) return null
-
-        // ── Overview numbers ──
-        const totalGames = games.length
-        const totalHours = games.reduce((sum, g) => sum + (g.hours || 0), 0)
-        const ratedGames = games.filter(g => g.rating > 0)
-        const avgRating = ratedGames.length > 0
-            ? (ratedGames.reduce((sum, g) => sum + g.rating, 0) / ratedGames.length).toFixed(1)
-            : 0
-        const completedGames = games.filter(g => g.status === 'completed').length
-
-        // ── Status breakdown for pie chart ──
-        const statusCount = {}
-        games.forEach(g => {
-            statusCount[g.status] = (statusCount[g.status] || 0) + 1
-        })
-
-        const statusData = [
-            { name: 'Playing', value: statusCount.playing || 0, color: '#c8ff57' },
-            { name: 'Completed', value: statusCount.completed || 0, color: '#5c9fff' },
-            { name: 'Planned', value: statusCount.planned || 0, color: '#ff9f5c' },
-            { name: 'Paused', value: statusCount.paused || 0, color: '#c45cff' },
-            { name: 'Dropped', value: statusCount.dropped || 0, color: '#ff5c5c' },
-        ].filter(s => s.value > 0)
-        // filter → only show statuses that have at least 1 game
-
-        // ── Genre breakdown for bar chart ──
-        const genreCount = {}
-        games.forEach(g => {
-            if (g.genre && g.genre !== 'Unknown') {
-                genreCount[g.genre] = (genreCount[g.genre] || 0) + 1
-            }
-        })
-
-        // Sort by count and take top 6
-        const genreData = Object.entries(genreCount)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 6)
-
-        // ── Top rated games ──
-        const topRated = [...games]
-            .filter(g => g.rating > 0)
-            .sort((a, b) => b.rating - a.rating)
-            .slice(0, 5)
-
-        return {
-            totalGames,
-            totalHours,
-            avgRating,
-            completedGames,
-            statusData,
-            genreData,
-            topRated
-        }
-
-    }, [games])
-
-    // ── LOADING STATE ──
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="text-[#7a7a90] font-mono text-sm">
-                    Loading stats...
-                </div>
-            </div>
-        )
-    }
-
-    // ── EMPTY STATE ──
-    if (!stats || games.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="text-5xl">📊</div>
-                <div className="text-white font-black text-2xl tracking-widest uppercase"
-                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                    No Stats Yet
-                </div>
-                <div className="text-[#7a7a90] font-mono text-sm text-center max-w-sm">
-                    Add some games to your library first and your stats will appear here!
-                </div>
-            </div>
-        )
-    }
-
+  if (!user) {
     return (
-        <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="text-5xl">📊</div>
+        <div
+          className="text-white font-black text-2xl tracking-widest uppercase"
+          style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+        >
+          Login to see your stats
+        </div>
+        <Link to="/login">
+          <button className="px-6 py-3 bg-[#c8ff57] text-black font-bold
+                             text-sm rounded hover:bg-[#d4ff6e] transition-all">
+            Login
+          </button>
+        </Link>
+      </div>
+    )
+  }
 
-            {/* ── Page Header ── */}
-            <div className="flex items-baseline gap-4 mb-8 pb-4 border-b border-[#2a2a35]">
-                <h2
-                    className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
-                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+  // ── Computed stats ──
+  const totalGames     = games.length
+  const totalHours     = games.reduce((s, g) => s + (g.hours || 0), 0)
+  const ratedGames     = games.filter(g => g.rating > 0)
+  const avgRating      = ratedGames.length > 0
+    ? (ratedGames.reduce((s, g) => s + g.rating, 0) / ratedGames.length).toFixed(1)
+    : '—'
+  const completed      = games.filter(g => g.status === 'completed').length
+  const playing        = games.filter(g => g.status === 'playing').length
+  const planned        = games.filter(g => g.status === 'planned').length
+  const dropped        = games.filter(g => g.status === 'dropped').length
+  const paused         = games.filter(g => g.status === 'paused').length
+  const completionRate = totalGames > 0
+    ? Math.round((completed / totalGames) * 100)
+    : 0
+
+  const memberYear = user.createdAt
+    ? new Date(user.createdAt).getFullYear()
+    : new Date().getFullYear()
+
+  // ── Genre breakdown ──
+  const genreMap = {}
+  games.forEach(game => {
+    const genre = game.genre || 'Unknown'
+    genreMap[genre] = (genreMap[genre] || 0) + 1
+  })
+  const genreList = Object.entries(genreMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+  const maxGenreCount = genreList[0]?.[1] || 1
+
+  // ── Platform breakdown ──
+  const platformMap = {}
+  games.forEach(game => {
+    game.platforms?.forEach(p => {
+      platformMap[p] = (platformMap[p] || 0) + 1
+    })
+  })
+  const platformList = Object.entries(platformMap)
+    .sort((a, b) => b[1] - a[1])
+  const maxPlatformCount = platformList[0]?.[1] || 1
+
+  // ── Rating distribution ──
+  const ratingBuckets = { '9-10': 0, '7-8': 0, '5-6': 0, '1-4': 0 }
+  ratedGames.forEach(g => {
+    if (g.rating >= 9)      ratingBuckets['9-10']++
+    else if (g.rating >= 7) ratingBuckets['7-8']++
+    else if (g.rating >= 5) ratingBuckets['5-6']++
+    else                    ratingBuckets['1-4']++
+  })
+  const maxRatingCount = Math.max(...Object.values(ratingBuckets), 1)
+
+  // ── Most played genre (by hours) ──
+  const genreHoursMap = {}
+  games.forEach(game => {
+    const genre = game.genre || 'Unknown'
+    genreHoursMap[genre] = (genreHoursMap[genre] || 0) + (game.hours || 0)
+  })
+  const genreHoursList = Object.entries(genreHoursMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+  const maxGenreHours = genreHoursList[0]?.[1] || 1
+
+  // ── Avg hours per game ──
+  const avgHours = totalGames > 0
+    ? (totalHours / totalGames).toFixed(1)
+    : 0
+
+  // ── Longest game ──
+  const longestGame = games.reduce((max, g) =>
+    (g.hours || 0) > (max?.hours || 0) ? g : max, null)
+
+  // ── Highest rated game ──
+  const highestRated = ratedGames.reduce((max, g) =>
+    g.rating > (max?.rating || 0) ? g : max, null)
+
+  return (
+    <div className="min-h-screen">
+
+      {/* ══════════════════════════════════
+          PROFILE HEADER
+      ══════════════════════════════════ */}
+      <div className="border-b border-[#2a2a35] bg-[#0a0a0f]">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8">
+          <div className="flex flex-col sm:flex-row items-start
+                          sm:items-center justify-between gap-6">
+
+            {/* Left — avatar + name */}
+            <div className="flex items-center gap-5">
+              <div
+                className="w-20 h-20 rounded-full bg-gradient-to-br
+                            from-[#c8ff57] to-[#5c9fff]
+                            flex items-center justify-center
+                            font-black text-3xl text-black flex-shrink-0"
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+              >
+                {user.username.slice(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <div
+                  className="font-black text-3xl md:text-4xl text-white
+                              uppercase tracking-widest"
+                  style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                 >
-                    My Stats
-                </h2>
-                <span className="font-mono text-xs text-[#7a7a90]">
-                    {stats.totalGames} games tracked
-                </span>
+                  {user.username}
+                </div>
+                <div className="font-mono text-xs text-[#7a7a90] mt-1">
+                  @{user.username}
+                  {' · Member since '}
+                  {memberYear}
+                  {' · All platforms'}
+                </div>
+              </div>
             </div>
 
-            {/* ── Overview Cards ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-
-                {[
-                    {
-                        label: 'Total Games',
-                        value: stats.totalGames,
-                        icon: '🎮',
-                        color: 'text-[#c8ff57]'
-                    },
-                    {
-                        label: 'Hours Played',
-                        value: stats.totalHours,
-                        icon: '⏱',
-                        color: 'text-[#5c9fff]'
-                    },
-                    {
-                        label: 'Avg Rating',
-                        value: `${stats.avgRating}/10`,
-                        icon: '⭐',
-                        color: 'text-[#ff9f5c]'
-                    },
-                    {
-                        label: 'Completed',
-                        value: stats.completedGames,
-                        icon: '🏆',
-                        color: 'text-[#c45cff]'
-                    },
-                ].map(card => (
-                    <div
-                        key={card.label}
-                        className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5
-                       hover:border-[#c8ff57]/30 transition-all"
-                    >
-                        <div className="text-2xl mb-3">{card.icon}</div>
-                        <div
-                            className={`font-black text-3xl md:text-4xl leading-none
-                         tracking-wider mb-1 ${card.color}`}
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                        >
-                            {card.value}
-                        </div>
-                        <div className="font-mono text-[11px] text-[#7a7a90] uppercase tracking-wider">
-                            {card.label}
-                        </div>
-                    </div>
-                ))}
-
+            {/* Right — header stats */}
+            <div className="flex gap-8 sm:gap-10">
+              {[
+                { value: totalGames, label: 'Games'     },
+                { value: totalHours, label: 'Hours'     },
+                { value: avgRating,  label: 'Avg Score' },
+                { value: completed,  label: 'Completed' },
+              ].map(stat => (
+                <div key={stat.label} className="text-right">
+                  <div
+                    className="font-black text-3xl text-[#c8ff57] leading-none"
+                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                  >
+                    {stat.value}
+                  </div>
+                  <div className="font-mono text-[10px] text-[#7a7a90]
+                                  uppercase tracking-wider mt-1">
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {/* ── Charts Row ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          </div>
+        </div>
+      </div>
 
-                {/* ── Status Donut Chart ── */}
-                <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
+      {/* ══════════════════════════════════
+          MAIN CONTENT
+      ══════════════════════════════════ */}
+      <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8">
 
-                    <h3
-                        className="font-black text-lg tracking-widest uppercase mb-6 text-white"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                    >
-                        Games by Status
-                    </h3>
-
-                    {/* ResponsiveContainer → chart resizes with its parent div */}
-                    <ResponsiveContainer width="100%" height={220}>
-                        <PieChart>
-                            <Pie
-                                data={stats.statusData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}   // innerRadius makes it a donut not a pie
-                                outerRadius={90}
-                                paddingAngle={3}   // small gap between slices
-                                dataKey="value"
-                            >
-                                {/* Render each slice with its color */}
-                                {stats.statusData.map((entry, index) => (
-                                    <Cell key={index} fill={entry.color} />
-                                ))}
-                            </Pie>
-                            {/* Tooltip → shows data when user hovers a slice */}
-                            <Tooltip
-                                contentStyle={{
-                                    background: '#18181f',
-                                    border: '1px solid #2a2a35',
-                                    borderRadius: '6px',
-                                    color: '#e8e8f0',
-                                    fontFamily: 'DM Mono',
-                                    fontSize: '12px'
-                                }}
-                            />
-                        </PieChart>
-                    </ResponsiveContainer>
-
-                    {/* Legend — shows what each color means */}
-                    <div className="flex flex-wrap gap-3 mt-2 justify-center">
-                        {stats.statusData.map(s => (
-                            <div key={s.name} className="flex items-center gap-1">
-                                <div
-                                    className="w-2 h-2 rounded-full"
-                                    style={{ background: s.color }}
-                                />
-                                <span className="font-mono text-[10px] text-[#7a7a90]">
-                                    {s.name} ({s.value})
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-
-                </div>
-
-                {/* ── Genre Bar Chart ── */}
-                <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
-
-                    <h3
-                        className="font-black text-lg tracking-widest uppercase mb-6 text-white"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                    >
-                        Top Genres
-                    </h3>
-
-                    {stats.genreData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={220}>
-                            <BarChart
-                                data={stats.genreData}
-                                // margin gives space for axis labels
-                                margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
-                            >
-                                {/* Grid lines */}
-                                <CartesianGrid
-                                    strokeDasharray="3 3"
-                                    stroke="#2a2a35"
-                                    vertical={false}
-                                />
-                                {/* X axis — genre names */}
-                                <XAxis
-                                    dataKey="name"
-                                    tick={{ fill: '#7a7a90', fontSize: 10, fontFamily: 'DM Mono' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                />
-                                {/* Y axis — counts */}
-                                <YAxis
-                                    tick={{ fill: '#7a7a90', fontSize: 10, fontFamily: 'DM Mono' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    allowDecimals={false}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        background: '#18181f',
-                                        border: '1px solid #2a2a35',
-                                        borderRadius: '6px',
-                                        color: '#e8e8f0',
-                                        fontFamily: 'DM Mono',
-                                        fontSize: '12px'
-                                    }}
-                                    cursor={{ fill: 'rgba(200,255,87,0.05)' }}
-                                />
-                                {/* The actual bars */}
-                                <Bar
-                                    dataKey="value"
-                                    fill="#c8ff57"
-                                    radius={[4, 4, 0, 0]}
-                                // radius → rounded top corners on bars
-                                />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="flex items-center justify-center h-[220px]
-                            text-[#7a7a90] font-mono text-xs">
-                            Add games with genres to see this chart
-                        </div>
-                    )}
-
-                </div>
-
+        {/* ── Stat Cards Grid ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
+          {[
+            {
+              value: totalGames,
+              label: 'Total Games',
+              sub: 'Across all platforms'
+            },
+            {
+              value: `${totalHours}H`,
+              label: 'Hours Played',
+              sub: 'Total tracked time'
+            },
+            {
+              value: avgRating,
+              label: 'Average Rating',
+              sub: 'Out of 10'
+            },
+            {
+              value: completed,
+              label: 'Completed',
+              sub: `${completionRate}% completion rate`
+            },
+            {
+              value: playing,
+              label: 'Currently Playing',
+              sub: 'Active now'
+            },
+            {
+              value: planned,
+              label: 'In Backlog',
+              sub: 'Planned to play'
+            },
+            {
+              value: dropped,
+              label: 'Dropped',
+              sub: 'Did not finish'
+            },
+            {
+              value: paused,
+              label: 'Paused',
+              sub: 'On hold'
+            },
+            {
+              value: avgHours,
+              label: 'Avg Hours',
+              sub: 'Per game'
+            },
+          ].map(card => (
+            <div
+              key={card.label}
+              className="bg-[#111118] border border-[#2a2a35] rounded-lg
+                         p-5 hover:border-[#c8ff57]/30 transition-all"
+            >
+              <div
+                className="font-black text-3xl text-[#c8ff57] leading-none mb-2"
+                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+              >
+                {card.value}
+              </div>
+              <div className="font-mono text-[10px] text-white uppercase
+                              tracking-widest mb-1">
+                {card.label}
+              </div>
+              <div className="font-mono text-[10px] text-[#7a7a90]">
+                {card.sub}
+              </div>
             </div>
+          ))}
+        </div>
 
-            {/* ── Top Rated Games ── */}
-            {stats.topRated.length > 0 && (
-                <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
 
-                    <h3
-                        className="font-black text-lg tracking-widest uppercase mb-5 text-white"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                    >
-                        Top Rated Games
-                    </h3>
+          {/* ── Left column ── */}
+          <div className="flex flex-col gap-10">
 
-                    <div className="flex flex-col gap-3">
-                        {stats.topRated.map((game, index) => (
-                            <div
-                                key={game._id}
-                                className="flex items-center gap-4 p-3 rounded-lg
-                           bg-[#18181f] border border-[#2a2a35]
-                           hover:border-[#c8ff57]/30 transition-all"
-                            >
-
-                                {/* Rank number */}
-                                <div
-                                    className="font-black text-2xl text-[#2a2a35] w-8 text-center flex-shrink-0"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                >
-                                    {index + 1}
-                                </div>
-
-                                {/* Game cover */}
-                                {game.cover ? (
-                                    <img
-                                        src={game.cover}
-                                        alt={game.title}
-                                        className="w-12 h-8 object-cover rounded flex-shrink-0"
-                                    />
-                                ) : (
-                                    <div className="w-12 h-8 bg-[#2a2a35] rounded flex-shrink-0
-                                  flex items-center justify-center text-sm">
-                                        🎮
-                                    </div>
-                                )}
-
-                                {/* Game info */}
-                                <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-sm truncate">
-                                        {game.title}
-                                    </div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90] mt-1">
-                                        {game.genre} · {game.status}
-                                    </div>
-                                </div>
-
-                                {/* Rating */}
-                                <div
-                                    className="font-black text-2xl text-[#c8ff57] flex-shrink-0"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                >
-                                    {game.rating}
-                                    <small className="font-mono text-[10px] text-[#7a7a90] font-normal">
-                                        /10
-                                    </small>
-                                </div>
-
-                            </div>
-                        ))}
-                    </div>
-
+            {/* Playtime by Genre */}
+            {genreList.length > 0 && (
+              <div>
+                <div className="font-mono text-xs text-[#7a7a90] uppercase
+                                tracking-widest mb-5">
+                  Playtime by Genre
                 </div>
+                <div className="flex flex-col gap-3">
+                  {genreList.map(([genre, count]) => {
+                    const pct = Math.round((count / maxGenreCount) * 100)
+                    return (
+                      <div key={genre} className="flex items-center gap-4">
+                        <div className="font-mono text-[11px] text-[#7a7a90]
+                                        w-28 flex-shrink-0 text-right truncate">
+                          {genre}
+                        </div>
+                        <div className="flex-1 h-2 bg-[#2a2a35] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${pct}%`,
+                              background: 'linear-gradient(90deg, #5c9fff, #c8ff57)'
+                            }}
+                          />
+                        </div>
+                        <div className="font-mono text-[11px] text-[#7a7a90] w-4 flex-shrink-0">
+                          {count}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             )}
 
+            {/* Hours by Genre */}
+            {genreHoursList.length > 0 && genreHoursList.some(([, h]) => h > 0) && (
+              <div>
+                <div className="font-mono text-xs text-[#7a7a90] uppercase
+                                tracking-widest mb-5">
+                  Hours by Genre
+                </div>
+                <div className="flex flex-col gap-3">
+                  {genreHoursList.map(([genre, hours]) => {
+                    const pct = Math.round((hours / maxGenreHours) * 100)
+                    return (
+                      <div key={genre} className="flex items-center gap-4">
+                        <div className="font-mono text-[11px] text-[#7a7a90]
+                                        w-28 flex-shrink-0 text-right truncate">
+                          {genre}
+                        </div>
+                        <div className="flex-1 h-2 bg-[#2a2a35] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${pct}%`,
+                              background: 'linear-gradient(90deg, #c45cff, #5c9fff)'
+                            }}
+                          />
+                        </div>
+                        <div className="font-mono text-[11px] text-[#7a7a90] w-8 flex-shrink-0">
+                          {hours}h
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Platform Breakdown */}
+            {platformList.length > 0 && (
+              <div>
+                <div className="font-mono text-xs text-[#7a7a90] uppercase
+                                tracking-widest mb-5">
+                  Platform Breakdown
+                </div>
+                <div className="flex flex-col gap-3">
+                  {platformList.map(([platform, count]) => {
+                    const pct = Math.round((count / maxPlatformCount) * 100)
+                    return (
+                      <div key={platform} className="flex items-center gap-4">
+                        <div className="font-mono text-[11px] text-[#7a7a90]
+                                        w-28 flex-shrink-0 text-right">
+                          {platform}
+                        </div>
+                        <div className="flex-1 h-2 bg-[#2a2a35] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${pct}%`,
+                              background: 'linear-gradient(90deg, #ff9f5c, #c8ff57)'
+                            }}
+                          />
+                        </div>
+                        <div className="font-mono text-[11px] text-[#7a7a90] w-4 flex-shrink-0">
+                          {count}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Rating Distribution */}
+            {ratedGames.length > 0 && (
+              <div>
+                <div className="font-mono text-xs text-[#7a7a90] uppercase
+                                tracking-widest mb-5">
+                  Rating Distribution
+                </div>
+                <div className="flex flex-col gap-3">
+                  {Object.entries(ratingBuckets).map(([range, count]) => {
+                    const pct = Math.round((count / maxRatingCount) * 100)
+                    return (
+                      <div key={range} className="flex items-center gap-4">
+                        <div className="font-mono text-[11px] text-[#7a7a90]
+                                        w-28 flex-shrink-0 text-right">
+                          {range} / 10
+                        </div>
+                        <div className="flex-1 h-2 bg-[#2a2a35] rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${pct}%`,
+                              background: 'linear-gradient(90deg, #ff5c5c, #ff9f5c)'
+                            }}
+                          />
+                        </div>
+                        <div className="font-mono text-[11px] text-[#7a7a90] w-4 flex-shrink-0">
+                          {count}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* ── Right column ── */}
+          <div className="flex flex-col gap-10">
+
+            {/* Top Rated Games */}
+            {ratedGames.length > 0 && (
+              <div>
+                <div className="font-mono text-xs text-[#7a7a90] uppercase
+                                tracking-widest mb-5">
+                  Your Top Rated
+                </div>
+                <div className="flex flex-col gap-2">
+                  {[...ratedGames]
+                    .sort((a, b) => b.rating - a.rating)
+                    .slice(0, 5)
+                    .map((game, index) => {
+                      const imageUrl = game.cover
+                        ? game.cover
+                        : game.steamId
+                          ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
+                          : null
+                      return (
+                        <div
+                          key={game._id}
+                          className="flex items-center gap-4 bg-[#111118] border
+                                     border-[#2a2a35] rounded-lg p-3
+                                     hover:border-[#c8ff57]/30 transition-all"
+                        >
+                          <div
+                            className="font-black text-2xl text-[#2a2a35] w-6
+                                       text-center flex-shrink-0"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                          >
+                            {index + 1}
+                          </div>
+                          <div
+                            className="w-10 h-14 rounded bg-[#18181f] bg-cover
+                                       bg-center flex-shrink-0"
+                            style={{
+                              backgroundImage: imageUrl ? `url(${imageUrl})` : 'none'
+                            }}
+                          >
+                            {!imageUrl && (
+                              <div className="w-full h-full flex items-center
+                                              justify-center text-lg">🎮</div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-white font-semibold text-sm truncate">
+                              {game.title}
+                            </div>
+                            <div className="font-mono text-[10px] text-[#7a7a90] mt-1">
+                              {game.genre}
+                            </div>
+                          </div>
+                          <div
+                            className="font-black text-2xl text-[#c8ff57] flex-shrink-0"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                          >
+                            {game.rating}
+                            <small className="font-mono text-[10px] text-[#7a7a90] font-normal">
+                              /10
+                            </small>
+                          </div>
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* Most Played Games (by hours) */}
+            {games.some(g => g.hours > 0) && (
+              <div>
+                <div className="font-mono text-xs text-[#7a7a90] uppercase
+                                tracking-widest mb-5">
+                  Most Played
+                </div>
+                <div className="flex flex-col gap-2">
+                  {[...games]
+                    .filter(g => g.hours > 0)
+                    .sort((a, b) => b.hours - a.hours)
+                    .slice(0, 5)
+                    .map((game, index) => {
+                      const imageUrl = game.cover
+                        ? game.cover
+                        : game.steamId
+                          ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
+                          : null
+                      return (
+                        <div
+                          key={game._id}
+                          className="flex items-center gap-4 bg-[#111118] border
+                                     border-[#2a2a35] rounded-lg p-3
+                                     hover:border-[#c8ff57]/30 transition-all"
+                        >
+                          <div
+                            className="font-black text-2xl text-[#2a2a35] w-6
+                                       text-center flex-shrink-0"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                          >
+                            {index + 1}
+                          </div>
+                          <div
+                            className="w-10 h-14 rounded bg-[#18181f] bg-cover
+                                       bg-center flex-shrink-0"
+                            style={{
+                              backgroundImage: imageUrl ? `url(${imageUrl})` : 'none'
+                            }}
+                          >
+                            {!imageUrl && (
+                              <div className="w-full h-full flex items-center
+                                              justify-center text-lg">🎮</div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-white font-semibold text-sm truncate">
+                              {game.title}
+                            </div>
+                            <div className="font-mono text-[10px] text-[#7a7a90] mt-1">
+                              {game.genre}
+                            </div>
+                          </div>
+                          <div
+                            className="font-black text-2xl text-[#5c9fff] flex-shrink-0"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                          >
+                            {game.hours}
+                            <small className="font-mono text-[10px] text-[#7a7a90] font-normal">
+                              h
+                            </small>
+                          </div>
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              </div>
+            )}
+
+            {/* Quick Insights */}
+            <div>
+              <div className="font-mono text-xs text-[#7a7a90] uppercase
+                              tracking-widest mb-5">
+                Quick Insights
+              </div>
+              <div className="bg-[#111118] border border-[#2a2a35] rounded-lg
+                              overflow-hidden">
+                {[
+                  {
+                    label: 'Favourite Genre',
+                    value: genreList[0]?.[0] || '—'
+                  },
+                  {
+                    label: 'Favourite Platform',
+                    value: platformList[0]?.[0] || '—'
+                  },
+                  {
+                    label: 'Longest Game',
+                    value: longestGame
+                      ? `${longestGame.title} (${longestGame.hours}h)`
+                      : '—'
+                  },
+                  {
+                    label: 'Highest Rated',
+                    value: highestRated
+                      ? `${highestRated.title} (${highestRated.rating}/10)`
+                      : '—'
+                  },
+                  {
+                    label: 'Completion Rate',
+                    value: `${completionRate}%`
+                  },
+                  {
+                    label: 'Avg Hours Per Game',
+                    value: `${avgHours}h`
+                  },
+                  {
+                    label: 'Games Rated',
+                    value: `${ratedGames.length} of ${totalGames}`
+                  },
+                  {
+                    label: 'Total Genres Explored',
+                    value: genreList.length
+                  },
+                ].map((item, i, arr) => (
+                  <div
+                    key={item.label}
+                    className={`flex items-center justify-between px-5 py-3
+                               ${i < arr.length - 1 ? 'border-b border-[#2a2a35]' : ''}
+                               hover:bg-[#18181f] transition-all`}
+                  >
+                    <span className="font-mono text-[11px] text-[#7a7a90] uppercase
+                                     tracking-wider">
+                      {item.label}
+                    </span>
+                    <span className="font-mono text-[11px] text-[#c8ff57] font-bold
+                                     text-right max-w-[180px] truncate">
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
         </div>
-    )
+
+        {/* Empty state */}
+        {games.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="text-5xl">📊</div>
+            <div
+              className="text-white font-black text-2xl tracking-widest uppercase"
+              style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+            >
+              No data yet
+            </div>
+            <div className="text-[#7a7a90] font-mono text-sm">
+              Start logging games to see your stats
+            </div>
+            <button
+              onClick={() => navigate('/library')}
+              className="px-6 py-3 bg-[#c8ff57] text-black font-bold
+                         text-sm rounded hover:bg-[#d4ff6e] transition-all"
+            >
+              + Log a Game
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  )
 }
 
 export default Stats
