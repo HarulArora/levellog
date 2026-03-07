@@ -1,29 +1,14 @@
-// games.js — all API endpoints related to games
-// Each endpoint is a URL the frontend can call
-
 import express from 'express'
 import Game from '../models/Game.js'
 
-// Router is like a mini Express app just for game routes
 const router = express.Router()
 
-
 // ── GET /api/games ──
-// Get all games
-// Frontend calls this to load the library
 router.get('/', async (req, res) => {
     try {
-        // find() with no arguments returns ALL games
-        // sort by newest first using createdAt
         const games = await Game.find().sort({ createdAt: -1 })
-
-        res.json({
-            success: true,
-            games
-        })
-
+        res.json({ success: true, games })
     } catch (error) {
-        // If something goes wrong — send error response
         res.status(500).json({
             success: false,
             message: 'Failed to fetch games',
@@ -32,16 +17,98 @@ router.get('/', async (req, res) => {
     }
 })
 
+// ── GET /api/games/user/:userId ──
+router.get('/user/:userId', async (req, res) => {
+    try {
+        const games = await Game.find({
+            userId: req.params.userId
+        }).sort({ createdAt: -1 })
+        res.json({ success: true, games })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch games',
+            error: error.message
+        })
+    }
+})
+
+// ── GET /api/games/activity/:userId ──
+router.get('/activity/:userId', async (req, res) => {
+    try {
+        const games = await Game.find({
+            userId: req.params.userId
+        }).sort({ updatedAt: -1 }).limit(20)
+
+        const activity = []
+
+        games.forEach(game => {
+            if (game.status === 'completed') {
+                activity.push({
+                    type: 'completed',
+                    game: { title: game.title, cover: game.cover, id: game._id },
+                    rating: game.rating > 0 ? game.rating : null,
+                    time: game.updatedAt
+                })
+            } else if (game.status === 'playing') {
+                activity.push({
+                    type: 'playing',
+                    game: { title: game.title, cover: game.cover, id: game._id },
+                    time: game.updatedAt
+                })
+            } else if (game.status === 'dropped') {
+                activity.push({
+                    type: 'dropped',
+                    game: { title: game.title, cover: game.cover, id: game._id },
+                    hours: game.hours,
+                    time: game.updatedAt
+                })
+            } else if (game.status === 'planned') {
+                activity.push({
+                    type: 'planned',
+                    game: { title: game.title, cover: game.cover, id: game._id },
+                    time: game.createdAt
+                })
+            } else if (game.status === 'paused') {
+                activity.push({
+                    type: 'paused',
+                    game: { title: game.title, cover: game.cover, id: game._id },
+                    time: game.updatedAt
+                })
+            }
+
+            if (game.rating > 0 && game.status !== 'completed') {
+                activity.push({
+                    type: 'rated',
+                    game: { title: game.title, cover: game.cover, id: game._id },
+                    rating: game.rating,
+                    time: game.updatedAt
+                })
+            }
+        })
+
+        activity.sort((a, b) => new Date(b.time) - new Date(a.time))
+
+        res.json({ success: true, activity: activity.slice(0, 20) })
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch activity',
+            error: error.message
+        })
+    }
+})
 
 // ── POST /api/games ──
-// Add a new game
-// Frontend sends game data in request body
 router.post('/', async (req, res) => {
     try {
-        // req.body contains the data sent from frontend
-        const { title, genre, status, rating, hours, platforms, steamId, notes } = req.body
+        const {
+            title, genre, status, rating,
+            hours, platforms, steamId,
+            notes, cover, summary, igdbId, userId
+        } = req.body
 
-        // Validate — title is required
         if (!title) {
             return res.status(400).json({
                 success: false,
@@ -49,19 +116,13 @@ router.post('/', async (req, res) => {
             })
         }
 
-        // Create new game document using our Game model
         const newGame = new Game({
-            title,
-            genre,
-            status,
-            rating,
-            hours,
-            platforms,
-            steamId,
-            notes
+            userId: userId || null,
+            title, genre, status, rating,
+            hours, platforms, steamId,
+            notes, cover, summary, igdbId
         })
 
-        // Save to MongoDB
         const savedGame = await newGame.save()
 
         res.status(201).json({
@@ -79,17 +140,13 @@ router.post('/', async (req, res) => {
     }
 })
 
-
 // ── PUT /api/games/:id ──
-// Update a game by its ID
-// :id is a URL parameter — /api/games/abc123
 router.put('/:id', async (req, res) => {
     try {
-        // req.params.id gets the :id from the URL
         const game = await Game.findByIdAndUpdate(
             req.params.id,
-            req.body,           // update with data from frontend
-            { new: true }       // return the updated document
+            req.body,
+            { new: true }
         )
 
         if (!game) {
@@ -99,11 +156,7 @@ router.put('/:id', async (req, res) => {
             })
         }
 
-        res.json({
-            success: true,
-            message: 'Game updated',
-            game
-        })
+        res.json({ success: true, message: 'Game updated', game })
 
     } catch (error) {
         res.status(500).json({
@@ -114,9 +167,7 @@ router.put('/:id', async (req, res) => {
     }
 })
 
-
 // ── DELETE /api/games/:id ──
-// Delete a game by its ID
 router.delete('/:id', async (req, res) => {
     try {
         const game = await Game.findByIdAndDelete(req.params.id)
@@ -128,10 +179,7 @@ router.delete('/:id', async (req, res) => {
             })
         }
 
-        res.json({
-            success: true,
-            message: 'Game deleted'
-        })
+        res.json({ success: true, message: 'Game deleted' })
 
     } catch (error) {
         res.status(500).json({
@@ -141,6 +189,5 @@ router.delete('/:id', async (req, res) => {
         })
     }
 })
-
 
 export default router

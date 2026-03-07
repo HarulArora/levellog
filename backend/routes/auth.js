@@ -1,39 +1,30 @@
-// auth.js — signup and login endpoints
-
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
+import Notification from '../models/Notification.js'
+import FollowRequest from '../models/FollowRequest.js'
 import protect from '../middleware/auth.js'
 
 const router = express.Router()
 
-
-// ── Helper: Create JWT Token ──
-// We use this in both signup and login
 const createToken = (userId) => {
     return jwt.sign(
-        { userId },                   // payload — data stored in token
-        process.env.JWT_SECRET,       // secret key to sign with
-        { expiresIn: '30d' }          // token expires in 30 days
+        { userId },
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' }
     )
 }
 
-
 // ── POST /api/auth/signup ──
-// Create a new account
 router.post('/signup', async (req, res) => {
     try {
         const { username, email, password } = req.body
-
-        // Validate all fields exist
         if (!username || !email || !password) {
             return res.status(400).json({
                 success: false,
                 message: 'Please provide username, email and password'
             })
         }
-
-        // Check if email already exists
         const emailExists = await User.findOne({ email })
         if (emailExists) {
             return res.status(400).json({
@@ -41,8 +32,6 @@ router.post('/signup', async (req, res) => {
                 message: 'Email already registered'
             })
         }
-
-        // Check if username already exists
         const usernameExists = await User.findOne({ username })
         if (usernameExists) {
             return res.status(400).json({
@@ -50,25 +39,20 @@ router.post('/signup', async (req, res) => {
                 message: 'Username already taken'
             })
         }
-
-        // Create new user
-        // Password gets hashed automatically by our pre-save middleware
         const user = await User.create({ username, email, password })
-
-        // Create JWT token for this user
         const token = createToken(user._id)
-
         res.status(201).json({
             success: true,
             message: 'Account created successfully',
             token,
             user: {
                 id: user._id,
+                _id: user._id,
                 username: user.username,
                 email: user.email,
+                isPrivate: user.isPrivate
             }
         })
-
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -78,33 +62,23 @@ router.post('/signup', async (req, res) => {
     }
 })
 
-
 // ── POST /api/auth/login ──
-// Login with existing account
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body
-
-        // Validate fields exist
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
                 message: 'Please provide email and password'
             })
         }
-
-        // Find user by email
         const user = await User.findOne({ email })
         if (!user) {
             return res.status(401).json({
                 success: false,
-                // Don't say "email not found" — security risk
-                // Always say generic message
                 message: 'Invalid email or password'
             })
         }
-
-        // Check if password is correct using our custom method
         const isPasswordCorrect = await user.comparePassword(password)
         if (!isPasswordCorrect) {
             return res.status(401).json({
@@ -112,21 +86,19 @@ router.post('/login', async (req, res) => {
                 message: 'Invalid email or password'
             })
         }
-
-        // Create token
         const token = createToken(user._id)
-
         res.json({
             success: true,
             message: 'Logged in successfully',
             token,
             user: {
                 id: user._id,
+                _id: user._id,
                 username: user.username,
                 email: user.email,
+                isPrivate: user.isPrivate
             }
         })
-
     } catch (error) {
         res.status(500).json({
             success: false,
@@ -136,17 +108,259 @@ router.post('/login', async (req, res) => {
     }
 })
 
-
 // ── GET /api/auth/me ──
-// Get currently logged in user's data
-// Protected route — requires valid token
 router.get('/me', protect, async (req, res) => {
-    // protect middleware already attached req.user
-    res.json({
-        success: true,
-        user: req.user
-    })
+    res.json({ success: true, user: req.user })
 })
 
+// ── GET /api/auth/profile/:username ──
+router.get('/profile/:username', async (req, res) => {
+    try {
+        const user = await User.findOne({
+            username: req.params.username
+        }).select('-password -email')
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            })
+        }
+        res.json({ success: true, user })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch profile',
+            error: error.message
+        })
+    }
+})
+
+// ── POST /api/auth/follow/:userId ──
+router.post('/follow/:userId', protect, async (req, res) => {
+    try {
+        if (req.params.userId === req.user._id.toString()) {
+            return res.status(400).json({
+                success: false,
+                message: 'You cannot follow yourself'
+            })
+        }
+
+        const userToFollow = await User.findById(req.params.userId)
+        if (!userToFollow) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            })
+        }
+
+        const alreadyFollowing = userToFollow.followers.includes(req.user._id)
+        if (alreadyFollowing) {
+            return res.status(400).json({
+                success: false,
+                message: 'Already following this user'
+            })
+        }
+
+        // ── PRIVATE PROFILE → send request ──
+        if (userToFollow.isPrivate) {
+            const existingRequest = await FollowRequest.findOne({
+                sender: req.user._id,
+                recipient: req.params.userId,
+                status: 'pending'
+            })
+            if (existingRequest) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Follow request already sent'
+                })
+            }
+            await FollowRequest.create({
+                sender: req.user._id,
+                recipient: req.params.userId
+            })
+            await Notification.create({
+                recipient: req.params.userId,
+                sender: req.user._id,
+                type: 'follow_request'
+            })
+            return res.json({
+                success: true,
+                message: 'Follow request sent',
+                type: 'request_sent'
+            })
+        }
+
+        // ── PUBLIC PROFILE → follow directly ──
+        await User.findByIdAndUpdate(req.params.userId, {
+            $push: { followers: req.user._id }
+        })
+        await User.findByIdAndUpdate(req.user._id, {
+            $push: { following: req.params.userId }
+        })
+        await Notification.create({
+            recipient: req.params.userId,
+            sender: req.user._id,
+            type: 'follow'
+        })
+        res.json({
+            success: true,
+            message: `Now following ${userToFollow.username}`,
+            type: 'followed'
+        })
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to follow user',
+            error: error.message
+        })
+    }
+})
+
+// ── POST /api/auth/unfollow/:userId ──
+router.post('/unfollow/:userId', protect, async (req, res) => {
+    try {
+        const userToUnfollow = await User.findById(req.params.userId)
+        if (!userToUnfollow) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            })
+        }
+        await FollowRequest.findOneAndDelete({
+            sender: req.user._id,
+            recipient: req.params.userId,
+            status: 'pending'
+        })
+        await User.findByIdAndUpdate(req.params.userId, {
+            $pull: { followers: req.user._id }
+        })
+        await User.findByIdAndUpdate(req.user._id, {
+            $pull: { following: req.params.userId }
+        })
+        res.json({
+            success: true,
+            message: `Unfollowed ${userToUnfollow.username}`
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to unfollow user',
+            error: error.message
+        })
+    }
+})
+
+// ── PATCH /api/auth/privacy ──
+router.patch('/privacy', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+        user.isPrivate = !user.isPrivate
+        await user.save()
+        res.json({
+            success: true,
+            message: user.isPrivate ? 'Profile is now private' : 'Profile is now public',
+            isPrivate: user.isPrivate
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update privacy',
+            error: error.message
+        })
+    }
+})
+
+// ── GET /api/auth/feed ──
+router.get('/feed', protect, async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.user._id)
+        if (currentUser.following.length === 0) {
+            return res.json({
+                success: true,
+                games: [],
+                message: 'Follow some users to see their games here'
+            })
+        }
+        const Game = (await import('../models/Game.js')).default
+        const games = await Game.find({
+            userId: { $in: currentUser.following }
+        })
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .populate('userId', 'username')
+        res.json({ success: true, games })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch feed',
+            error: error.message
+        })
+    }
+})
+
+// ── GET /api/auth/search?q=username ──
+router.get('/search', async (req, res) => {
+    try {
+        const query = req.query.q
+        if (!query || query.trim().length < 2) {
+            return res.json({ success: true, users: [] })
+        }
+        const users = await User.find({
+            username: { $regex: query.trim(), $options: 'i' }
+        })
+            .select('-password -email')
+            .limit(10)
+        res.json({ success: true, users })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Search failed',
+            error: error.message
+        })
+    }
+})
+
+// ── GET /api/auth/followers/:userId ──
+router.get('/followers/:userId', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId)
+            .populate('followers', 'username bio isPrivate followers')
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            })
+        }
+        res.json({ success: true, users: user.followers })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch followers',
+            error: error.message
+        })
+    }
+})
+
+// ── GET /api/auth/following/:userId ──
+router.get('/following/:userId', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId)
+            .populate('following', 'username bio isPrivate followers')
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            })
+        }
+        res.json({ success: true, users: user.following })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch following',
+            error: error.message
+        })
+    }
+})
 
 export default router

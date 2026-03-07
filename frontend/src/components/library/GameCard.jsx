@@ -76,8 +76,8 @@ function GameCard({ game, onDelete }) {
 
                 {/* Game title */}
                 {/* group-hover → title turns green when card is hovered */}
-                <div className="font-semibold text-sm mb-2 truncate
-                        group-hover:text-[#c8ff57] transition-colors">
+                <div className="font-semibold text-sm mb-2 truncate text-white
+                group-hover:text-[#c8ff57] transition-colors">
                     {game.title}
                 </div>
 

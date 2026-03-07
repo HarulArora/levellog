@@ -88,9 +88,10 @@ function GameSearch({ onSelect }) {
 
       {/* Search Results Dropdown */}
       {showResults && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1
-                        bg-[#18181f] border border-[#2a2a35] rounded-lg
-                        overflow-hidden z-50 shadow-2xl">
+              <div className="absolute top-full left-0 right-0 mt-1
+                bg-[#18181f] border border-[#2a2a35] rounded-lg
+                overflow-y-auto z-50 shadow-2xl
+                max-h-[300px]">
           {results.map(game => (
             <div
               key={game.igdbId}
@@ -115,9 +116,9 @@ function GameSearch({ onSelect }) {
 
               {/* Game info */}
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm truncate">
-                  {game.title}
-                </div>
+                      <div className="font-semibold text-sm truncate text-white">
+                          {game.title}
+                      </div>
                 <div className="font-mono text-[10px] text-[#7a7a90] mt-1">
                   {game.genres.slice(0, 2).join(' · ')}
                   {game.releaseYear && ` · ${game.releaseYear}`}

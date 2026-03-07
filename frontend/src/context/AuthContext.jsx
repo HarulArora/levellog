@@ -1,62 +1,76 @@
-// AuthContext.jsx
-// Global auth state — stores the logged in user
-// Any component in the app can access this
-
 import { createContext, useContext, useState, useEffect } from 'react'
 import api from '../api/axios'
 
-// Step 1 — Create the context (like creating a radio station)
 const AuthContext = createContext()
 
-// Step 2 — Create the Provider (like the radio tower that broadcasts)
-// Wrap your whole app in this so every component can tune in
 export function AuthProvider({ children }) {
 
-    // The logged in user — null means not logged in
     const [user, setUser] = useState(null)
-
-    // Loading while we check if user is already logged in
     const [loading, setLoading] = useState(true)
 
-
-    // ── CHECK IF ALREADY LOGGED IN ──
-    // When app starts — check if there's a saved token
-    // If yes — fetch user data and stay logged in
+    // ── CHECK IF USER IS ALREADY LOGGED IN ──
+    // Runs once when app starts
+    // Reads token from localStorage and fetches user data
     useEffect(() => {
-        const token = localStorage.getItem('levellog_token')
+        const initAuth = async () => {
+            const token = localStorage.getItem('levellog_token')
 
-        if (token) {
-            // Add token to all future Axios requests automatically
-            api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+            if (!token) {
+                setLoading(false)
+                return
+            }
 
-            // Verify token and get user data
-            api.get('/auth/me')
-                .then(res => setUser(res.data.user))
-                .catch(() => {
-                    // Token is invalid or expired — clear it
-                    localStorage.removeItem('levellog_token')
-                    delete api.defaults.headers.common['Authorization']
+            try {
+                // Set token in axios headers
+                api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
+                // Fetch current user data
+                const res = await api.get('/auth/me')
+
+                setUser({
+                    id: res.data.user._id || res.data.user.id,
+                    _id: res.data.user._id || res.data.user.id,
+                    username: res.data.user.username,
+                    email: res.data.user.email,
+                    isPrivate: res.data.user.isPrivate || false
                 })
-                .finally(() => setLoading(false))
-        } else {
-            setLoading(false)
-        }
-    }, [])
 
+            } catch (err) {
+                // Token invalid or expired — clear it
+                localStorage.removeItem('levellog_token')
+                delete api.defaults.headers.common['Authorization']
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        initAuth()
+    }, [])
 
     // ── SIGNUP ──
     const signup = async (username, email, password) => {
         try {
-            const res = await api.post('/auth/signup', { username, email, password })
+            const res = await api.post('/auth/signup', {
+                username,
+                email,
+                password
+            })
 
-            // Save token to localStorage — persists across page refreshes
-            localStorage.setItem('levellog_token', res.data.token)
+            const { token, user: userData } = res.data
 
-            // Set token in Axios headers for future requests
-            api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`
+            // Save token to localStorage
+            localStorage.setItem('levellog_token', token)
 
-            // Save user in state
-            setUser(res.data.user)
+            // Set token in axios headers for future requests
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
+            setUser({
+                id: userData.id || userData._id,
+                _id: userData.id || userData._id,
+                username: userData.username,
+                email: userData.email,
+                isPrivate: userData.isPrivate || false
+            })
 
             return { success: true }
 
@@ -68,15 +82,23 @@ export function AuthProvider({ children }) {
         }
     }
 
-
     // ── LOGIN ──
     const login = async (email, password) => {
         try {
             const res = await api.post('/auth/login', { email, password })
 
-            localStorage.setItem('levellog_token', res.data.token)
-            api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`
-            setUser(res.data.user)
+            const { token, user: userData } = res.data
+
+            localStorage.setItem('levellog_token', token)
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
+            setUser({
+                id: userData.id || userData._id,
+                _id: userData.id || userData._id,
+                username: userData.username,
+                email: userData.email,
+                isPrivate: userData.isPrivate || false
+            })
 
             return { success: true }
 
@@ -88,33 +110,27 @@ export function AuthProvider({ children }) {
         }
     }
 
-
     // ── LOGOUT ──
     const logout = () => {
-        // Remove token from localStorage
         localStorage.removeItem('levellog_token')
-
-        // Remove token from Axios headers
         delete api.defaults.headers.common['Authorization']
-
-        // Clear user from state
         setUser(null)
     }
 
-
-    // Step 3 — Broadcast these values to all components
     return (
         <AuthContext.Provider value={{ user, loading, signup, login, logout }}>
-            {/* Only render children after we know auth status */}
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     )
 }
 
-
-// Step 4 — Custom hook to easily USE the context
-// Instead of writing useContext(AuthContext) everywhere
-// Just write useAuth()
+// Custom hook to use auth context anywhere
 export function useAuth() {
-    return useContext(AuthContext)
+    const context = useContext(AuthContext)
+    if (!context) {
+        throw new Error('useAuth must be used inside AuthProvider')
+    }
+    return context
 }
+
+export default AuthContext
