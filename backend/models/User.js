@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
             default: '',
             maxlength: 200,
         },
+        avatar: {
+            type: String,
+            default: '',
+        },
         isPrivate: {
             type: Boolean,
             default: false
@@ -44,8 +48,6 @@ const userSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
-
-        // ── XP & LEVELING ──
         xp: {
             type: Number,
             default: 0
@@ -58,16 +60,12 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: '🎮'
         },
-
-        // ── SUBSCRIPTION ──
         isPro: {
             type: Boolean,
             default: false
         }
     },
-    {
-        timestamps: true,
-    }
+    { timestamps: true }
 )
 
 userSchema.pre('save', async function () {
@@ -80,5 +78,4 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 }
 
 const User = mongoose.model('User', userSchema)
-
 export default User
