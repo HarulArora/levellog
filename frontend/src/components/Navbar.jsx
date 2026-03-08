@@ -13,6 +13,7 @@ function Navbar() {
     const links = [
         { name: 'HOME', path: '/' },
         { name: 'LIBRARY', path: '/library' },
+        { name: 'LISTS', path: '/lists' },
         { name: 'STATS', path: '/stats' },
         { name: 'FIND FRIENDS', path: '/search' },
     ]

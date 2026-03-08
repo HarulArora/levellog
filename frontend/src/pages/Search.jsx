@@ -151,20 +151,26 @@ function Search() {
                                 </Link>
 
                                 {/* Info */}
+                               
                                 <div className="flex-1 min-w-0">
                                     <Link to={`/user/${u.username}`}>
                                         <div className="text-white font-bold text-sm
-                                    hover:text-[#c8ff57] transition-colors">
+                    hover:text-[#c8ff57] transition-colors">
                                             {u.username}
                                         </div>
                                     </Link>
-                                    <div className="flex items-center gap-3 mt-1">
-                                        <span className="font-mono text-[10px] text-[#7a7a90]">
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-xs">{u.badge || '🎮'}</span>
+                                        <span className="font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                            Lv.{u.level || 1}
+                                        </span>
+                                        <span className="font-mono text-[9px] text-[#7a7a90]">·</span>
+                                        <span className="font-mono text-[9px] text-[#7a7a90]">
                                             {u.followers?.length || 0} followers
                                         </span>
                                         {u.isPrivate && (
-                                            <span className="font-mono text-[10px] text-[#ff5c5c]">
-                                                🔒 Private
+                                            <span className="font-mono text-[9px] text-[#ff5c5c]">
+                                                🔒
                                             </span>
                                         )}
                                     </div>

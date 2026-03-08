@@ -194,21 +194,33 @@ function Profile() {
                     <div className="flex-1 text-center sm:text-left">
 
                         <div className="flex flex-col sm:flex-row items-center
-                            sm:items-start gap-3 mb-2">
+    sm:items-start gap-3 mb-2">
                             <h1
                                 className="font-black text-3xl md:text-4xl tracking-widest
-                           uppercase text-white"
+       uppercase text-white"
                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                             >
                                 {user.username}
                             </h1>
                             {user.isPrivate && (
                                 <span className="font-mono text-[10px] uppercase tracking-wider
-                                 px-2 py-1 rounded-sm bg-[#ff5c5c]/15
-                                 text-[#ff5c5c] border border-[#ff5c5c]/30">
+         px-2 py-1 rounded-sm bg-[#ff5c5c]/15
+         text-[#ff5c5c] border border-[#ff5c5c]/30">
                                     🔒 Private
                                 </span>
                             )}
+                        </div>
+
+                        {/* XP + Level */}
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">{user.badge || '🎮'}</span>
+                            <span className="font-mono text-xs text-[#c8ff57] uppercase tracking-wider">
+                                Level {user.level || 1}
+                            </span>
+                            <span className="font-mono text-xs text-[#7a7a90]">·</span>
+                            <span className="font-mono text-xs text-[#7a7a90]">
+                                {user.xp || 0} XP
+                            </span>
                         </div>
 
                         {user.bio && (

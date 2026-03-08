@@ -4,6 +4,7 @@ import User from '../models/User.js'
 import Notification from '../models/Notification.js'
 import FollowRequest from '../models/FollowRequest.js'
 import protect from '../middleware/auth.js'
+import { awardXP } from '../utils/xp.js'
 
 const router = express.Router()
 
@@ -50,7 +51,10 @@ router.post('/signup', async (req, res) => {
                 _id: user._id,
                 username: user.username,
                 email: user.email,
-                isPrivate: user.isPrivate
+                isPrivate: user.isPrivate,
+                xp: 0,
+                level: 1,
+                badge: '🎮'
             }
         })
     } catch (error) {
@@ -96,7 +100,10 @@ router.post('/login', async (req, res) => {
                 _id: user._id,
                 username: user.username,
                 email: user.email,
-                isPrivate: user.isPrivate
+                isPrivate: user.isPrivate,
+                xp: user.xp || 0,
+                level: user.level || 1,
+                badge: user.badge || '🎮'
             }
         })
     } catch (error) {
@@ -202,6 +209,13 @@ router.post('/follow/:userId', protect, async (req, res) => {
             sender: req.user._id,
             type: 'follow'
         })
+
+        // ── Award XP: +1 for following, +1 for getting followed ──
+        await Promise.all([
+            awardXP(req.user._id, 1),         // follower earns XP
+            awardXP(req.params.userId, 1)      // person being followed earns XP
+        ])
+
         res.json({
             success: true,
             message: `Now following ${userToFollow.username}`,
@@ -325,7 +339,7 @@ router.get('/search', async (req, res) => {
 router.get('/followers/:userId', async (req, res) => {
     try {
         const user = await User.findById(req.params.userId)
-            .populate('followers', 'username bio isPrivate followers')
+            .populate('followers', 'username bio isPrivate followers badge level')
         if (!user) {
             return res.status(404).json({
                 success: false,
@@ -346,7 +360,7 @@ router.get('/followers/:userId', async (req, res) => {
 router.get('/following/:userId', async (req, res) => {
     try {
         const user = await User.findById(req.params.userId)
-            .populate('following', 'username bio isPrivate followers')
+            .populate('following', 'username bio isPrivate followers badge level')
         if (!user) {
             return res.status(404).json({
                 success: false,
