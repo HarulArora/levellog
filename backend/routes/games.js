@@ -5,7 +5,6 @@ import { protect } from '../middleware/auth.js'
 const router = express.Router()
 
 // ── GET /api/games ──
-// Only return games for the logged in user
 router.get('/', protect, async (req, res) => {
     try {
         const games = await Game.find({
@@ -23,7 +22,6 @@ router.get('/', protect, async (req, res) => {
 })
 
 // ── GET /api/games/user/:userId ──
-// Public profile games — only show if profile is public or own profile
 router.get('/user/:userId', async (req, res) => {
     try {
         const games = await Game.find({
@@ -50,36 +48,44 @@ router.get('/activity/:userId', protect, async (req, res) => {
         const activity = []
 
         games.forEach(game => {
+            // ── helper so every activity item carries igdbId ──
+            const gameInfo = {
+                title: game.title,
+                cover: game.cover,
+                id: game._id,
+                igdbId: game.igdbId || null   // ← THE FIX
+            }
+
             if (game.status === 'completed') {
                 activity.push({
                     type: 'completed',
-                    game: { title: game.title, cover: game.cover, id: game._id },
+                    game: gameInfo,
                     rating: game.rating > 0 ? game.rating : null,
                     time: game.updatedAt
                 })
             } else if (game.status === 'playing') {
                 activity.push({
                     type: 'playing',
-                    game: { title: game.title, cover: game.cover, id: game._id },
+                    game: gameInfo,
                     time: game.updatedAt
                 })
             } else if (game.status === 'dropped') {
                 activity.push({
                     type: 'dropped',
-                    game: { title: game.title, cover: game.cover, id: game._id },
+                    game: gameInfo,
                     hours: game.hours,
                     time: game.updatedAt
                 })
             } else if (game.status === 'planned') {
                 activity.push({
                     type: 'planned',
-                    game: { title: game.title, cover: game.cover, id: game._id },
+                    game: gameInfo,
                     time: game.createdAt
                 })
             } else if (game.status === 'paused') {
                 activity.push({
                     type: 'paused',
-                    game: { title: game.title, cover: game.cover, id: game._id },
+                    game: gameInfo,
                     time: game.updatedAt
                 })
             }
@@ -87,7 +93,7 @@ router.get('/activity/:userId', protect, async (req, res) => {
             if (game.rating > 0 && game.status !== 'completed') {
                 activity.push({
                     type: 'rated',
-                    game: { title: game.title, cover: game.cover, id: game._id },
+                    game: gameInfo,
                     rating: game.rating,
                     time: game.updatedAt
                 })
@@ -150,7 +156,6 @@ router.post('/', protect, async (req, res) => {
 // ── PUT /api/games/:id ──
 router.put('/:id', protect, async (req, res) => {
     try {
-        // Make sure the game belongs to the logged in user
         const game = await Game.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
             req.body,
@@ -178,7 +183,6 @@ router.put('/:id', protect, async (req, res) => {
 // ── DELETE /api/games/:id ──
 router.delete('/:id', protect, async (req, res) => {
     try {
-        // Make sure the game belongs to the logged in user
         const game = await Game.findOneAndDelete({
             _id: req.params.id,
             userId: req.user._id
