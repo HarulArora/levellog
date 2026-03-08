@@ -120,7 +120,7 @@ function HeroBanner({ games }) {
     const covers = games
         .filter(g => g.cover)
         .map(g => g.cover)
-        .filter((v, i, a) => a.indexOf(v) === i) // deduplicate
+        .filter((v, i, a) => a.indexOf(v) === i)
 
     if (covers.length === 0) return null
 
@@ -142,11 +142,8 @@ function HeroBanner({ games }) {
         { w: 'w-[142px]', h: 'h-[188px]' },
     ]
 
-    // Shuffle covers randomly
     const shuffled = [...covers].sort(() => Math.random() - 0.5)
 
-    // Split into two halves — row1 gets first half, row2 gets second half
-    // If not enough covers, cycle through them but keep rows different
     const getRow = (startIndex, count) => {
         const row = []
         for (let i = 0; i < count; i++) {
@@ -165,74 +162,38 @@ function HeroBanner({ games }) {
 
     return (
         <div className="absolute inset-0 z-0 overflow-hidden">
-
-            {/* Row 1 — scrolls left */}
             <div className="absolute top-0 left-0 right-0 h-[55%] flex items-end gap-3 pb-2">
                 <div
                     className="flex gap-3 items-end"
-                    style={{
-                        animation: 'mosaicLeft 40s linear infinite',
-                        width: 'max-content'
-                    }}
+                    style={{ animation: 'mosaicLeft 40s linear infinite', width: 'max-content' }}
                 >
-                    {/* Double for seamless loop */}
                     {[...row1Tiles, ...row1Tiles].map((tile, i) => (
-                        <img
-                            key={i}
-                            src={tile.img}
-                            alt=""
-                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`}
-                        />
+                        <img key={i} src={tile.img} alt=""
+                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
                     ))}
                 </div>
             </div>
-
-            {/* Row 2 — scrolls right */}
             <div className="absolute bottom-0 left-0 right-0 h-[55%] flex items-start gap-3 pt-2">
                 <div
                     className="flex gap-3 items-start"
-                    style={{
-                        animation: 'mosaicRight 32s linear infinite',
-                        width: 'max-content'
-                    }}
+                    style={{ animation: 'mosaicRight 32s linear infinite', width: 'max-content' }}
                 >
-                    {/* Double for seamless loop */}
                     {[...row2Tiles, ...row2Tiles].map((tile, i) => (
-                        <img
-                            key={i}
-                            src={tile.img}
-                            alt=""
-                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`}
-                        />
+                        <img key={i} src={tile.img} alt=""
+                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
                     ))}
                 </div>
             </div>
-
-            {/* Blur layer */}
             <div className="absolute inset-0 backdrop-blur-[3px]" />
-
-            {/* Dark overlay */}
             <div className="absolute inset-0 bg-[#0a0a0f]/80" />
-
-            {/* Bottom fade */}
-            <div className="absolute bottom-0 left-0 right-0 h-32
-                            bg-gradient-to-t from-[#0a0a0f] to-transparent" />
-
-            {/* Top fade */}
-            <div className="absolute top-0 left-0 right-0 h-20
-                            bg-gradient-to-b from-[#0a0a0f] to-transparent" />
-
-            {/* Left fade */}
-            <div className="absolute top-0 left-0 bottom-0 w-24
-                            bg-gradient-to-r from-[#0a0a0f] to-transparent" />
-
-            {/* Right fade */}
-            <div className="absolute top-0 right-0 bottom-0 w-24
-                            bg-gradient-to-l from-[#0a0a0f] to-transparent" />
-
+            <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0a0a0f] to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-[#0a0a0f] to-transparent" />
+            <div className="absolute top-0 left-0 bottom-0 w-24 bg-gradient-to-r from-[#0a0a0f] to-transparent" />
+            <div className="absolute top-0 right-0 bottom-0 w-24 bg-gradient-to-l from-[#0a0a0f] to-transparent" />
         </div>
     )
 }
+
 function Home() {
 
     const { user } = useAuth()
@@ -247,6 +208,7 @@ function Home() {
     const [loadingTrending, setLoadingTrending] = useState(true)
     const [loadingComing, setLoadingComing] = useState(true)
     const [loadingActivity, setLoadingActivity] = useState(false)
+    const [gameStats, setGameStats] = useState({})
 
     useEffect(() => {
         const fetch_ = async () => {
@@ -256,8 +218,24 @@ function Home() {
                     api.get('/igdb/trending'),
                     api.get('/igdb/top-rated')
                 ])
-                setTrending(trendRes.data.games.slice(0, 10))
-                setTopRated(topRes.data.games.slice(0, 10))
+                const trendGames = trendRes.data.games.slice(0, 10)
+                const topGames = topRes.data.games.slice(0, 10)
+                setTrending(trendGames)
+                setTopRated(topGames)
+
+                // Fetch real platform stats for all games in one batch
+                const allIds = [...trendGames, ...topGames]
+                    .map(g => g.id)
+                    .filter(Boolean)
+
+                if (allIds.length > 0) {
+                    try {
+                        const statsRes = await api.post('/games/stats/batch', { igdbIds: allIds })
+                        setGameStats(statsRes.data.stats || {})
+                    } catch (err) {
+                        console.error('Batch stats error:', err)
+                    }
+                }
             } catch (err) {
                 console.error('Trending error:', err)
             } finally {
@@ -321,9 +299,12 @@ function Home() {
         return match?.rating > 0 ? match.rating : null
     }
 
+    // Shows: my rating (yellow), platform avg from DB (blue)
+    // If no platform avg exists, shows nothing — no IGDB fallback
     const RatingDisplay = ({ game }) => {
         const myRating = getMyRating(game.id)
-        const avgRating = game.rating
+        const platformAvg = gameStats[game.id]?.avgRating
+
         return (
             <div className="flex flex-col items-end gap-1 flex-shrink-0">
                 {myRating ? (
@@ -344,7 +325,8 @@ function Home() {
                         not rated
                     </div>
                 ) : null}
-                {avgRating && (
+
+                {platformAvg ? (
                     <div className="flex items-center gap-1">
                         <span className="font-mono text-[8px] text-[#7a7a90] uppercase tracking-wider">
                             avg
@@ -353,11 +335,11 @@ function Home() {
                             className="font-black text-lg text-[#5c9fff] leading-none"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                         >
-                            {avgRating}
+                            {platformAvg}
                             <small className="font-mono text-[8px] text-[#7a7a90] font-normal">/10</small>
                         </div>
                     </div>
-                )}
+                ) : null}
             </div>
         )
     }
@@ -370,14 +352,12 @@ function Home() {
             ══════════════════════════ */}
             <section className="relative py-12 md:py-20 overflow-hidden">
 
-                {/* Mosaic banner background */}
                 {!loadingTrending && trending.length > 0 && (
                     <HeroBanner
                         games={[...trending, ...topRated, ...(loadingComing ? [] : comingSoon)]}
                     />
                 )}
 
-                {/* Content */}
                 <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
 
@@ -567,7 +547,6 @@ function Home() {
                                             </div>
                                         )
                                     })}
-
                                     <button
                                         onClick={() => navigate('/library')}
                                         className="w-full py-3 border border-dashed border-[#2a2a35]
@@ -631,12 +610,12 @@ function Home() {
                                 {user.avatar ? (
                                     <img src={user.avatar} alt={user.username}
                                         className="w-10 h-10 rounded-full object-cover flex-shrink-0
-                   ring-2 ring-[#2a2a35]" />
+                                                   ring-2 ring-[#2a2a35]" />
                                 ) : (
                                     <div className="w-10 h-10 rounded-full bg-gradient-to-br
-                    from-[#c8ff57] to-[#5c9fff]
-                    flex items-center justify-center
-                    font-black text-sm text-black flex-shrink-0"
+                                                    from-[#c8ff57] to-[#5c9fff]
+                                                    flex items-center justify-center
+                                                    font-black text-sm text-black flex-shrink-0"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                         {user.username.charAt(0).toUpperCase()}
                                     </div>
@@ -648,11 +627,10 @@ function Home() {
                                     <div className="font-mono text-[10px] text-[#7a7a90]">
                                         @{user.username} · All platforms
                                     </div>
-                                    {/* XP Row */}
                                     <div className="flex items-center gap-2 mt-0.5">
                                         <span className="text-sm flex-shrink-0">{user.badge || '🎮'}</span>
                                         <span className="font-mono text-[10px] text-[#c8ff57] uppercase
-                             tracking-wider flex-shrink-0">
+                                                         tracking-wider flex-shrink-0">
                                             Lv.{user.level || 1}
                                         </span>
                                         <div className="w-20 h-1.5 bg-[#2a2a35] rounded-full flex-shrink-0 overflow-hidden">
@@ -699,7 +677,7 @@ function Home() {
                             <div className="sm:ml-auto">
                                 <Link to="/stats">
                                     <button className="font-mono text-xs text-[#7a7a90]
-                                           hover:text-[#c8ff57] transition-colors">
+                                                       hover:text-[#c8ff57] transition-colors">
                                         View Full Stats →
                                     </button>
                                 </Link>
