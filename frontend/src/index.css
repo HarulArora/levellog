@@ -23,3 +23,23 @@
         transform: translateY(0px);
     }
 }
+
+@keyframes mosaicLeft {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+@keyframes mosaicRight {
+    0% {
+        transform: translateX(-50%);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
+}

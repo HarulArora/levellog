@@ -1,6 +1,3 @@
-// AddGameModal.jsx
-// Updated with IGDB game search and hours hint text
-
 import { useState } from 'react'
 import GameSearch from './GameSearch'
 
@@ -15,6 +12,7 @@ function AddGameModal({ onClose, onAdd }) {
         platforms: [],
         cover: '',
         summary: '',
+        igdbId: '',
     })
 
     const [gameSelected, setGameSelected] = useState(false)
@@ -37,8 +35,6 @@ function AddGameModal({ onClose, onAdd }) {
         }))
     }
 
-    // ── WHEN USER SELECTS A GAME FROM IGDB ──
-    // Auto fill the form with game data
     const handleGameSelect = (game) => {
         setFormData(prev => ({
             ...prev,
@@ -46,6 +42,7 @@ function AddGameModal({ onClose, onAdd }) {
             genre: game.genres[0] || '',
             cover: game.cover || '',
             summary: game.summary || '',
+            igdbId: game.igdbId || '',   // ← THE FIX
             platforms: game.platforms
                 .map(p => {
                     if (p.includes('PC')) return 'PC'
@@ -70,20 +67,17 @@ function AddGameModal({ onClose, onAdd }) {
     }
 
     return (
-        // Overlay
         <div
             className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50
-                 flex items-center justify-center p-4"
+                       flex items-center justify-center p-4"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-
-            {/* Modal box */}
             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg
-                      w-full max-w-md max-h-[90vh] overflow-y-auto">
+                            w-full max-w-md max-h-[90vh] overflow-y-auto">
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-5
-                        border-b border-[#2a2a35]">
+                                border-b border-[#2a2a35]">
                     <h3
                         className="font-black text-lg tracking-widest uppercase text-white"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}
@@ -101,10 +95,10 @@ function AddGameModal({ onClose, onAdd }) {
                 {/* Form Body */}
                 <div className="p-5 flex flex-col gap-4">
 
-                    {/* ── IGDB Search ── */}
+                    {/* IGDB Search */}
                     <div>
                         <label className="block font-mono text-xs uppercase tracking-wider
-                              text-[#7a7a90] mb-2">
+                                          text-[#7a7a90] mb-2">
                             Search Game
                         </label>
                         <GameSearch onSelect={handleGameSelect} />
@@ -113,7 +107,7 @@ function AddGameModal({ onClose, onAdd }) {
                     {/* Selected game preview */}
                     {gameSelected && formData.cover && (
                         <div className="flex items-center gap-3 bg-[#18181f]
-                            border border-[#c8ff57]/20 rounded-lg p-3">
+                                        border border-[#c8ff57]/20 rounded-lg p-3">
                             <img
                                 src={formData.cover}
                                 alt={formData.title}
@@ -129,6 +123,11 @@ function AddGameModal({ onClose, onAdd }) {
                                 <div className="text-[#c8ff57] font-mono text-[10px] mt-1">
                                     ✓ Game data loaded automatically
                                 </div>
+                                {formData.igdbId && (
+                                    <div className="text-[#5c9fff] font-mono text-[10px] mt-0.5">
+                                        ✓ Game page linked
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -137,7 +136,7 @@ function AddGameModal({ onClose, onAdd }) {
                     {!gameSelected && (
                         <div>
                             <label className="block font-mono text-xs uppercase tracking-wider
-                                text-[#7a7a90] mb-2">
+                                              text-[#7a7a90] mb-2">
                                 Or enter title manually
                             </label>
                             <input
@@ -146,9 +145,9 @@ function AddGameModal({ onClose, onAdd }) {
                                 value={formData.title}
                                 onChange={e => handleChange('title', e.target.value)}
                                 className="w-full bg-[#18181f] border border-[#2a2a35] rounded
-                           px-3 py-2 text-sm text-white
-                           focus:outline-none focus:border-[#c8ff57]
-                           placeholder:text-[#7a7a90] transition-colors"
+                                           px-3 py-2 text-sm text-white
+                                           focus:outline-none focus:border-[#c8ff57]
+                                           placeholder:text-[#7a7a90] transition-colors"
                             />
                         </div>
                     )}
@@ -156,16 +155,16 @@ function AddGameModal({ onClose, onAdd }) {
                     {/* Status */}
                     <div>
                         <label className="block font-mono text-xs uppercase tracking-wider
-                              text-[#7a7a90] mb-2">
+                                          text-[#7a7a90] mb-2">
                             Status
                         </label>
                         <select
                             value={formData.status}
                             onChange={e => handleChange('status', e.target.value)}
                             className="w-full bg-[#18181f] border border-[#2a2a35] rounded
-                         px-3 py-2 text-sm text-white
-                         focus:outline-none focus:border-[#c8ff57]
-                         transition-colors"
+                                       px-3 py-2 text-sm text-white
+                                       focus:outline-none focus:border-[#c8ff57]
+                                       transition-colors"
                         >
                             {statuses.map(s => (
                                 <option key={s} value={s}>
@@ -178,7 +177,7 @@ function AddGameModal({ onClose, onAdd }) {
                     {/* Hours */}
                     <div>
                         <label className="block font-mono text-xs uppercase tracking-wider
-                              text-[#7a7a90] mb-2">
+                                          text-[#7a7a90] mb-2">
                             Hours Played
                         </label>
                         <input
@@ -188,11 +187,10 @@ function AddGameModal({ onClose, onAdd }) {
                             value={formData.hours}
                             onChange={e => handleChange('hours', e.target.value)}
                             className="w-full bg-[#18181f] border border-[#2a2a35] rounded
-                         px-3 py-2 text-sm text-white
-                         focus:outline-none focus:border-[#c8ff57]
-                         placeholder:text-[#7a7a90] transition-colors"
+                                       px-3 py-2 text-sm text-white
+                                       focus:outline-none focus:border-[#c8ff57]
+                                       placeholder:text-[#7a7a90] transition-colors"
                         />
-                        {/* Hint text — makes users feel comfortable entering estimates */}
                         <p className="text-[#7a7a90] font-mono text-[10px] mt-1">
                             💡 Your estimate is fine — this is your personal diary
                         </p>
@@ -201,7 +199,7 @@ function AddGameModal({ onClose, onAdd }) {
                     {/* Rating */}
                     <div>
                         <label className="block font-mono text-xs uppercase tracking-wider
-                              text-[#7a7a90] mb-2">
+                                          text-[#7a7a90] mb-2">
                             Your Rating
                         </label>
                         <div className="flex gap-2 flex-wrap">
@@ -211,8 +209,8 @@ function AddGameModal({ onClose, onAdd }) {
                                     type="button"
                                     onClick={() => handleChange('rating', r)}
                                     className={`w-9 h-9 rounded font-mono text-sm font-bold
-                             border transition-all
-                             ${formData.rating === r
+                                               border transition-all
+                                               ${formData.rating === r
                                             ? 'bg-[#c8ff57] text-black border-[#c8ff57]'
                                             : 'bg-[#18181f] text-[#7a7a90] border-[#2a2a35] hover:border-[#c8ff57]'
                                         }`}
@@ -226,7 +224,7 @@ function AddGameModal({ onClose, onAdd }) {
                     {/* Platforms */}
                     <div>
                         <label className="block font-mono text-xs uppercase tracking-wider
-                              text-[#7a7a90] mb-2">
+                                          text-[#7a7a90] mb-2">
                             Platforms
                         </label>
                         <div className="flex gap-2 flex-wrap">
@@ -236,8 +234,8 @@ function AddGameModal({ onClose, onAdd }) {
                                     type="button"
                                     onClick={() => togglePlatform(p)}
                                     className={`px-3 py-1 rounded font-mono text-xs
-                             border transition-all
-                             ${formData.platforms.includes(p)
+                                               border transition-all
+                                               ${formData.platforms.includes(p)
                                             ? 'bg-[#c8ff57]/15 text-[#c8ff57] border-[#c8ff57]/50'
                                             : 'bg-[#18181f] text-[#7a7a90] border-[#2a2a35] hover:border-[#c8ff57]'
                                         }`}
@@ -248,13 +246,13 @@ function AddGameModal({ onClose, onAdd }) {
                         </div>
                     </div>
 
-                    {/* Submit button */}
+                    {/* Submit */}
                     <button
                         onClick={handleSubmit}
                         disabled={submitting || !formData.title.trim()}
                         className="w-full py-3 bg-[#c8ff57] text-black font-bold text-sm
-                       rounded hover:bg-[#d4ff6e] transition-all
-                       disabled:opacity-40 disabled:cursor-not-allowed mt-2"
+                                   rounded hover:bg-[#d4ff6e] transition-all
+                                   disabled:opacity-40 disabled:cursor-not-allowed mt-2"
                     >
                         {submitting ? 'Logging...' : '🎮 Log Game'}
                     </button>
