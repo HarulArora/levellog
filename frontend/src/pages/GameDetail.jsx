@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext'
 import useGames from '../hooks/useGames'
 import AddGameModal from '../components/library/AddGameModal'
 
-
 function GameDetail() {
 
     const { igdbId } = useParams()
@@ -18,7 +17,6 @@ function GameDetail() {
     const [error, setError] = useState(null)
     const [activeTab, setActiveTab] = useState('overview')
     const [expanded, setExpanded] = useState(false)
-
 
     // Add to library modal
     const [showAddModal, setShowAddModal] = useState(false)
@@ -46,6 +44,9 @@ function GameDetail() {
     // XP toast
     const [xpToast, setXpToast] = useState(null)
 
+    // Platform stats
+    const [platformStats, setPlatformStats] = useState(null)
+
     const showXpToast = (msg) => {
         setXpToast(msg)
         setTimeout(() => setXpToast(null), 3000)
@@ -61,6 +62,15 @@ function GameDetail() {
         g.title?.toLowerCase() === game?.title?.toLowerCase()
     )
 
+    const fetchPlatformStats = async () => {
+        try {
+            const res = await api.get(`/games/stats/${igdbId}`)
+            setPlatformStats(res.data.stats)
+        } catch (err) {
+            console.error('Platform stats error:', err)
+        }
+    }
+
     useEffect(() => {
         const fetchGame = async () => {
             try {
@@ -68,6 +78,7 @@ function GameDetail() {
                 setError(null)
                 const res = await api.get(`/igdb/game/${igdbId}`)
                 setGame(res.data.game)
+                await fetchPlatformStats()
             } catch (err) {
                 setError('Failed to load game details')
             } finally {
@@ -111,44 +122,7 @@ function GameDetail() {
             .catch(() => { })
     }, [game])
 
-    // Open add to library modal
-    // const handleOpenAddModal = () => {
-    //     setAddForm({ status: 'planned', hours: '', rating: '', notes: '' })
-    //     setAddSaved(false)
-    //     setShowAddModal(true)
-    // }
-
-    // // Save from add modal
-    // const handleAddToLibrary = async () => {
-    //     if (!addForm.status) return
-    //     setAddSaving(true)
-    //     try {
-    //         await addGame({
-    //             title: game.title,
-    //             genre: game.genre,
-    //             status: addForm.status,
-    //             hours: parseInt(addForm.hours) || 0,
-    //             rating: parseFloat(addForm.rating) || 0,
-    //             notes: addForm.notes || '',
-    //             cover: game.cover,
-    //             summary: game.summary,
-    //             igdbId: game.id,
-    //             platforms: game.platforms,
-    //         })
-    //         setAddSaved(true)
-    //         setTimeout(() => {
-    //             setShowAddModal(false)
-    //             setAddSaved(false)
-    //         }, 1200)
-    //     } catch (err) {
-    //         console.error('Add error:', err)
-    //     } finally {
-    //         setAddSaving(false)
-    //     }
-    // }
-
     const handleOpenAddModal = () => setShowAddModal(true)
-
 
     const handleLike = async () => {
         if (!user || liking) return
@@ -162,6 +136,7 @@ function GameDetail() {
             })
             setLiked(res.data.liked)
             if (res.data.liked) showXpToast('❤️ Liked! +1 XP')
+            await fetchPlatformStats()
         } catch (err) {
             console.error('Like error:', err)
         } finally {
@@ -189,7 +164,6 @@ function GameDetail() {
         }
     }
 
-    // Open add to list modal — fetch custom lists
     const handleOpenListModal = async () => {
         setShowListModal(true)
         setLoadingLists(true)
@@ -239,6 +213,7 @@ function GameDetail() {
             setReviewSaved(true)
             setTimeout(() => setReviewSaved(false), 2000)
             if (res.data.xp !== undefined) showXpToast('✍️ Review posted! +1 XP')
+            await fetchPlatformStats()
         } catch (err) {
             console.error('Review error:', err)
         } finally {
@@ -322,7 +297,6 @@ function GameDetail() {
             {/* ══ HERO ══ */}
             <div className="relative overflow-hidden min-h-[420px]">
 
-                {/* Background — brighter blur */}
                 {game.cover && (
                     <div className="absolute inset-0 bg-cover bg-center scale-110"
                         style={{
@@ -331,10 +305,8 @@ function GameDetail() {
                         }}
                     />
                 )}
-                {/* Gradient overlay — lighter so bg colour shows through */}
                 <div className="absolute inset-0 bg-gradient-to-b
                                 from-[#0a0a0f]/40 via-[#0a0a0f]/55 to-[#0a0a0f]" />
-                {/* Bottom fade */}
                 <div className="absolute bottom-0 left-0 right-0 h-32
                                 bg-gradient-to-t from-[#0a0a0f] to-transparent" />
 
@@ -351,8 +323,7 @@ function GameDetail() {
                         {game.cover && (
                             <div className="flex-shrink-0 drop-shadow-2xl">
                                 <img src={game.cover} alt={game.title}
-                                    className="w-36 md:w-48 rounded-lg shadow-2xl
-                                               ring-1 ring-white/10" />
+                                    className="w-36 md:w-48 rounded-lg shadow-2xl ring-1 ring-white/10" />
                             </div>
                         )}
 
@@ -385,8 +356,10 @@ function GameDetail() {
                                     ))}
                             </div>
 
-                            {/* Scores */}
-                            <div className="flex gap-8 mb-8">
+                            {/* ══ SCORES ══ */}
+                            <div className="flex flex-wrap gap-8 mb-8">
+
+                                {/* Critic Score — from IGDB */}
                                 {game.criticScore && (
                                     <div>
                                         <div className="font-black text-4xl text-[#c8ff57] leading-none"
@@ -398,51 +371,67 @@ function GameDetail() {
                                         </div>
                                     </div>
                                 )}
-                                {game.userScore && (
-                                    <div>
-                                        <div className="font-black text-4xl text-[#5c9fff] leading-none"
-                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                            {game.userScore}
-                                        </div>
-                                        <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
-                                            AVG RATING
-                                        </div>
+
+                                {/* Avg Rating — real from your DB */}
+                                <div>
+                                    <div className="font-black text-4xl text-[#5c9fff] leading-none"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                        {platformStats?.avgRating ?? '—'}
+                                        {platformStats?.avgRating && (
+                                            <small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>
+                                        )}
                                     </div>
-                                )}
-                                {game.ratingCount > 0 && (
-                                    <div>
-                                        <div className="font-black text-4xl text-[#ff9f5c] leading-none"
-                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                            {game.ratingCount > 1000
-                                                ? `${(game.ratingCount / 1000).toFixed(1)}K`
-                                                : game.ratingCount}
-                                        </div>
-                                        <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
-                                            Logged
-                                        </div>
+                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
+                                        Avg Rating
+                                        {platformStats?.ratingCount > 0 && (
+                                            <span className="ml-1 text-[#7a7a90]">
+                                                ({platformStats.ratingCount})
+                                            </span>
+                                        )}
                                     </div>
-                                )}
+                                </div>
+
+                                {/* Logged count — real from your DB */}
+                                <div>
+                                    <div className="font-black text-4xl text-[#ff9f5c] leading-none"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                        {platformStats?.loggedCount ?? '—'}
+                                    </div>
+                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
+                                        Logged
+                                    </div>
+                                </div>
+
+                                {/* Like count — real from your DB */}
+                                <div>
+                                    <div className="font-black text-4xl text-[#ff5c5c] leading-none"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                        {platformStats?.likeCount ?? '—'}
+                                    </div>
+                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
+                                        Likes
+                                    </div>
+                                </div>
+
                             </div>
 
                             {/* Action buttons */}
                             <div className="flex flex-wrap gap-3">
 
-                                {/* Add to Library / status badge */}
                                 {user ? (
                                     myGame ? (
-                                        <button
-                                            onClick={handleOpenAddModal}
+                                        <button onClick={handleOpenAddModal}
                                             className={`flex items-center gap-2 px-4 py-2 rounded
-                font-mono text-xs border transition-all
-                ${statusConfig[myGame.status]?.bg || 'bg-[#c8ff57]/15'}
-                ${statusConfig[myGame.status]?.color || 'text-[#c8ff57]'}
-                border-current hover:opacity-80`}>
+                                                       font-mono text-xs border transition-all
+                                                       ${statusConfig[myGame.status]?.bg || 'bg-[#c8ff57]/15'}
+                                                       ${statusConfig[myGame.status]?.color || 'text-[#c8ff57]'}
+                                                       border-current hover:opacity-80`}>
                                             {statusConfig[myGame.status]?.label || 'In Library'} · Update Log
                                         </button>
                                     ) : (
                                         <button onClick={handleOpenAddModal}
                                             className="px-4 py-2 bg-[#c8ff57] text-black font-bold
-               text-xs rounded hover:bg-[#d4ff6e] transition-all">
+                                                       text-xs rounded hover:bg-[#d4ff6e] transition-all">
                                             + Log This Game
                                         </button>
                                     )
@@ -492,8 +481,7 @@ function GameDetail() {
                                 )}
 
                                 {/* Share */}
-                                <button
-                                    onClick={() => navigator.clipboard.writeText(window.location.href)}
+                                <button onClick={() => navigator.clipboard.writeText(window.location.href)}
                                     className="px-4 py-2 border border-white/15 text-[#a0a0b8]
                                                font-mono text-xs rounded hover:border-[#c8ff57]
                                                hover:text-[#c8ff57] transition-all">
@@ -608,7 +596,9 @@ function GameDetail() {
                                                        placeholder:text-[#7a7a90] transition-colors" />
                                         <div className="flex items-center gap-3 mb-4">
                                             <label className="font-mono text-[10px] text-[#7a7a90]
-                      uppercase tracking-wider w-12 flex-shrink-0">Rating</label>
+                                                              uppercase tracking-wider w-12 flex-shrink-0">
+                                                Rating
+                                            </label>
                                             <input type="number" value={reviewRating}
                                                 onChange={e => {
                                                     const val = parseFloat(e.target.value)
@@ -617,8 +607,8 @@ function GameDetail() {
                                                 }}
                                                 placeholder="0–10" min="0" max="10" step="0.5"
                                                 className="w-24 bg-[#18181f] border border-[#2a2a35] text-white
-               font-mono text-xs rounded px-3 py-2
-               focus:outline-none focus:border-[#c8ff57] transition-all" />
+                                                           font-mono text-xs rounded px-3 py-2
+                                                           focus:outline-none focus:border-[#c8ff57] transition-all" />
                                         </div>
                                         <button onClick={handleSubmitReview}
                                             disabled={!myReview.trim() || submittingReview}
@@ -658,10 +648,16 @@ function GameDetail() {
                                         <div key={review._id}
                                             className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                             <div className="flex items-center gap-3 mb-3">
-                                                <div className="w-8 h-8 rounded-full bg-[#2a2a35]
-                                                                flex items-center justify-center text-sm">
-                                                    {review.userId?.badge || '🎮'}
-                                                </div>
+                                                {review.userId?.avatar ? (
+                                                    <img src={review.userId.avatar} alt={review.userId.username}
+                                                        className="w-8 h-8 rounded-full object-cover flex-shrink-0
+                                                                   ring-1 ring-[#2a2a35]" />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-[#2a2a35]
+                                                                    flex items-center justify-center text-sm flex-shrink-0">
+                                                        {review.userId?.badge || '🎮'}
+                                                    </div>
+                                                )}
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-white font-semibold text-sm">
@@ -805,6 +801,7 @@ function GameDetail() {
                                 await addGame(formData)
                             }
                             setShowAddModal(false)
+                            await fetchPlatformStats()
                             return { success: true }
                         } catch (err) {
                             return { success: false }

@@ -125,7 +125,7 @@ router.get('/requests', protect, async (req, res) => {
         const requests = await FollowRequest.find({
             recipient: req.user._id,
             status: 'pending'
-        }).populate('sender', 'username')
+        }).populate('sender', 'username avatar badge level')
 
         res.json({ success: true, requests })
     } catch (error) {

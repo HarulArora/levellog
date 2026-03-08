@@ -452,15 +452,19 @@ function Notifications() {
                              bg-[#111118] hover:bg-[#18181f] transition-all"
                                 >
                                     {/* Avatar */}
-                                    <div
-                                        className="w-9 h-9 rounded-full bg-gradient-to-br
-                               from-[#c8ff57] to-[#5c9fff]
-                               flex items-center justify-center
-                               font-black text-sm text-black flex-shrink-0"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                    >
-                                        {req.sender?.username?.charAt(0).toUpperCase()}
-                                    </div>
+                                    {req.sender?.avatar ? (
+                                        <img src={req.sender.avatar} alt={req.sender.username}
+                                            className="w-9 h-9 rounded-full object-cover flex-shrink-0
+                   ring-2 ring-[#2a2a35]" />
+                                    ) : (
+                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br
+                    from-[#c8ff57] to-[#5c9fff]
+                    flex items-center justify-center
+                    font-black text-sm text-black flex-shrink-0"
+                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                            {req.sender?.username?.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
 
                                     {/* Text */}
                                     <div className="flex-1 text-sm text-[#7a7a90]">
