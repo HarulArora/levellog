@@ -148,9 +148,8 @@ function GameCard({ game, onDelete }) {
                         onDelete()
                     }}
                     className="mt-2 w-full py-1 text-[10px] font-mono uppercase tracking-wider
-                               text-[#ff5c5c] border border-[#ff5c5c]/20 rounded
-                               hover:bg-[#ff5c5c]/10 transition-all
-                               opacity-0 group-hover:opacity-100"
+           text-[#ff5c5c] border border-[#ff5c5c]/20 rounded
+           hover:bg-[#ff5c5c]/10 transition-all"
                 >
                     Remove
                 </button>
