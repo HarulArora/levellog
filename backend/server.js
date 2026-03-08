@@ -6,6 +6,7 @@ import gamesRouter from './routes/games.js'
 import authRouter from './routes/auth.js'
 import igdbRouter from './routes/igdb.js'
 import notificationsRouter from './routes/notifications.js'
+import listsRouter from './routes/lists.js'
 
 dotenv.config()
 
@@ -25,6 +26,7 @@ app.use('/api/auth', authRouter)
 app.use('/api/games', gamesRouter)
 app.use('/api/igdb', igdbRouter)
 app.use('/api/notifications', notificationsRouter)
+app.use('/api/lists', listsRouter)
 
 app.get('/', (req, res) => {
     res.json({ message: '🎮 LevelLog API is running!' })

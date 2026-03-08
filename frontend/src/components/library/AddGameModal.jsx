@@ -1,21 +1,28 @@
 import { useState } from 'react'
 import GameSearch from './GameSearch'
 
-function AddGameModal({ onClose, onAdd }) {
+function AddGameModal({ onClose, onAdd, preselectedGame = null }) {
 
     const [formData, setFormData] = useState({
-        title: '',
-        genre: '',
+        title: preselectedGame?.title || '',
+        genre: preselectedGame?.genres?.[0] || '',
         status: 'playing',
         rating: 0,
         hours: '',
-        platforms: [],
-        cover: '',
-        summary: '',
-        igdbId: '',
+        platforms: preselectedGame?.platforms?.map(p => {
+            if (p.includes('PC')) return 'PC'
+            if (p.includes('PlayStation')) return 'PS'
+            if (p.includes('Xbox')) return 'Xbox'
+            if (p.includes('Nintendo Switch')) return 'SW'
+            if (p.includes('Mac')) return 'Mac'
+            return null
+        }).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i) || [],
+        cover: preselectedGame?.cover || '',
+        summary: preselectedGame?.summary || '',
+        igdbId: preselectedGame?.igdbId || '',
     })
 
-    const [gameSelected, setGameSelected] = useState(false)
+    const [gameSelected, setGameSelected] = useState(!!preselectedGame)
     const [submitting, setSubmitting] = useState(false)
 
     const statuses = ['playing', 'completed', 'planned', 'paused', 'dropped']
@@ -42,7 +49,7 @@ function AddGameModal({ onClose, onAdd }) {
             genre: game.genres[0] || '',
             cover: game.cover || '',
             summary: game.summary || '',
-            igdbId: game.igdbId || '',   // ← THE FIX
+            igdbId: game.igdbId || '',
             platforms: game.platforms
                 .map(p => {
                     if (p.includes('PC')) return 'PC'
@@ -82,7 +89,7 @@ function AddGameModal({ onClose, onAdd }) {
                         className="font-black text-lg tracking-widest uppercase text-white"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                     >
-                        Log a Game
+                        {preselectedGame ? 'Log This Game' : 'Log a Game'}
                     </h3>
                     <button
                         onClick={onClose}
@@ -95,14 +102,16 @@ function AddGameModal({ onClose, onAdd }) {
                 {/* Form Body */}
                 <div className="p-5 flex flex-col gap-4">
 
-                    {/* IGDB Search */}
-                    <div>
-                        <label className="block font-mono text-xs uppercase tracking-wider
-                                          text-[#7a7a90] mb-2">
-                            Search Game
-                        </label>
-                        <GameSearch onSelect={handleGameSelect} />
-                    </div>
+                    {/* IGDB Search — hidden when opened from GameDetail */}
+                    {!preselectedGame && (
+                        <div>
+                            <label className="block font-mono text-xs uppercase tracking-wider
+                                              text-[#7a7a90] mb-2">
+                                Search Game
+                            </label>
+                            <GameSearch onSelect={handleGameSelect} />
+                        </div>
+                    )}
 
                     {/* Selected game preview */}
                     {gameSelected && formData.cover && (
@@ -132,8 +141,8 @@ function AddGameModal({ onClose, onAdd }) {
                         </div>
                     )}
 
-                    {/* Manual title if no game selected from IGDB */}
-                    {!gameSelected && (
+                    {/* Manual title — only when opened standalone and no game selected yet */}
+                    {!preselectedGame && !gameSelected && (
                         <div>
                             <label className="block font-mono text-xs uppercase tracking-wider
                                               text-[#7a7a90] mb-2">

@@ -1,6 +1,7 @@
 import express from 'express'
 import Game from '../models/Game.js'
 import { protect } from '../middleware/auth.js'
+import { awardXP } from '../utils/xp.js'
 
 const router = express.Router()
 
@@ -48,12 +49,11 @@ router.get('/activity/:userId', protect, async (req, res) => {
         const activity = []
 
         games.forEach(game => {
-            // ── helper so every activity item carries igdbId ──
             const gameInfo = {
                 title: game.title,
                 cover: game.cover,
                 id: game._id,
-                igdbId: game.igdbId || null   // ← THE FIX
+                igdbId: game.igdbId || null
             }
 
             if (game.status === 'completed') {
@@ -138,6 +138,9 @@ router.post('/', protect, async (req, res) => {
 
         const savedGame = await newGame.save()
 
+        // ── Award XP for logging a game ──
+        await awardXP(req.user._id, 1)
+
         res.status(201).json({
             success: true,
             message: 'Game added successfully',
@@ -156,17 +159,36 @@ router.post('/', protect, async (req, res) => {
 // ── PUT /api/games/:id ──
 router.put('/:id', protect, async (req, res) => {
     try {
+        // Get the game before update to compare rating
+        const existingGame = await Game.findOne({
+            _id: req.params.id,
+            userId: req.user._id
+        })
+
+        if (!existingGame) {
+            return res.status(404).json({
+                success: false,
+                message: 'Game not found or not authorized'
+            })
+        }
+
+        const hadRatingBefore = existingGame.rating > 0
+        const hasRatingNow = req.body.rating > 0
+
         const game = await Game.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
             req.body,
             { new: true }
         )
 
-        if (!game) {
-            return res.status(404).json({
-                success: false,
-                message: 'Game not found or not authorized'
-            })
+        // ── Award XP for rating a game (only first time) ──
+        if (!hadRatingBefore && hasRatingNow) {
+            await awardXP(req.user._id, 1)
+        }
+
+        // ── Award XP for completing a game (only first time) ──
+        if (existingGame.status !== 'completed' && req.body.status === 'completed') {
+            await awardXP(req.user._id, 1)
         }
 
         res.json({ success: true, message: 'Game updated', game })

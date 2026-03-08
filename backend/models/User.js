@@ -28,45 +28,53 @@ const userSchema = new mongoose.Schema(
             default: '',
             maxlength: 200,
         },
-
-        // ── PRIVACY ──
-        // public  → anyone can see profile and games
-        // private → only followers can see games
         isPrivate: {
             type: Boolean,
             default: false
         },
-
-        // ── FOLLOWERS / FOLLOWING ──
-        // Array of userIds who follow this user
         followers: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User'
         }],
-
-        // Array of userIds this user follows
         following: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User'
         }],
-
         gamesCount: {
             type: Number,
             default: 0,
         },
+
+        // ── XP & LEVELING ──
+        xp: {
+            type: Number,
+            default: 0
+        },
+        level: {
+            type: Number,
+            default: 1
+        },
+        badge: {
+            type: String,
+            default: '🎮'
+        },
+
+        // ── SUBSCRIPTION ──
+        isPro: {
+            type: Boolean,
+            default: false
+        }
     },
     {
         timestamps: true,
     }
 )
 
-// ── HASH PASSWORD ──
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return
     this.password = await bcrypt.hash(this.password, 12)
 })
 
-// ── COMPARE PASSWORD ──
 userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password)
 }

@@ -629,17 +629,41 @@ function Home() {
                             <div className="flex items-center gap-3">
                                 <div
                                     className="w-10 h-10 rounded-full bg-gradient-to-br
-                                              from-[#c8ff57] to-[#5c9fff]
-                                              flex items-center justify-center
-                                              font-black text-sm text-black flex-shrink-0"
+                  from-[#c8ff57] to-[#5c9fff]
+                  flex items-center justify-center
+                  font-black text-sm text-black flex-shrink-0"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                 >
                                     {user.username.charAt(0).toUpperCase()}
                                 </div>
-                                <div>
-                                    <div className="text-white font-bold text-sm">{user.username}</div>
+                                <div className="flex flex-col gap-1 min-w-0">
+                                    <div className="text-white font-bold text-sm truncate">
+                                        {user.username}
+                                    </div>
                                     <div className="font-mono text-[10px] text-[#7a7a90]">
                                         @{user.username} · All platforms
+                                    </div>
+                                    {/* XP Row */}
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-sm flex-shrink-0">{user.badge || '🎮'}</span>
+                                        <span className="font-mono text-[10px] text-[#c8ff57] uppercase
+                             tracking-wider flex-shrink-0">
+                                            Lv.{user.level || 1}
+                                        </span>
+                                        <div className="w-20 h-1.5 bg-[#2a2a35] rounded-full flex-shrink-0 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full bg-gradient-to-r from-[#c8ff57] to-[#5c9fff]"
+                                                style={{
+                                                    width: `${Math.min(
+                                                        ((user.xp || 0) / [5, 15, 30, 50][[5, 15, 30, 50].findIndex(x => (user.xp || 0) < x)] || 1) * 100,
+                                                        100
+                                                    )}%`
+                                                }}
+                                            />
+                                        </div>
+                                        <span className="font-mono text-[10px] text-[#7a7a90] flex-shrink-0 tabular-nums">
+                                            {user.xp || 0} XP
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -670,7 +694,7 @@ function Home() {
                             <div className="sm:ml-auto">
                                 <Link to="/stats">
                                     <button className="font-mono text-xs text-[#7a7a90]
-                                                       hover:text-[#c8ff57] transition-colors">
+                                           hover:text-[#c8ff57] transition-colors">
                                         View Full Stats →
                                     </button>
                                 </Link>
