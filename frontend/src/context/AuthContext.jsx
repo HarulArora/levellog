@@ -8,6 +8,8 @@ const buildUser = (userData) => ({
     _id: userData._id || userData.id,
     username: userData.username,
     email: userData.email,
+    bio: userData.bio || '',
+    avatar: userData.avatar || '',
     isPrivate: userData.isPrivate || false,
     xp: userData.xp || 0,
     level: userData.level || 1,
@@ -15,17 +17,13 @@ const buildUser = (userData) => ({
 })
 
 export function AuthProvider({ children }) {
-
     const [user, setUser] = useState(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         const initAuth = async () => {
             const token = localStorage.getItem('levellog_token')
-            if (!token) {
-                setLoading(false)
-                return
-            }
+            if (!token) { setLoading(false); return }
             try {
                 api.defaults.headers.common['Authorization'] = `Bearer ${token}`
                 const res = await api.get('/auth/me')
@@ -49,10 +47,7 @@ export function AuthProvider({ children }) {
             setUser(buildUser(userData))
             return { success: true }
         } catch (err) {
-            return {
-                success: false,
-                message: err.response?.data?.message || 'Signup failed'
-            }
+            return { success: false, message: err.response?.data?.message || 'Signup failed' }
         }
     }
 
@@ -65,10 +60,7 @@ export function AuthProvider({ children }) {
             setUser(buildUser(userData))
             return { success: true }
         } catch (err) {
-            return {
-                success: false,
-                message: err.response?.data?.message || 'Login failed'
-            }
+            return { success: false, message: err.response?.data?.message || 'Login failed' }
         }
     }
 
@@ -78,7 +70,6 @@ export function AuthProvider({ children }) {
         setUser(null)
     }
 
-    // Refresh XP/level from server (call this after earning XP)
     const refreshUser = async () => {
         try {
             const res = await api.get('/auth/me')
@@ -97,9 +88,7 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
     const context = useContext(AuthContext)
-    if (!context) {
-        throw new Error('useAuth must be used inside AuthProvider')
-    }
+    if (!context) throw new Error('useAuth must be used inside AuthProvider')
     return context
 }
 

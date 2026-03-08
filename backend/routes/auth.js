@@ -117,7 +117,13 @@ router.post('/login', async (req, res) => {
 
 // ── GET /api/auth/me ──
 router.get('/me', protect, async (req, res) => {
-    res.json({ success: true, user: req.user })
+    try {
+        const user = await User.findById(req.user._id).select('-password')
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' })
+        res.json({ success: true, user })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
 })
 
 // ── GET /api/auth/profile/:username ──
@@ -374,6 +380,58 @@ router.get('/following/:userId', async (req, res) => {
             message: 'Failed to fetch following',
             error: error.message
         })
+    }
+})
+
+
+
+
+// ── PUT /api/auth/profile ── update profile
+router.put('/profile', protect, async (req, res) => {
+    try {
+        const { username, bio, avatar } = req.body
+        const updates = {}
+
+        if (username !== undefined) {
+            const trimmed = username.trim()
+            if (trimmed.length < 3 || trimmed.length > 20)
+                return res.status(400).json({ success: false, message: 'Username must be 3–20 characters' })
+            const existing = await User.findOne({ username: trimmed, _id: { $ne: req.user._id } })
+            if (existing)
+                return res.status(400).json({ success: false, message: 'Username already taken' })
+            updates.username = trimmed
+        }
+
+        if (bio !== undefined) {
+            if (bio.length > 200)
+                return res.status(400).json({ success: false, message: 'Bio max 200 characters' })
+            updates.bio = bio.trim()
+        }
+
+        if (avatar !== undefined) updates.avatar = avatar
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user._id,
+            { $set: updates },
+            { new: true }
+        )
+
+        res.json({
+            success: true,
+            user: {
+                _id: updatedUser._id,
+                username: updatedUser.username,
+                email: updatedUser.email,
+                bio: updatedUser.bio,
+                avatar: updatedUser.avatar,
+                isPrivate: updatedUser.isPrivate,
+                xp: updatedUser.xp,
+                level: updatedUser.level,
+                badge: updatedUser.badge,
+            }
+        })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
     }
 })
 
