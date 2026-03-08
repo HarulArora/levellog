@@ -116,17 +116,21 @@ function Stats() {
                           sm:items-center justify-between gap-6">
 
                         {/* Left — avatar + name */}
-                       
+
                         <div className="flex items-center gap-5">
-                            <div
-                                className="w-20 h-20 rounded-full bg-gradient-to-br
+                            {user.avatar ? (
+                                <img src={user.avatar} alt={user.username}
+                                    className="w-20 h-20 rounded-full object-cover flex-shrink-0
+                   ring-2 ring-[#2a2a35]" />
+                            ) : (
+                                <div className="w-20 h-20 rounded-full bg-gradient-to-br
                     from-[#c8ff57] to-[#5c9fff]
                     flex items-center justify-center
                     font-black text-3xl text-black flex-shrink-0"
-                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                            >
-                                {user.username.slice(0, 2).toUpperCase()}
-                            </div>
+                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                    {user.username.slice(0, 2).toUpperCase()}
+                                </div>
+                            )}
                             <div>
                                 <div
                                     className="font-black text-3xl md:text-4xl text-white

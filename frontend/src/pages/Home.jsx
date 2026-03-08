@@ -622,20 +622,25 @@ function Home() {
                 USER STATS BAR
             ══════════════════════════ */}
             {user && (
-                <section className="border-y border-[#2a2a35] bg-[#111118]">
+                <section className="border-y border-[#2a2a35] bg-[#111118] cursor-pointer hover:bg-[#18181f] transition-colors"
+                    onClick={() => navigate('/stats')}>
                     <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-5">
                         <div className="flex flex-col sm:flex-row items-center gap-6">
 
                             <div className="flex items-center gap-3">
-                                <div
-                                    className="w-10 h-10 rounded-full bg-gradient-to-br
-                  from-[#c8ff57] to-[#5c9fff]
-                  flex items-center justify-center
-                  font-black text-sm text-black flex-shrink-0"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                >
-                                    {user.username.charAt(0).toUpperCase()}
-                                </div>
+                                {user.avatar ? (
+                                    <img src={user.avatar} alt={user.username}
+                                        className="w-10 h-10 rounded-full object-cover flex-shrink-0
+                   ring-2 ring-[#2a2a35]" />
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br
+                    from-[#c8ff57] to-[#5c9fff]
+                    flex items-center justify-center
+                    font-black text-sm text-black flex-shrink-0"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                        {user.username.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                                 <div className="flex flex-col gap-1 min-w-0">
                                     <div className="text-white font-bold text-sm truncate">
                                         {user.username}
