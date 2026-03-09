@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 
 
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 
 
 import api from '../api/axios'
@@ -20,6 +20,7 @@ function Profile() {
 
     const { username } = useParams()
 
+    const navigate = useNavigate()
 
     const { user: currentUser } = useAuth()
 
@@ -47,7 +48,10 @@ function Profile() {
 
 
     const [followModal, setFollowModal] = useState(null)
+
     const [xpToast, setXpToast] = useState(null)
+
+    const [activeTab, setActiveTab] = useState('games')
 
     const showXpToast = (msg, type = 'gain') => {
         setXpToast({ msg, type })
@@ -245,7 +249,24 @@ function Profile() {
         playing: games.filter(g => g.status === 'playing').length,
 
 
+        planned: games.filter(g => g.status === 'planned').length,
+
+
+        dropped: games.filter(g => g.status === 'dropped').length,
+
+
+        paused: games.filter(g => g.status === 'paused').length,
+
+
         hours: games.reduce((sum, g) => sum + (g.hours || 0), 0),
+
+
+        avgRating: games.filter(g => g.rating > 0).length > 0
+            ? (games.filter(g => g.rating > 0).reduce((sum, g) => sum + g.rating, 0) / games.filter(g => g.rating > 0).length).toFixed(1)
+            : null,
+
+
+        rated: games.filter(g => g.rating > 0).length,
 
 
     }), [games])
@@ -278,6 +299,7 @@ function Profile() {
 
 
                 setRequestSent(false)
+
                 showXpToast(res.data.message || 'Unfollowed · -1 XP', 'loss')
 
 
@@ -294,10 +316,12 @@ function Profile() {
 
 
                     setRequestSent(true)
+
                     showXpToast('Follow request sent · XP awarded on accept', 'pending')
 
 
                 } else {
+
 
                     showXpToast(res.data.message || 'Following · +1 XP', 'gain')
 
@@ -489,16 +513,27 @@ function Profile() {
 
         <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10">
 
+
             {/* XP Toast */}
+
             {xpToast && (
+
                 <div className={`fixed top-5 right-5 z-[100] px-4 py-3 rounded-lg font-mono text-sm border transition-all
+
                                 ${xpToast.type === 'loss'
+
                         ? 'bg-[#ff5c5c]/15 border-[#ff5c5c]/50 text-[#ff5c5c]'
+
                         : xpToast.type === 'pending'
+
                             ? 'bg-[#ff9f5c]/15 border-[#ff9f5c]/50 text-[#ff9f5c]'
+
                             : 'bg-[#c8ff57]/15 border-[#c8ff57]/50 text-[#c8ff57]'}`}>
+
                     {xpToast.msg}
+
                 </div>
+
             )}
 
 
@@ -776,17 +811,18 @@ function Profile() {
 
                         {isOwnProfile && (
 
+                            <>
 
-                            <button
-
-
-                                onClick={handlePrivacyToggle}
+                                <button
 
 
-                                disabled={privacyLoading}
+                                    onClick={handlePrivacyToggle}
 
 
-                                className={`px-4 py-2 text-sm font-semibold rounded
+                                    disabled={privacyLoading}
+
+
+                                    className={`px-4 py-2 text-sm font-semibold rounded
 
 
                            border transition-all disabled:opacity-50
@@ -795,32 +831,49 @@ function Profile() {
                            ${user.isPrivate
 
 
-                                        ? 'border-[#c8ff57]/50 text-[#c8ff57] hover:bg-[#c8ff57]/10'
+                                            ? 'border-[#c8ff57]/50 text-[#c8ff57] hover:bg-[#c8ff57]/10'
 
 
-                                        : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-[#c8ff57]'
+                                            : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-[#c8ff57]'
 
 
-                                    }`}
+                                        }`}
 
 
-                            >
+                                >
 
 
-                                {privacyLoading
+                                    {privacyLoading
 
 
-                                    ? 'Updating...'
+                                        ? 'Updating...'
 
 
-                                    : user.isPrivate ? '🔒 Private' : '🌐 Public'
+                                        : user.isPrivate ? '🔒 Private' : '🌐 Public'
 
 
-                                }
+                                    }
 
 
-                            </button>
+                                </button>
 
+                                <button
+
+                                    onClick={() => navigate('/edit-profile')}
+
+                                    className="px-4 py-2 text-sm font-semibold rounded border
+
+                                               border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]
+
+                                               hover:text-[#c8ff57] transition-all"
+
+                                >
+
+                                    ✏️ Edit Profile
+
+                                </button>
+
+                            </>
 
                         )}
 
@@ -1011,103 +1064,143 @@ function Profile() {
             </div>
 
 
+            {/* ── Tab Bar ── */}
 
-            {/* ── Games Section ── */}
+            {canSeeGames && (
+
+                <div className="flex gap-1 mb-4">
+
+                    {[
+
+                        { id: 'games', label: '🎮 Recent Games' },
+
+                        { id: 'stats', label: '📊 Stats' },
+
+                    ].map(tab => (
+
+                        <button
+
+                            key={tab.id}
+
+                            onClick={() => setActiveTab(tab.id)}
+
+                            className={`font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-lg border transition-all
+
+                                       ${activeTab === tab.id
+
+                                    ? 'bg-[#c8ff57]/10 border-[#c8ff57]/40 text-[#c8ff57]'
+
+                                    : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]/30 hover:text-[#c8ff57]'}`}>
+
+                            {tab.label}
+
+                        </button>
+
+                    ))}
+
+                </div>
+
+            )}
 
 
-            <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
+            {/* ── Games Tab ── */}
+
+            {(!canSeeGames || activeTab === 'games') && (
+
+
+                <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
 
 
 
-                <h2
+                    <h2
 
 
-                    className="font-black text-xl tracking-widest uppercase text-white mb-5"
+                        className="font-black text-xl tracking-widest uppercase text-white mb-5"
 
 
-                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
 
 
-                >
+                    >
 
 
-                    Recent Games
+                        Recent Games
 
 
-                    {canSeeGames && (
+                        {canSeeGames && (
 
 
-                        <span className="font-mono text-xs text-[#7a7a90] ml-3
+                            <span className="font-mono text-xs text-[#7a7a90] ml-3
 
 
                              normal-case tracking-normal">
 
 
-                            {games.length} total
+                                {games.length} total
 
 
-                        </span>
+                            </span>
 
 
-                    )}
+                        )}
 
 
-                </h2>
+                    </h2>
 
 
 
-                {!canSeeGames ? (
+                    {!canSeeGames ? (
 
 
-                    <div className="flex flex-col items-center justify-center py-16 gap-4">
+                        <div className="flex flex-col items-center justify-center py-16 gap-4">
 
 
-                        <div className="text-5xl">🔒</div>
+                            <div className="text-5xl">🔒</div>
 
 
-                        <div
+                            <div
 
 
-                            className="text-white font-black text-xl tracking-widest uppercase"
+                                className="text-white font-black text-xl tracking-widest uppercase"
 
 
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
 
 
-                        >
+                            >
 
 
-                            Private Profile
+                                Private Profile
 
 
-                        </div>
+                            </div>
 
 
-                        <div className="text-[#7a7a90] font-mono text-sm text-center max-w-xs">
+                            <div className="text-[#7a7a90] font-mono text-sm text-center max-w-xs">
 
 
-                            {requestSent
+                                {requestSent
 
 
-                                ? `Your follow request is pending. Wait for ${user.username} to accept.`
+                                    ? `Your follow request is pending. Wait for ${user.username} to accept.`
 
 
-                                : `Follow ${user.username} to see their games`
+                                    : `Follow ${user.username} to see their games`
 
 
-                            }
+                                }
 
 
-                        </div>
+                            </div>
 
 
-                        {!currentUser && (
+                            {!currentUser && (
 
 
-                            <Link to="/login">
+                                <Link to="/login">
 
 
-                                <button className="px-4 py-2 bg-[#c8ff57] text-black
+                                    <button className="px-4 py-2 bg-[#c8ff57] text-black
 
 
                                    font-bold text-sm rounded mt-2
@@ -1116,151 +1209,294 @@ function Profile() {
                                    hover:bg-[#d4ff6e] transition-all">
 
 
-                                    Login to Follow
+                                        Login to Follow
 
 
-                                </button>
+                                    </button>
 
 
-                            </Link>
+                                </Link>
 
 
-                        )}
+                            )}
 
 
-                    </div>
+                        </div>
 
 
 
-                ) : recentGames.length > 0 ? (
+                    ) : recentGames.length > 0 ? (
 
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
 
 
-                        {recentGames.map(game => {
+                            {recentGames.map(game => {
 
 
-                            const sc = statusConfig[game.status] || statusConfig.planned
+                                const sc = statusConfig[game.status] || statusConfig.planned
 
 
-                            const imageUrl = game.cover
+                                const imageUrl = game.cover
 
 
-                                ? game.cover
+                                    ? game.cover
 
 
-                                : game.steamId
+                                    : game.steamId
 
 
-                                    ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
+                                        ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
 
 
-                                    : null
+                                        : null
 
 
-                            return (
+                                return (
 
 
-                                <div
+                                    <Link
 
 
-                                    key={game._id}
+                                        key={game._id}
 
 
-                                    className="bg-[#18181f] border border-[#2a2a35] rounded-lg
+                                        to={game.igdbId ? `/game/${game.igdbId}` : '#'}
 
 
-                             overflow-hidden hover:border-[#c8ff57]/50 transition-all"
+                                        className="bg-[#18181f] border border-[#2a2a35] rounded-lg
 
 
-                                >
+                                                   overflow-hidden hover:border-[#c8ff57]/50
 
 
-                                    <div
-
-
-                                        className="h-[80px] bg-cover bg-center bg-[#2a2a35]"
-
-
-                                        style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}
+                                                   transition-all group"
 
 
                                     >
 
 
-                                        {!imageUrl && (
+                                        <div
 
 
-                                            <div className="w-full h-full flex items-center
+                                            className="h-[120px] bg-cover bg-center bg-[#2a2a35] relative"
+
+
+                                            style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}
+
+
+                                        >
+
+
+                                            {!imageUrl && (
+
+
+                                                <div className="w-full h-full flex items-center
 
 
                                       justify-center text-2xl">🎮</div>
 
 
-                                        )}
+                                            )}
 
-
-                                    </div>
-
-
-                                    <div className="p-2">
-
-
-                                        <div className="text-white font-semibold text-xs truncate mb-1">
-
-
-                                            {game.title}
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all" />
 
 
                                         </div>
 
 
-                                        <span className={`font-mono text-[9px] uppercase tracking-wider
+                                        <div className="p-2">
+
+
+                                            <div className="text-white font-semibold text-xs truncate mb-1
+
+
+                                                            group-hover:text-[#c8ff57] transition-colors">
+
+
+                                                {game.title}
+
+
+                                            </div>
+
+
+                                            <span className={`font-mono text-[9px] uppercase tracking-wider
 
 
                                      px-1 py-[1px] rounded-sm ${sc.bg} ${sc.color}`}>
 
 
-                                            {sc.label}
+                                                {sc.label}
 
 
-                                        </span>
+                                            </span>
 
+
+                                        </div>
+
+
+                                    </Link>
+
+
+                                )
+
+
+                            })}
+
+
+                        </div>
+
+
+                    ) : (
+
+
+                        <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">
+
+
+                            No games logged yet
+
+
+                        </div>
+
+
+                    )}
+
+
+
+                </div>
+
+            )}
+
+
+            {/* ── Stats Tab ── */}
+
+            {canSeeGames && activeTab === 'stats' && (
+
+                <div className="flex flex-col gap-4">
+
+                    {/* Overview */}
+
+                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
+
+                        <div className="flex items-center justify-between mb-5">
+
+                            <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest">Overview</div>
+
+                            {isOwnProfile && (
+
+                                <button
+
+                                    onClick={() => navigate('/stats')}
+
+                                    className="font-mono text-[10px] text-[#c8ff57] hover:underline uppercase tracking-wider">
+
+                                    View Full Stats →
+
+                                </button>
+
+                            )}
+
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+                            {[
+
+                                { label: 'Total Games', value: stats.total, color: 'text-[#c8ff57]' },
+
+                                { label: 'Hours Played', value: `${stats.hours}h`, color: 'text-[#ff9f5c]' },
+
+                                { label: 'Avg Rating', value: stats.avgRating ? `${stats.avgRating}/10` : '—', color: 'text-[#5c9fff]' },
+
+                                { label: 'Rated', value: stats.rated, color: 'text-[#c45cff]' },
+
+                            ].map(s => (
+
+                                <div key={s.label} className="text-center bg-[#18181f] border border-[#2a2a35] rounded-lg p-4">
+
+                                    <div className={`font-black text-3xl leading-none tracking-wider ${s.color}`}
+
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+
+                                        {s.value}
 
                                     </div>
 
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider mt-1">
+
+                                        {s.label}
+
+                                    </div>
 
                                 </div>
 
+                            ))}
 
-                            )
-
-
-                        })}
-
+                        </div>
 
                     </div>
 
+                    {/* Status breakdown */}
 
-                ) : (
+                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
 
+                        <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-5">By Status</div>
 
-                    <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">
+                        <div className="flex flex-col gap-3">
 
+                            {[
 
-                        No games logged yet
+                                { label: 'Playing', value: stats.playing, color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]' },
 
+                                { label: 'Completed', value: stats.completed, color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]' },
+
+                                { label: 'Planned', value: stats.planned, color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]' },
+
+                                { label: 'Paused', value: stats.paused, color: 'text-[#c45cff]', bg: 'bg-[#c45cff]' },
+
+                                { label: 'Dropped', value: stats.dropped, color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]' },
+
+                            ].map(s => (
+
+                                <div key={s.label}>
+
+                                    <div className="flex justify-between mb-1">
+
+                                        <span className={`font-mono text-xs uppercase tracking-wider ${s.color}`}>{s.label}</span>
+
+                                        <span className="font-mono text-xs text-[#7a7a90]">
+
+                                            {s.value}
+
+                                            {stats.total > 0 && <span className="text-[#4a4a5a] ml-1">· {Math.round((s.value / stats.total) * 100)}%</span>}
+
+                                        </span>
+
+                                    </div>
+
+                                    <div className="h-1.5 bg-[#2a2a35] rounded-full overflow-hidden">
+
+                                        <div
+
+                                            className={`h-full rounded-full ${s.bg} transition-all duration-500`}
+
+                                            style={{ width: stats.total > 0 ? `${(s.value / stats.total) * 100}%` : '0%' }}
+
+                                        />
+
+                                    </div>
+
+                                </div>
+
+                            ))}
+
+                        </div>
 
                     </div>
 
+                </div>
 
-                )}
-
-
-
-            </div>
-
+            )}
 
 
             {/* Follow List Modal */}
