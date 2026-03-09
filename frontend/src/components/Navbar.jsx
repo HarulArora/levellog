@@ -28,6 +28,10 @@ function Navbar() {
 
         { name: 'HOME', path: '/' },
 
+        { name: 'DISCOVER', path: '/discover' },
+
+        { name: 'DEALS', path: '/deals' },
+
         { name: 'LIBRARY', path: '/library' },
 
         { name: 'LISTS', path: '/lists' },
@@ -297,6 +301,48 @@ function Navbar() {
                                             </Link>
 
 
+                                            <Link to="/stats"
+
+                                                onClick={handleLinkClick}
+
+                                                className="flex items-center gap-3 px-4 py-2.5
+
+                                                           text-[#a0a0b8] hover:text-white
+
+                                                           hover:bg-[#1a1a25] transition-all text-sm">
+
+                                                <span className="text-base">📊</span>
+
+                                                <span className="font-mono text-xs uppercase tracking-wider">
+
+                                                    Stats
+
+                                                </span>
+
+                                            </Link>
+
+
+                                            <Link to="/edit-profile"
+
+                                                onClick={handleLinkClick}
+
+                                                className="flex items-center gap-3 px-4 py-2.5
+
+                                                           text-[#a0a0b8] hover:text-white
+
+                                                           hover:bg-[#1a1a25] transition-all text-sm">
+
+                                                <span className="text-base">✏️</span>
+
+                                                <span className="font-mono text-xs uppercase tracking-wider">
+
+                                                    Edit Profile
+
+                                                </span>
+
+                                            </Link>
+
+
                                             <Link to="/search"
 
                                                 onClick={handleLinkClick}
@@ -529,6 +575,32 @@ function Navbar() {
                                 <span>👤</span>
 
                                 <span className="font-mono text-xs uppercase tracking-wider">My Profile</span>
+
+                            </Link>
+
+
+                            <Link to="/stats" onClick={handleLinkClick}
+
+                                className="flex items-center gap-3 py-2.5 text-[#a0a0b8]
+
+                                           hover:text-white transition-colors">
+
+                                <span>📊</span>
+
+                                <span className="font-mono text-xs uppercase tracking-wider">Stats</span>
+
+                            </Link>
+
+
+                            <Link to="/edit-profile" onClick={handleLinkClick}
+
+                                className="flex items-center gap-3 py-2.5 text-[#a0a0b8]
+
+                                           hover:text-white transition-colors">
+
+                                <span>✏️</span>
+
+                                <span className="font-mono text-xs uppercase tracking-wider">Edit Profile</span>
 
                             </Link>
 
