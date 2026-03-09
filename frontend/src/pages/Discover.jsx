@@ -108,7 +108,7 @@ function GameCardSkeleton() {
     return (
         <div className="animate-pulse" style={{ background: '#111118', border: '1px solid #2a2a35', borderRadius: 8, overflow: 'hidden' }}>
             <div style={{ height: 110, background: '#18181f' }} />
-            <div style={{ padding: '12px 14px 14px' }}>
+            <div style={{ padding: '8px 10px 10px' }}>
                 <div style={{ height: 12, background: '#18181f', borderRadius: 3, width: '70%', marginBottom: 8 }} />
                 <div style={{ display: 'flex', gap: 3, marginBottom: 10 }}>
                     {[28, 24, 32].map((w, i) => <div key={i} style={{ height: 14, width: w, background: '#18181f', borderRadius: 2 }} />)}
@@ -191,7 +191,7 @@ function GameCard({ game, entry, onClick }) {
             )}
 
             {/* Card body */}
-            <div style={{ padding: '12px 14px 14px' }}>
+            <div style={{ padding: '8px 10px 10px' }}>
                 {/* Title */}
                 <div style={{
                     fontFamily: "'DM Sans', sans-serif",
@@ -343,7 +343,68 @@ export default function Discover() {
 
     return (
         <div style={{ minHeight: '100vh', color: '#e8e8f0', paddingBottom: 60 }}>
-            <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 40px 0' }}>
+            <style>{`
+        .discover-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+          margin-bottom: 40px;
+        }
+        @media (min-width: 480px) {
+          .discover-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        }
+        @media (min-width: 768px) {
+          .discover-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        }
+        @media (min-width: 1024px) {
+          .discover-grid { grid-template-columns: repeat(5, 1fr); gap: 16px; }
+        }
+        @media (min-width: 1280px) {
+          .discover-grid { grid-template-columns: repeat(6, 1fr); gap: 16px; }
+        }
+        .genre-grid-responsive {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 8px;
+          margin-bottom: 40px;
+        }
+        @media (min-width: 480px) {
+          .genre-grid-responsive { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+        }
+        @media (min-width: 768px) {
+          .genre-grid-responsive { grid-template-columns: repeat(7, 1fr); gap: 12px; }
+        }
+        @media (min-width: 1024px) {
+          .genre-grid-responsive { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+        }
+        .discover-page-padding {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 24px 16px 0;
+        }
+        @media (min-width: 768px) {
+          .discover-page-padding { padding: 40px 40px 0; }
+        }
+        .game-card-body-inner {
+          padding: 8px 10px 10px;
+        }
+        @media (min-width: 480px) {
+          .game-card-body-inner { padding: 12px 14px 14px; }
+        }
+        .game-card-title-text {
+          font-weight: 600;
+          font-size: 11px;
+          color: #e8e8f0;
+          margin-bottom: 5px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        @media (min-width: 480px) {
+          .game-card-title-text { font-size: 13px; }
+        }
+      `}</style>
+            <div className="discover-page-padding">
 
                 {/* ── Browse by Genre ── */}
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 28, paddingBottom: 16, borderBottom: '1px solid #2a2a35' }}>
@@ -351,7 +412,7 @@ export default function Discover() {
                 </div>
 
                 {/* Genre cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, marginBottom: 40 }}>
+                <div className="genre-grid-responsive">
                     {GENRE_CARDS.map(card => {
                         const isActive = activeGenre?.label === card.label
                         return (
@@ -414,7 +475,7 @@ export default function Discover() {
                             style={{ background: '#111118', border: '1px solid #2a2a35', borderRadius: 12, padding: 32, width: 520, maxWidth: '92vw' }}
                         >
                             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 3, marginBottom: 20 }}>MORE GENRES</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
                                 {MORE_GENRES.map(card => {
                                     const isActive = activeGenre?.label === card.label
                                     return (
@@ -477,7 +538,7 @@ export default function Discover() {
                 </div>
 
                 {/* Games Grid — 6 cols */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 16, marginBottom: 40 }}>
+                <div className="discover-grid">
                     {loading
                         ? Array.from({ length: LIMIT }).map((_, i) => <GameCardSkeleton key={i} />)
                         : games.map(game => (
