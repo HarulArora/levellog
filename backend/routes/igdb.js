@@ -1,5 +1,6 @@
 import express from 'express'
 import { searchGames, getAccessToken } from '../utils/igdb.js'
+import Game from '../models/Game.js'
 
 const router = express.Router()
 
@@ -15,8 +16,110 @@ router.get('/search', async (req, res) => {
     }
 })
 
+// ── GET /api/igdb/discover?genre=Action&page=1&limit=24 ──
+router.get('/discover', async (req, res) => {
+    try {
+        const { genre, page = 1, limit = 24 } = req.query
+        const pageNum = Math.max(1, parseInt(page) || 1)
+        const limitNum = Math.min(50, parseInt(limit) || 24)
+        const offset = (pageNum - 1) * limitNum
+
+        const genreFilter = genre && genre.toLowerCase() !== 'all'
+            ? ` & genres.name = "${genre}"`
+            : ''
+
+        const where = `where rating != null & rating_count > 20 & cover != null${genreFilter}`
+
+        const token = await getAccessToken()
+
+        const headers = {
+            'Client-ID': process.env.IGDB_CLIENT_ID,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'text/plain'
+        }
+
+        const [gamesRes, countRes] = await Promise.all([
+            fetch('https://api.igdb.com/v4/games', {
+                method: 'POST',
+                headers,
+                body: `
+          fields name, cover.url, genres.name, platforms.name, rating, rating_count, first_release_date;
+          ${where};
+          sort rating_count desc;
+          limit ${limitNum};
+          offset ${offset};
+        `
+            }),
+            fetch('https://api.igdb.com/v4/games/count', {
+                method: 'POST',
+                headers,
+                body: `${where};`
+            })
+        ])
+
+        const [gamesData, countData] = await Promise.all([gamesRes.json(), countRes.json()])
+
+        const shortPlatform = (name) => {
+            if (name.includes('PC') || name === 'Windows' || name === 'Linux' || name === 'Mac') return 'PC'
+            if (name.includes('PlayStation 5')) return 'PS5'
+            if (name.includes('PlayStation 4')) return 'PS4'
+            if (name.includes('PlayStation 3')) return 'PS3'
+            if (name.includes('PlayStation')) return 'PS'
+            if (name.includes('Xbox Series')) return 'Xbox Series'
+            if (name.includes('Xbox One')) return 'Xbox One'
+            if (name.includes('Xbox')) return 'Xbox'
+            if (name.includes('Nintendo Switch')) return 'Switch'
+            if (name.includes('iOS') || name.includes('Android')) return 'Mobile'
+            return null // skip obscure platforms
+        }
+
+        const rawGames = (Array.isArray(gamesData) ? gamesData : []).map(game => ({
+            id: game.id,
+            title: game.name,
+            cover: game.cover?.url
+                ? game.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
+                : null,
+            genre: game.genres?.[0]?.name || null,
+            platforms: [...new Set(
+                (game.platforms || [])
+                    .map(p => shortPlatform(p.name))
+                    .filter(Boolean)
+            )].slice(0, 4),
+            ratingCount: game.rating_count || 0,
+        }))
+
+        // Batch fetch avg platform (user) ratings from DB
+        const igdbIds = rawGames.map(g => g.id)
+        const avgRatings = await Game.aggregate([
+            { $match: { igdbId: { $in: igdbIds }, rating: { $ne: null } } },
+            { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
+        ])
+        const ratingMap = {}
+        for (const r of avgRatings) ratingMap[r._id] = { avg: r.avg, count: r.count }
+
+        const games = rawGames.map(g => ({
+            ...g,
+            avgRating: ratingMap[g.id] ? parseFloat(ratingMap[g.id].avg.toFixed(1)) : null,
+            avgRatingCount: ratingMap[g.id]?.count || 0,
+        }))
+
+        const total = countData.count || 0
+
+        res.json({
+            success: true,
+            games,
+            total,
+            page: pageNum,
+            limit: limitNum,
+            totalPages: Math.ceil(total / limitNum),
+        })
+    } catch (error) {
+        console.error('Discover error:', error)
+        res.status(500).json({ success: false, message: 'Failed to fetch games', error: error.message })
+    }
+})
+
 // ── GET /api/igdb/game/:id ──
-// Full game details
 router.get('/game/:id', async (req, res) => {
     try {
         const token = await getAccessToken()
@@ -57,11 +160,9 @@ router.get('/game/:id', async (req, res) => {
 
         const g = data[0]
 
-        // ── Format company info ──
         const developer = g.involved_companies?.find(c => c.developer)?.company?.name || null
         const publisher = g.involved_companies?.find(c => c.publisher)?.company?.name || null
 
-        // ── Format age rating ──
         const ageRatingMap = {
             1: 'RP', 2: 'EC', 3: 'E', 4: 'E10+',
             5: 'T', 6: 'M', 7: 'AO',
@@ -71,17 +172,14 @@ router.get('/game/:id', async (req, res) => {
             ? ageRatingMap[g.age_ratings[0].rating] || null
             : null
 
-        // ── Format cover ──
         const cover = g.cover?.url
             ? g.cover.url.replace('t_thumb', 't_cover_big_2x').replace('//', 'https://')
             : null
 
-        // ── Format screenshots ──
         const screenshots = g.screenshots?.map(s =>
             s.url.replace('t_thumb', 't_screenshot_big').replace('//', 'https://')
         ) || []
 
-        // ── Format similar games ──
         const similarGames = g.similar_games?.slice(0, 6).map(sg => ({
             id: sg.id,
             title: sg.name,
@@ -91,7 +189,6 @@ router.get('/game/:id', async (req, res) => {
             rating: sg.rating ? (sg.rating / 10).toFixed(1) : null
         })) || []
 
-        // ── Format platforms ──
         const platforms = g.platforms?.map(p => {
             const name = p.name
             if (name.includes('PC')) return 'PC'
@@ -136,11 +233,7 @@ router.get('/game/:id', async (req, res) => {
         res.json({ success: true, game })
 
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch game details',
-            error: error.message
-        })
+        res.status(500).json({ success: false, message: 'Failed to fetch game details', error: error.message })
     }
 })
 

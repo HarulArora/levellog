@@ -12,6 +12,7 @@ import Notifications from './pages/Notifications'
 import Search from './pages/Search'
 import GameDetail from './pages/GameDetail'
 import EditProfile from './pages/EditProfile'
+import Discover from './pages/Discover'
 
 function App() {
     return (
@@ -34,6 +35,7 @@ function App() {
                                 <Route path="/search" element={<Search />} />
                                 <Route path="/game/:igdbId" element={<GameDetail />} />
                                 <Route path="/edit-profile" element={<EditProfile />} />
+                                <Route path="/discover" element={<Discover />} />
                             </Routes>
                         </>
                     } />

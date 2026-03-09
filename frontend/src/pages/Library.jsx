@@ -6,7 +6,6 @@ import AddGameModal from '../components/library/AddGameModal'
 import Toast from '../components/ui/Toast'
 
 function Library() {
-
     const { games, loading, error, addGame, deleteGame } = useGames()
     const [activeFilter, setActiveFilter] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
@@ -52,59 +51,49 @@ function Library() {
         <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10">
 
             {/* ── Page Header ── */}
-            <div className="flex flex-wrap items-center gap-3 mb-6 pb-4 border-b border-[#2a2a35]">
-
+            <div className="flex items-center gap-3 mb-3 pb-4 border-b border-[#2a2a35]">
                 <h2
                     className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                 >
                     My Library
                 </h2>
-
                 <span className="font-mono text-xs text-[#7a7a90]">
                     {filteredGames.length} games
                 </span>
 
-                {/* Search and button — full width on mobile */}
-                <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-
-                    {/* Search */}
-                    <div className="relative flex-1 sm:flex-none">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#7a7a90] text-sm">
-                            🔍
-                        </span>
-                        <input
-                            type="text"
-                            placeholder="Search games..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full sm:w-52 bg-[#111118] border border-[#2a2a35] rounded
-                         px-3 py-2 pl-7 text-sm text-white
-                         focus:outline-none focus:border-[#c8ff57]
-                         placeholder:text-[#7a7a90] transition-colors"
-                        />
-                    </div>
-
-                    {/* Log Game button */}
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-sm
-                       rounded hover:bg-[#d4ff6e] transition-all whitespace-nowrap"
-                    >
-                        + Log Game
-                    </button>
-
+                {/* Search — pushed to right, before Log Game */}
+                <div className="relative ml-auto">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#7a7a90] text-sm">🔍</span>
+                    <input
+                        type="text"
+                        placeholder="Search games..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-52 bg-[#111118] border border-[#2a2a35] rounded
+                                   px-3 py-2 pl-7 text-sm text-white
+                                   focus:outline-none focus:border-[#c8ff57]
+                                   placeholder:text-[#7a7a90] transition-colors"
+                    />
                 </div>
+
+                {/* Log Game button — far right */}
+                <button
+                    onClick={() => setShowModal(true)}
+                    className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-sm
+                               rounded hover:bg-[#d4ff6e] transition-all whitespace-nowrap"
+                >
+                    + Log Game
+                </button>
             </div>
 
-            {/* ── Filter Buttons ── */}
-            <div className="overflow-x-auto pb-2 mb-2">
-                <FilterBar
-                    activeFilter={activeFilter}
-                    onFilter={setActiveFilter}
-                    counts={counts}
-                />
-            </div>
+            {/* ── Filters row ── */}
+            <FilterBar
+                activeFilter={activeFilter}
+                onFilter={setActiveFilter}
+                counts={counts}
+            />
+
 
             {/* ── Loading State ── */}
             {loading && (
@@ -123,12 +112,8 @@ function Library() {
             {/* ── Game Grid ── */}
             {!loading && !error && (
                 filteredGames.length > 0 ? (
-                    // Responsive grid
-                    // 2 columns on mobile
-                    // 3 columns on tablet
-                    // 4-5 columns on desktop
-                    <div className="grid grid-cols-2 sm:grid-cols-3 
-                          lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3
+                                    lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                         {filteredGames.map(game => (
                             <GameCard
                                 key={game._id}
