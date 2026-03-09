@@ -32,12 +32,7 @@ router.get('/activity/:userId', protect, async (req, res) => {
         const activity = []
 
         games.forEach(game => {
-            const gameInfo = {
-                title: game.title,
-                cover: game.cover,
-                id: game._id,
-                igdbId: game.igdbId || null
-            }
+            const gameInfo = { title: game.title, cover: game.cover, id: game._id, igdbId: game.igdbId || null }
 
             if (game.status === 'completed') {
                 activity.push({ type: 'completed', game: gameInfo, rating: game.rating > 0 ? game.rating : null, time: game.updatedAt })
@@ -75,10 +70,8 @@ router.get('/stats/:igdbId', async (req, res) => {
             ]),
             (await import('../models/GameLike.js')).default.countDocuments({ igdbId })
         ])
-
         const avgRating = ratingData[0] ? parseFloat(ratingData[0].avg.toFixed(1)) : null
         const ratingCount = ratingData[0]?.count || 0
-
         res.json({ success: true, stats: { loggedCount, avgRating, ratingCount, likeCount } })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
@@ -90,7 +83,6 @@ router.post('/stats/batch', async (req, res) => {
     try {
         const { igdbIds } = req.body
         if (!igdbIds?.length) return res.json({ success: true, stats: {} })
-
         const ids = igdbIds.map(Number)
         const [reviewData, likeCounts, logCounts] = await Promise.all([
             Game.aggregate([
@@ -106,7 +98,6 @@ router.post('/stats/batch', async (req, res) => {
                 { $group: { _id: '$igdbId', count: { $sum: 1 } } }
             ])
         ])
-
         const stats = {}
         ids.forEach(id => {
             const review = reviewData.find(r => r._id === id)
@@ -119,65 +110,57 @@ router.post('/stats/batch', async (req, res) => {
                 loggedCount: log?.count || 0
             }
         })
-
         res.json({ success: true, stats })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── POST /api/games ── +1 XP for logging
+// ── POST /api/games ── +1 XP for logging, +1 XP if rated on first log
 router.post('/', protect, async (req, res) => {
     try {
         const { title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId } = req.body
 
-        if (!title) {
-            return res.status(400).json({ success: false, message: 'Title is required' })
-        }
+        if (!title) return res.status(400).json({ success: false, message: 'Title is required' })
 
         const newGame = new Game({
             userId: req.user._id,
-            title, genre, status, rating, hours, platforms,
-            steamId, notes, cover, summary, igdbId
+            title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId
         })
-
         const savedGame = await newGame.save()
 
-        // +1 XP for logging a game
+        // +1 XP for logging
+        let updatedUser = await awardXP(req.user._id, 1)
         let xpGained = 1
-        await awardXP(req.user._id, 1)
 
         // +1 XP if rated on first log
         if (rating > 0) {
+            updatedUser = await awardXP(req.user._id, 1)
             xpGained += 1
-            await awardXP(req.user._id, 1)
         }
 
-        // +1 XP if immediately marked completed
-        if (status === 'completed') {
-            xpGained += 1
-            await awardXP(req.user._id, 1)
-        }
-
-        res.status(201).json({ success: true, message: 'Game added successfully', game: savedGame, xpGained })
+        res.status(201).json({
+            success: true,
+            message: 'Game added successfully',
+            game: savedGame,
+            xpGained,
+            xp: updatedUser.xp,
+            level: updatedUser.level,
+            badge: updatedUser.badge
+        })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to add game', error: error.message })
     }
 })
 
-// ── PUT /api/games/:id ── award/deduct XP for rating and completion changes
+// ── PUT /api/games/:id ── award/deduct XP for rating changes only
 router.put('/:id', protect, async (req, res) => {
     try {
         const existingGame = await Game.findOne({ _id: req.params.id, userId: req.user._id })
-
-        if (!existingGame) {
-            return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
-        }
+        if (!existingGame) return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
 
         const hadRatingBefore = existingGame.rating > 0
         const hasRatingNow = req.body.rating > 0
-        const wasCompleted = existingGame.status === 'completed'
-        const isNowCompleted = req.body.status === 'completed'
 
         const game = await Game.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
@@ -185,54 +168,49 @@ router.put('/:id', protect, async (req, res) => {
             { new: true }
         )
 
-        // Rating: first time rated → +1 XP
+        let updatedUser = null
+
+        // First time rating → +1 XP
         if (!hadRatingBefore && hasRatingNow) {
-            await awardXP(req.user._id, 1)
+            updatedUser = await awardXP(req.user._id, 1)
         }
-        // Rating: removed rating → -1 XP
+        // Rating removed → -1 XP
         if (hadRatingBefore && !hasRatingNow) {
-            await deductXP(req.user._id, 1)
+            updatedUser = await deductXP(req.user._id, 1)
         }
 
-        // Completion: first time completed → +1 XP
-        if (!wasCompleted && isNowCompleted) {
-            await awardXP(req.user._id, 1)
-        }
-        // Completion: un-completed (changed away from completed) → -1 XP
-        if (wasCompleted && !isNowCompleted) {
-            await deductXP(req.user._id, 1)
-        }
-
-        res.json({ success: true, message: 'Game updated', game })
+        res.json({
+            success: true,
+            message: 'Game updated',
+            game,
+            ...(updatedUser && { xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge })
+        })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to update game', error: error.message })
     }
 })
 
-// ── DELETE /api/games/:id ── deduct all XP earned for this game
+// ── DELETE /api/games/:id ── deduct XP earned for this game
 router.delete('/:id', protect, async (req, res) => {
     try {
         const game = await Game.findOne({ _id: req.params.id, userId: req.user._id })
+        if (!game) return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
 
-        if (!game) {
-            return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
-        }
-
-        // Calculate how much XP this game contributed
-        let xpToDeduct = 1 // always earned 1 for logging
-
-        if (game.rating > 0) {
-            xpToDeduct += 1 // earned 1 for rating
-        }
-
-        if (game.status === 'completed') {
-            xpToDeduct += 1 // earned 1 for completing
-        }
+        // Calculate XP to deduct: 1 for logging + 1 if had rating
+        let xpToDeduct = 1
+        if (game.rating > 0) xpToDeduct += 1
 
         await game.deleteOne()
-        await deductXP(req.user._id, xpToDeduct)
+        const updatedUser = await deductXP(req.user._id, xpToDeduct)
 
-        res.json({ success: true, message: 'Game deleted', xpDeducted: xpToDeduct })
+        res.json({
+            success: true,
+            message: 'Game deleted',
+            xpDeducted: xpToDeduct,
+            xp: updatedUser.xp,
+            level: updatedUser.level,
+            badge: updatedUser.badge
+        })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to delete game', error: error.message })
     }

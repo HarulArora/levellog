@@ -6,7 +6,7 @@ import useGames from '../hooks/useGames'
 import AddGameModal from '../components/library/AddGameModal'
 
 // ── Single comment + replies ──
-function CommentItem({ comment, currentUser, igdbId, onRefresh }) {
+function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [replyText, setReplyText] = useState('')
     const [submittingReply, setSubmittingReply] = useState(false)
@@ -59,7 +59,8 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh }) {
     const handleDelete = async () => {
         if (!window.confirm('Delete this comment?')) return
         try {
-            await api.delete(`/comments/${comment._id}`)
+            const res = await api.delete(`/comments/${comment._id}`)
+            onXpToast(res.data.message || '🗑 Comment deleted · -1 XP', 'loss')
             onRefresh()
         } catch (err) { console.error('Delete error:', err) }
     }
@@ -80,7 +81,8 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh }) {
         if (!replyText.trim()) return
         setSubmittingReply(true)
         try {
-            await api.post(`/comments/${igdbId}`, { text: replyText, parentId: comment._id })
+            const res = await api.post(`/comments/${igdbId}`, { text: replyText, parentId: comment._id })
+            onXpToast(res.data.message || '💬 Reply posted · +1 XP', 'gain')
             setReplyText('')
             setShowReplyBox(false)
             onRefresh()
@@ -124,7 +126,6 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh }) {
                         Lv.{comment.userId?.level || 1}
                     </span>
                     <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                        {/* Edited badge */}
                         {isEdited && (
                             <span className="font-mono text-[9px] text-[#7a7a90] italic">edited</span>
                         )}
@@ -224,7 +225,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh }) {
                 <div className="mt-2 flex flex-col gap-2">
                     {comment.replies.map(reply => (
                         <CommentItem key={reply._id} comment={reply} currentUser={currentUser}
-                            igdbId={igdbId} onRefresh={onRefresh} />
+                            igdbId={igdbId} onRefresh={onRefresh} onXpToast={onXpToast} />
                     ))}
                 </div>
             )}
@@ -266,7 +267,10 @@ function GameDetail() {
     const [lightboxIndex, setLightboxIndex] = useState(null)
     const [shareCopied, setShareCopied] = useState(false)
 
-    const showXpToast = (msg) => { setXpToast(msg); setTimeout(() => setXpToast(null), 3000) }
+    const showXpToast = (msg, type = 'gain') => {
+        setXpToast({ msg, type })
+        setTimeout(() => setXpToast(null), 3000)
+    }
     const showListToast = (msg, type = 'success') => { setListToast({ msg, type }); setTimeout(() => setListToast(null), 3000) }
 
     const myGame = games.find(g =>
@@ -356,7 +360,8 @@ function GameDetail() {
                 igdbId: parseInt(igdbId), gameTitle: game.title, gameCover: game.cover, genre: game.genre
             })
             setLiked(res.data.liked)
-            if (res.data.liked) showXpToast('❤️ Liked! +1 XP')
+            if (res.data.liked) showXpToast('❤️ Liked! +1 XP', 'gain')
+            else showXpToast('💔 Unliked · -1 XP', 'loss')
             await fetchPlatformStats()
         } catch (err) { } finally { setLiking(false) }
     }
@@ -370,7 +375,7 @@ function GameDetail() {
                 gameCover: game.cover, genre: game.genre, releaseYear: game.releaseYear || ''
             })
             setWishlisted(res.data.wishlisted)
-            if (res.data.wishlisted) showXpToast('🎯 Wishlisted! +1 XP')
+            if (res.data.wishlisted) showXpToast('🎯 Wishlisted!', 'gain')
         } catch (err) { } finally { setWishing(false) }
     }
 
@@ -398,7 +403,8 @@ function GameDetail() {
         if (!commentText.trim() || submittingComment) return
         setSubmittingComment(true)
         try {
-            await api.post(`/comments/${igdbId}`, { text: commentText.trim() })
+            const res = await api.post(`/comments/${igdbId}`, { text: commentText.trim() })
+            showXpToast(res.data.message || '💬 Comment posted · +1 XP', 'gain')
             setCommentText('')
             await fetchComments()
         } catch (err) { console.error('Comment error:', err) }
@@ -472,9 +478,11 @@ function GameDetail() {
 
             {/* XP Toast */}
             {xpToast && (
-                <div className="fixed top-5 right-5 z-[100] px-4 py-3 rounded-lg font-mono text-sm
-                                bg-[#c8ff57]/15 border border-[#c8ff57]/50 text-[#c8ff57] animate-pulse">
-                    {xpToast}
+                <div className={`fixed top-5 right-5 z-[100] px-4 py-3 rounded-lg font-mono text-sm border transition-all
+                                ${xpToast.type === 'loss'
+                        ? 'bg-[#ff5c5c]/15 border-[#ff5c5c]/50 text-[#ff5c5c]'
+                        : 'bg-[#c8ff57]/15 border-[#c8ff57]/50 text-[#c8ff57]'}`}>
+                    {xpToast.msg}
                 </div>
             )}
 
@@ -734,7 +742,6 @@ function GameDetail() {
                         {activeTab === 'comments' && (
                             <div className="flex flex-col gap-4">
 
-                                {/* Comment input — always visible when logged in */}
                                 {user ? (
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-3">Leave a Comment</div>
@@ -781,12 +788,12 @@ function GameDetail() {
                                     </div>
                                 )}
 
-                                {/* Comments list */}
                                 {comments.length > 0 ? (
                                     <div className="flex flex-col gap-3">
                                         {comments.map(comment => (
                                             <CommentItem key={comment._id} comment={comment}
-                                                currentUser={user} igdbId={igdbId} onRefresh={fetchComments} />
+                                                currentUser={user} igdbId={igdbId}
+                                                onRefresh={fetchComments} onXpToast={showXpToast} />
                                         ))}
                                     </div>
                                 ) : (
@@ -802,7 +809,6 @@ function GameDetail() {
                     {/* Right Column */}
                     <div className="flex flex-col gap-6">
 
-                        {/* My Log */}
                         {user && myGame && (
                             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                 <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">My Log</div>
@@ -840,7 +846,6 @@ function GameDetail() {
                             </div>
                         )}
 
-                        {/* Game Info */}
                         <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                             <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">Game Info</div>
                             <div className="flex flex-col divide-y divide-[#2a2a35]">
@@ -860,7 +865,6 @@ function GameDetail() {
                             </div>
                         </div>
 
-                        {/* Platforms */}
                         {game.platforms?.length > 0 && (
                             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                 <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">Platforms</div>
@@ -874,7 +878,6 @@ function GameDetail() {
                             </div>
                         )}
 
-                        {/* Similar Games */}
                         {game.similarGames?.length > 0 && (
                             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                 <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">Similar Games</div>
@@ -907,7 +910,6 @@ function GameDetail() {
                 </div>
             </div>
 
-            {/* Add to Library Modal */}
             {showAddModal && (
                 <AddGameModal
                     onClose={() => setShowAddModal(false)}
@@ -927,7 +929,6 @@ function GameDetail() {
                 />
             )}
 
-            {/* Add to List Modal */}
             {showListModal && (
                 <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
                     onClick={e => e.target === e.currentTarget && setShowListModal(false)}>
