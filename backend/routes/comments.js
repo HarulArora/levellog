@@ -1,6 +1,7 @@
 import express from 'express'
 import Comment from '../models/Comment.js'
 import { protect } from '../middleware/auth.js'
+import { awardXP, deductXP } from '../utils/xp.js'
 
 const router = express.Router()
 
@@ -27,13 +28,11 @@ router.get('/:igdbId', async (req, res) => {
     }
 })
 
-// ── POST /api/comments/:igdbId ──
+// ── POST /api/comments/:igdbId ── +1 XP for posting a comment
 router.post('/:igdbId', protect, async (req, res) => {
     try {
         const { text, parentId } = req.body
-        if (!text?.trim()) {
-            return res.status(400).json({ success: false, message: 'Comment text is required' })
-        }
+        if (!text?.trim()) return res.status(400).json({ success: false, message: 'Comment text is required' })
 
         const comment = await Comment.create({
             igdbId: Number(req.params.igdbId),
@@ -45,24 +44,30 @@ router.post('/:igdbId', protect, async (req, res) => {
         const populated = await Comment.findById(comment._id)
             .populate('userId', 'username avatar badge level')
 
-        res.status(201).json({ success: true, comment: populated })
+        // +1 XP for commenting (top-level and replies both earn XP)
+        const updatedUser = await awardXP(req.user._id, 1)
+
+        res.status(201).json({
+            success: true,
+            comment: populated,
+            message: 'Comment posted · +1 XP',
+            xp: updatedUser.xp,
+            level: updatedUser.level,
+            badge: updatedUser.badge
+        })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── PUT /api/comments/:id ── sets edited: true
+// ── PUT /api/comments/:id ── edit, sets edited: true, no XP change
 router.put('/:id', protect, async (req, res) => {
     try {
         const { text } = req.body
-        if (!text?.trim()) {
-            return res.status(400).json({ success: false, message: 'Comment text is required' })
-        }
+        if (!text?.trim()) return res.status(400).json({ success: false, message: 'Comment text is required' })
 
         const comment = await Comment.findOne({ _id: req.params.id, userId: req.user._id })
-        if (!comment) {
-            return res.status(404).json({ success: false, message: 'Comment not found or not authorized' })
-        }
+        if (!comment) return res.status(404).json({ success: false, message: 'Comment not found or not authorized' })
 
         comment.text = text.trim()
         comment.edited = true
@@ -77,20 +82,32 @@ router.put('/:id', protect, async (req, res) => {
     }
 })
 
-// ── DELETE /api/comments/:id ──
+// ── DELETE /api/comments/:id ── -1 XP for deleting own comment
 router.delete('/:id', protect, async (req, res) => {
     try {
         const comment = await Comment.findOne({ _id: req.params.id, userId: req.user._id })
-        if (!comment) {
-            return res.status(404).json({ success: false, message: 'Comment not found or not authorized' })
-        }
+        if (!comment) return res.status(404).json({ success: false, message: 'Comment not found or not authorized' })
 
+        // Delete replies too if top-level
         if (!comment.parentId) {
+            const replies = await Comment.find({ parentId: comment._id })
+            // Deduct XP for each reply author too
+            for (const reply of replies) {
+                await deductXP(reply.userId.toString(), 1)
+            }
             await Comment.deleteMany({ parentId: comment._id })
         }
-        await comment.deleteOne()
 
-        res.json({ success: true, message: 'Comment deleted' })
+        await comment.deleteOne()
+        const updatedUser = await deductXP(req.user._id, 1)
+
+        res.json({
+            success: true,
+            message: 'Comment deleted · -1 XP',
+            xp: updatedUser.xp,
+            level: updatedUser.level,
+            badge: updatedUser.badge
+        })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }

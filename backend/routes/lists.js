@@ -25,7 +25,7 @@ router.get('/me', protect, async (req, res) => {
     }
 })
 
-// ── POST /api/lists/custom ── create custom list (requires level 2)
+// ── POST /api/lists/custom ── requires level 2
 router.post('/custom', protect, async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
@@ -33,7 +33,8 @@ router.post('/custom', protect, async (req, res) => {
         if (user.level < 2) {
             return res.status(403).json({
                 success: false,
-                message: 'You need to reach Level 2 (5 XP) to create a custom list'
+                message: 'You need to reach Level 2 (5 XP) to create a custom list',
+                locked: true
             })
         }
 
@@ -49,9 +50,7 @@ router.post('/custom', protect, async (req, res) => {
         }
 
         const { name, description, isPublic } = req.body
-        if (!name?.trim()) {
-            return res.status(400).json({ success: false, message: 'List name is required' })
-        }
+        if (!name?.trim()) return res.status(400).json({ success: false, message: 'List name is required' })
 
         const list = await GameList.create({
             userId: req.user._id,
@@ -69,7 +68,6 @@ router.post('/custom', protect, async (req, res) => {
 // ── PUT /api/lists/custom/:id/game ──
 router.put('/custom/:id/game', protect, async (req, res) => {
     try {
-        // Check level lock — list exists but user may have fallen below level 2
         const user = await User.findById(req.user._id)
         if (user.level < 2) {
             return res.status(403).json({
@@ -83,7 +81,6 @@ router.put('/custom/:id/game', protect, async (req, res) => {
         if (!list) return res.status(404).json({ success: false, message: 'List not found' })
 
         const { igdbId, gameTitle, gameCover, genre, action } = req.body
-
         if (action === 'add') {
             const exists = list.games.find(g => g.igdbId === igdbId)
             if (!exists) list.games.push({ igdbId, gameTitle, gameCover, genre })
@@ -108,150 +105,93 @@ router.delete('/custom/:id', protect, async (req, res) => {
     }
 })
 
-// ── POST /api/lists/like ── toggle like, +1 XP on like / -1 XP on unlike
+// ── POST /api/lists/like ── +1 XP on like, -1 XP on unlike
 router.post('/like', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, genre } = req.body
         const existing = await GameLike.findOne({ userId: req.user._id, igdbId: Number(igdbId) })
 
         if (existing) {
-            // Unlike → remove and deduct XP
             await GameLike.findByIdAndDelete(existing._id)
             const updatedUser = await deductXP(req.user._id, 1)
             return res.json({
-                success: true,
-                liked: false,
-                message: 'Like removed -1 XP',
-                xp: updatedUser.xp,
-                level: updatedUser.level,
-                badge: updatedUser.badge
+                success: true, liked: false,
+                message: 'Like removed · -1 XP',
+                xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge
             })
         }
 
-        // Like → add and award XP
         await GameLike.create({ userId: req.user._id, igdbId: Number(igdbId), gameTitle, gameCover, genre })
         const updatedUser = await awardXP(req.user._id, 1)
         res.json({
-            success: true,
-            liked: true,
-            message: 'Game liked +1 XP',
-            xp: updatedUser.xp,
-            level: updatedUser.level,
-            badge: updatedUser.badge
+            success: true, liked: true,
+            message: 'Game liked · +1 XP',
+            xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge
         })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── POST /api/lists/wishlist ── toggle wishlist, +1 XP on add / -1 XP on remove
+// ── POST /api/lists/wishlist ── no XP (wishlist is free)
 router.post('/wishlist', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, genre, releaseYear } = req.body
         const existing = await Wishlist.findOne({ userId: req.user._id, igdbId: Number(igdbId) })
 
         if (existing) {
-            // Remove → deduct XP
             await Wishlist.findByIdAndDelete(existing._id)
-            const updatedUser = await deductXP(req.user._id, 1)
-            return res.json({
-                success: true,
-                wishlisted: false,
-                message: 'Removed from wishlist -1 XP',
-                xp: updatedUser.xp,
-                level: updatedUser.level,
-                badge: updatedUser.badge
-            })
+            return res.json({ success: true, wishlisted: false, message: 'Removed from wishlist' })
         }
 
-        // Add → award XP
         await Wishlist.create({ userId: req.user._id, igdbId: Number(igdbId), gameTitle, gameCover, genre, releaseYear })
-        const updatedUser = await awardXP(req.user._id, 1)
-        res.json({
-            success: true,
-            wishlisted: true,
-            message: 'Added to wishlist +1 XP',
-            xp: updatedUser.xp,
-            level: updatedUser.level,
-            badge: updatedUser.badge
-        })
+        res.json({ success: true, wishlisted: true, message: 'Added to wishlist' })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── POST /api/lists/review ── write/update review, +1 XP on first post only
+// ── POST /api/lists/review ── kept for legacy data, no XP changes
 router.post('/review', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, review, rating } = req.body
-        if (!review?.trim()) {
-            return res.status(400).json({ success: false, message: 'Review text is required' })
-        }
+        if (!review?.trim()) return res.status(400).json({ success: false, message: 'Review text is required' })
 
         const igdbIdNum = Number(igdbId)
         const existing = await GameReview.findOne({ userId: req.user._id, igdbId: igdbIdNum })
-        let updatedUser = null
         let savedReview = null
 
         if (existing) {
-            // Update only — no XP change
             existing.review = review.trim()
             if (rating !== undefined) existing.rating = Number(rating)
             await existing.save()
             savedReview = existing
         } else {
-            // First time posting → +1 XP
             savedReview = await GameReview.create({
-                userId: req.user._id,
-                igdbId: igdbIdNum,
-                gameTitle,
-                gameCover,
-                review: review.trim(),
-                rating: Number(rating) || 0
+                userId: req.user._id, igdbId: igdbIdNum,
+                gameTitle, gameCover, review: review.trim(), rating: Number(rating) || 0
             })
-            updatedUser = await awardXP(req.user._id, 1)
         }
 
         if (rating !== undefined && rating > 0) {
             const Game = (await import('../models/Game.js')).default
-            await Game.findOneAndUpdate(
-                { userId: req.user._id, igdbId: igdbIdNum },
-                { rating: Number(rating) }
-            )
+            await Game.findOneAndUpdate({ userId: req.user._id, igdbId: igdbIdNum }, { rating: Number(rating) })
         }
 
-        res.json({
-            success: true,
-            review: savedReview,
-            message: existing ? 'Review updated' : 'Review posted +1 XP',
-            ...(updatedUser && { xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge })
-        })
+        res.json({ success: true, review: savedReview, message: existing ? 'Review updated' : 'Review posted' })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── DELETE /api/lists/review/:igdbId ── delete review, -1 XP
+// ── DELETE /api/lists/review/:igdbId ──
 router.delete('/review/:igdbId', protect, async (req, res) => {
     try {
         const deleted = await GameReview.findOneAndDelete({
-            userId: req.user._id,
-            igdbId: Number(req.params.igdbId)
+            userId: req.user._id, igdbId: Number(req.params.igdbId)
         })
-        if (!deleted) {
-            return res.status(404).json({ success: false, message: 'Review not found' })
-        }
-
-        // Deduct the XP that was earned for writing the review
-        const updatedUser = await deductXP(req.user._id, 1)
-
-        res.json({
-            success: true,
-            message: 'Review deleted -1 XP',
-            xp: updatedUser.xp,
-            level: updatedUser.level,
-            badge: updatedUser.badge
-        })
+        if (!deleted) return res.status(404).json({ success: false, message: 'Review not found' })
+        res.json({ success: true, message: 'Review deleted' })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }

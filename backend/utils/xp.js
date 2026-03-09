@@ -1,11 +1,14 @@
 import User from '../models/User.js'
 
-const LEVELS = [
+export const LEVELS = [
     { level: 1, xpRequired: 0, badge: '🎮', title: 'Newbie' },
     { level: 2, xpRequired: 5, badge: '🕹️', title: 'Gamer' },
-    { level: 3, xpRequired: 15, badge: '⭐', title: 'Enthusiast' },
-    { level: 4, xpRequired: 30, badge: '🔥', title: 'Veteran' },
-    { level: 5, xpRequired: 50, badge: '💎', title: 'Legend' },
+    { level: 3, xpRequired: 25, badge: '⭐', title: 'Enthusiast' },
+    { level: 4, xpRequired: 60, badge: '🔥', title: 'Veteran' },
+    { level: 5, xpRequired: 100, badge: '💎', title: 'Legend' },
+    { level: 6, xpRequired: 150, badge: '👑', title: 'Elite' },
+    { level: 7, xpRequired: 500, badge: '🚀', title: 'Master' },
+    { level: 8, xpRequired: 1000, badge: '🌟', title: 'Immortal' },
 ]
 
 export const getLevelInfo = (xp) => {
@@ -23,30 +26,23 @@ export const getLevelInfo = (xp) => {
 export const awardXP = async (userId, amount = 1) => {
     const user = await User.findById(userId)
     if (!user) return
-
     user.xp = (user.xp || 0) + amount
-
     const { current } = getLevelInfo(user.xp)
     user.level = current.level
     user.badge = current.badge
-
     await user.save()
     return user
 }
 
-// Deduct XP — never goes below 0, level recalculates automatically
-// Unlocked content (lists, etc.) is NOT deleted — it just becomes locked
-// in the route checks (level < 2 guard) until they earn XP back
+// XP never goes below 0. Level recalculates automatically.
+// Unlocked content is preserved in DB but locked in route-level checks.
 export const deductXP = async (userId, amount = 1) => {
     const user = await User.findById(userId)
     if (!user) return
-
     user.xp = Math.max(0, (user.xp || 0) - amount)
-
     const { current } = getLevelInfo(user.xp)
     user.level = current.level
     user.badge = current.badge
-
     await user.save()
     return user
 }
