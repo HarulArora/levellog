@@ -26,7 +26,23 @@ export const awardXP = async (userId, amount = 1) => {
 
     user.xp = (user.xp || 0) + amount
 
-    // Recalculate level
+    const { current } = getLevelInfo(user.xp)
+    user.level = current.level
+    user.badge = current.badge
+
+    await user.save()
+    return user
+}
+
+// Deduct XP — never goes below 0, level recalculates automatically
+// Unlocked content (lists, etc.) is NOT deleted — it just becomes locked
+// in the route checks (level < 2 guard) until they earn XP back
+export const deductXP = async (userId, amount = 1) => {
+    const user = await User.findById(userId)
+    if (!user) return
+
+    user.xp = Math.max(0, (user.xp || 0) - amount)
+
     const { current } = getLevelInfo(user.xp)
     user.level = current.level
     user.badge = current.badge
