@@ -505,54 +505,69 @@ export default function Deals() {
     const [newDeals, setNewDeals] = useState([])
     const prevIds = useRef(new Set())
 
-    // ── Fetch Epic free games via real Epic API (through cors-proxy) ─────────
+    // ── Fetch Epic free games ─────────────────────────────────────────────────
+    // Race multiple sources simultaneously — whoever responds first wins.
+    // GamerPower runs in parallel as instant fallback.
     const fetchEpic = useCallback(async () => {
         try {
             setEpicLoading(true)
-            // Use allorigins CORS proxy to hit Epic's public promotions endpoint
+
             const epicUrl = 'https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US'
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(epicUrl)}`
-            const res = await fetch(proxyUrl)
-            const json = await res.json()
-            const data = JSON.parse(json.contents)
-            const all = data?.data?.Catalog?.searchStore?.elements || []
 
-            // FREE NOW — has active promotional offer with 100% discount
-            const freeNow = all.filter(g => {
-                const offers = g.promotions?.promotionalOffers?.[0]?.promotionalOffers || []
-                return offers.some(o => o.discountSetting?.discountPercentage === 0)
-            })
-
-            // COMING SOON — has upcoming offers but not currently free
-            const upcoming = all.filter(g => {
-                const hasUpcoming = (g.promotions?.upcomingPromotionalOffers?.[0]?.promotionalOffers || []).length > 0
-                const isFreeNow = (g.promotions?.promotionalOffers?.[0]?.promotionalOffers || []).some(
-                    o => o.discountSetting?.discountPercentage === 0
+            // Parse raw Epic API response into { freeNow, upcoming }
+            const parseEpicData = (data) => {
+                const all = data?.data?.Catalog?.searchStore?.elements || []
+                const freeNow = all.filter(g =>
+                    (g.promotions?.promotionalOffers?.[0]?.promotionalOffers || [])
+                        .some(o => o.discountSetting?.discountPercentage === 0)
                 )
-                return hasUpcoming && !isFreeNow
-            })
+                const upcoming = all.filter(g => {
+                    const hasUpcoming = (g.promotions?.upcomingPromotionalOffers?.[0]?.promotionalOffers || []).length > 0
+                    const isFreeNow = (g.promotions?.promotionalOffers?.[0]?.promotionalOffers || [])
+                        .some(o => o.discountSetting?.discountPercentage === 0)
+                    return hasUpcoming && !isFreeNow
+                })
+                return { freeNow, upcoming }
+            }
 
-            setEpicGames({ freeNow, upcoming })
-        } catch (err) {
-            // Fallback to GamerPower if proxy fails
-            try {
-                const res = await fetch('https://www.gamerpower.com/api/giveaways?platform=epic-games-store&type=game')
+            // GamerPower normalize — used as instant fallback
+            const fetchGamerPower = async () => {
+                const res = await fetch('https://www.gamerpower.com/api/giveaways?platform=epic-games-store&type=game', { signal: AbortSignal.timeout(5000) })
                 const data = await res.json()
-                const games = Array.isArray(data) ? data.slice(0, 4) : []
-                setEpicGames({
-                    freeNow: games.map(g => ({
+                if (!Array.isArray(data) || !data.length) throw new Error('empty')
+                return {
+                    freeNow: data.slice(0, 4).map(g => ({
                         id: g.id, title: g.title,
-                        keyImages: [{ type: 'OfferImageWide', url: g.image }],
+                        keyImages: [{ url: g.image }],
                         price: { totalPrice: { fmtPrice: { originalPrice: g.worth } } },
                         promotions: { promotionalOffers: [{ promotionalOffers: [{ endDate: g.end_date, discountSetting: { discountPercentage: 0 } }] }] },
-                        productSlug: null,
-                        _gamerpower: true,
-                        _url: g.open_giveaway_url,
-                    })), upcoming: []
-                })
-            } catch {
-                setEpicGames({ freeNow: [], upcoming: [] })
+                        _gamerpower: true, _url: g.open_giveaway_url,
+                    })),
+                    upcoming: [],
+                }
             }
+
+            // Two CORS proxies — race them, first one wins
+            const fetchViaProxy = async (proxyFn) => {
+                const res = await proxyFn()
+                const json = await res.json()
+                const raw = typeof json.contents === 'string' ? JSON.parse(json.contents) : json
+                return parseEpicData(raw)
+            }
+
+            const proxy1 = () => fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(epicUrl)}`, { signal: AbortSignal.timeout(6000) })
+            const proxy2 = () => fetch(`https://corsproxy.io/?url=${encodeURIComponent(epicUrl)}`, { signal: AbortSignal.timeout(6000) })
+
+            // Race all 3 sources — Epic proxy1, Epic proxy2, GamerPower
+            const result = await Promise.any([
+                fetchViaProxy(proxy1),
+                fetchViaProxy(proxy2),
+                fetchGamerPower(),
+            ])
+
+            setEpicGames(result)
+        } catch {
+            setEpicGames({ freeNow: [], upcoming: [] })
         } finally {
             setEpicLoading(false)
         }
@@ -801,7 +816,7 @@ export default function Deals() {
 
                 {/* ══ PC DEALS ════════════════════════════════════════════════════ */}
                 <div className="sec-head">
-                    <h2 className="sec-title">💸 PC DEALS</h2>
+                    <h2 className="sec-title">💸 GAME DEALS</h2>
                     <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#7a7a90' }}>
                         Steam · GOG · Humble · Fanatical · GMG & more
                     </span>
