@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+
 import Navbar from './components/Navbar'
 import Home from './pages/Home'
 import Library from './pages/Library'
@@ -13,6 +14,7 @@ import Search from './pages/Search'
 import GameDetail from './pages/GameDetail'
 import EditProfile from './pages/EditProfile'
 import Discover from './pages/Discover'
+import Deals from './pages/Deals'
 
 function App() {
     return (
@@ -36,6 +38,7 @@ function App() {
                                 <Route path="/game/:igdbId" element={<GameDetail />} />
                                 <Route path="/edit-profile" element={<EditProfile />} />
                                 <Route path="/discover" element={<Discover />} />
+                                <Route path="/deals" element={<Deals />} />
                             </Routes>
                         </>
                     } />

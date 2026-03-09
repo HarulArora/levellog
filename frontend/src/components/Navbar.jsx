@@ -15,7 +15,7 @@ function Navbar() {
     const links = [
         { name: 'HOME', path: '/' },
         { name: 'DISCOVER', path: '/discover' },
-        { name: 'DEALS', path: '/deals' },
+        { name: 'DEALS🔥', path: '/deals' },
         { name: 'LIBRARY', path: '/library' },
         { name: 'LISTS', path: '/lists' },
     ]
