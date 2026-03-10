@@ -263,6 +263,8 @@ function Library() {
 
                     onAdd={handleAddGame}
 
+                    games={games}
+
                 />
 
             )}
