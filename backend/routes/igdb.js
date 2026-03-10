@@ -9,7 +9,45 @@ router.get('/search', async (req, res) => {
     try {
         const query = req.query.q
         if (!query) return res.status(400).json({ success: false, message: 'Query is required' })
-        const games = await searchGames(query)
+        const raw = await searchGames(query)
+
+        const normCover = (c) => {
+            if (!c) return null
+            if (typeof c === 'string') return c.startsWith('http') ? c : ('https:' + c)
+            if (c.url) return c.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
+            return null
+        }
+
+        // Return ALL fields needed by both GameSearch.jsx (igdbId, genres[]) and GameSearchBar (id, genre)
+        const games = (raw || []).map(g => {
+            const genreNames = g.genres
+                ? (Array.isArray(g.genres)
+                    ? g.genres.map(x => typeof x === 'string' ? x : x.name).filter(Boolean)
+                    : [g.genres])
+                : (g.genre ? [g.genre] : [])
+
+            const title = g.title || g.name || 'Unknown'
+            const cover = normCover(g.cover)
+            const releaseYear = g.releaseYear || (g.first_release_date
+                ? new Date(g.first_release_date * 1000).getFullYear() : null)
+            const platforms = g.platforms || []
+            const summary = g.summary || g.description || ''
+            const rating = g.rating != null ? g.rating : (g.igdbRating != null ? g.igdbRating : null)
+
+            return {
+                id: g.id,
+                igdbId: g.igdbId || g.id,
+                title,
+                cover,
+                genre: genreNames[0] || null,
+                genres: genreNames,
+                releaseYear,
+                rating,
+                platforms,
+                summary,
+            }
+        })
+
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({ success: false, message: 'IGDB search failed', error: error.message })
