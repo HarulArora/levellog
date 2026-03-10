@@ -3,7 +3,7 @@ import { useState } from 'react'
 import GameSearch from './GameSearch'
 
 
-function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = null }) {
+function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = null, games = [] }) {
 
 
     const [formData, setFormData] = useState({
@@ -81,6 +81,34 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
     const handleGameSelect = (game) => {
 
+        // Check if this game is already in the user's library
+        const alreadyLogged = games.find(
+            g => g.title.toLowerCase() === game.title.toLowerCase() ||
+                (game.igdbId && g.igdbId === game.igdbId)
+        )
+
+        const mappedPlatforms = game.platforms
+
+            .map(p => {
+
+                if (p.includes('PC')) return 'PC'
+
+                if (p.includes('PlayStation')) return 'PS'
+
+                if (p.includes('Xbox')) return 'Xbox'
+
+                if (p.includes('Nintendo Switch')) return 'SW'
+
+                if (p.includes('Mac')) return 'Mac'
+
+                return null
+
+            })
+
+            .filter(Boolean)
+
+            .filter((v, i, a) => a.indexOf(v) === i)
+
         setFormData(prev => ({
 
             ...prev,
@@ -95,27 +123,14 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
             igdbId: game.igdbId || '',
 
-            platforms: game.platforms
+            // If already logged, pre-fill user's saved data; otherwise use IGDB platforms
+            platforms: alreadyLogged ? alreadyLogged.platforms : mappedPlatforms,
 
-                .map(p => {
+            status: alreadyLogged ? alreadyLogged.status : 'playing',
 
-                    if (p.includes('PC')) return 'PC'
+            rating: alreadyLogged ? alreadyLogged.rating : 0,
 
-                    if (p.includes('PlayStation')) return 'PS'
-
-                    if (p.includes('Xbox')) return 'Xbox'
-
-                    if (p.includes('Nintendo Switch')) return 'SW'
-
-                    if (p.includes('Mac')) return 'Mac'
-
-                    return null
-
-                })
-
-                .filter(Boolean)
-
-                .filter((v, i, a) => a.indexOf(v) === i)
+            hours: alreadyLogged ? alreadyLogged.hours : '',
 
         }))
 
