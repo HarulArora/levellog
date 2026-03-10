@@ -1,22 +1,13 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
+const resend = new Resend(process.env.RESEND_API_KEY)
 const BASE_URL = process.env.CLIENT_URL || 'http://localhost:5173'
-
-// Create transporter fresh each time so env vars are always loaded
-const getTransporter = () => nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
-})
 
 // ── Send email verification ───────────────────────────────────────────────────
 export const sendVerificationEmail = async (email, token) => {
     const link = `${BASE_URL}/verify-email?token=${token}`
-    const transporter = getTransporter()
-    await transporter.sendMail({
-        from: `"LevelLog" <${process.env.SMTP_USER}>`,
+    await resend.emails.send({
+        from: 'LevelLog <onboarding@resend.dev>',
         to: email,
         subject: 'Verify your LevelLog email',
         html: `
@@ -41,9 +32,8 @@ export const sendVerificationEmail = async (email, token) => {
 // ── Send password reset ───────────────────────────────────────────────────────
 export const sendPasswordResetEmail = async (email, token) => {
     const link = `${BASE_URL}/reset-password?token=${token}`
-    const transporter = getTransporter()
-    await transporter.sendMail({
-        from: `"LevelLog" <${process.env.SMTP_USER}>`,
+    await resend.emails.send({
+        from: 'LevelLog <onboarding@resend.dev>',
         to: email,
         subject: 'Reset your LevelLog password',
         html: `
