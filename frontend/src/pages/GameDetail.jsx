@@ -910,6 +910,7 @@ function GameDetail() {
                 </div>
             </div>
 
+            {/* ── ADD / EDIT MODAL ── */}
             {showAddModal && (
                 <AddGameModal
                     onClose={() => setShowAddModal(false)}
@@ -923,9 +924,14 @@ function GameDetail() {
                         } catch (err) { return { success: false } }
                     }}
                     preselectedGame={{
-                        title: game.title, genres: [game.genre || ''], cover: game.cover || '',
-                        summary: game.summary || '', igdbId: game.id, platforms: game.platforms || []
+                        title: game.title,
+                        genres: [game.genre || ''],
+                        cover: game.cover || '',
+                        summary: game.summary || '',
+                        igdbId: game.id,
+                        platforms: game.platforms || []
                     }}
+                    existingEntry={myGame ?? null}
                 />
             )}
 
