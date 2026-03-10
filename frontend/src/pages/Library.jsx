@@ -12,9 +12,7 @@ function Library() {
     const [showModal, setShowModal] = useState(false)
     const [toast, setToast] = useState(null)
 
-    const showToast = (message, type = 'success') => {
-        setToast({ message, type })
-    }
+    const showToast = (message, type = 'success') => setToast({ message, type })
 
     const counts = useMemo(() => {
         const c = { all: games.length }
@@ -30,61 +28,57 @@ function Library() {
 
     const handleAddGame = async (gameData) => {
         const result = await addGame(gameData)
-        if (result.success) {
-            showToast(`"${result.game.title}" logged!`)
-        } else {
-            showToast(result.message, 'error')
-        }
+        if (result.success) showToast(`"${result.game.title}" logged!`)
+        else showToast(result.message, 'error')
         return result
     }
 
     const handleDeleteGame = async (id, title) => {
         const result = await deleteGame(id)
-        if (result.success) {
-            showToast(`"${title}" removed`)
-        } else {
-            showToast(result.message, 'error')
-        }
+        if (result.success) showToast(`"${title}" removed`)
+        else showToast(result.message, 'error')
     }
 
     return (
-        <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-10 py-8 md:py-10">
 
             {/* ── Page Header ── */}
-            <div className="flex items-center gap-3 mb-3 pb-4 border-b border-[#2a2a35]">
-                <h2
-                    className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
-                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                >
-                    My Library
-                </h2>
-                <span className="font-mono text-xs text-[#7a7a90]">
-                    {filteredGames.length} games
-                </span>
+            <div className="mb-3 pb-4 border-b border-[#2a2a35]">
 
-                {/* Search — pushed to right, before Log Game */}
-                <div className="relative ml-auto">
+                {/* Row 1: Title + count + Log Game button */}
+                <div className="flex items-center gap-3 mb-3">
+                    <h2
+                        className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white leading-tight"
+                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                    >
+                        My Library
+                    </h2>
+                    <span className="font-mono text-xs text-[#7a7a90] shrink-0">
+                        {filteredGames.length} games
+                    </span>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="ml-auto px-3 py-2 bg-[#c8ff57] text-black font-bold text-sm
+                                   rounded hover:bg-[#d4ff6e] transition-all whitespace-nowrap shrink-0"
+                    >
+                        + Log Game
+                    </button>
+                </div>
+
+                {/* Row 2: Search — full width on mobile */}
+                <div className="relative">
                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#7a7a90] text-sm">🔍</span>
                     <input
                         type="text"
                         placeholder="Search games..."
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        className="w-52 bg-[#111118] border border-[#2a2a35] rounded
+                        className="w-full md:w-64 bg-[#111118] border border-[#2a2a35] rounded
                                    px-3 py-2 pl-7 text-sm text-white
                                    focus:outline-none focus:border-[#c8ff57]
                                    placeholder:text-[#7a7a90] transition-colors"
                     />
                 </div>
-
-                {/* Log Game button — far right */}
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-sm
-                               rounded hover:bg-[#d4ff6e] transition-all whitespace-nowrap"
-                >
-                    + Log Game
-                </button>
             </div>
 
             {/* ── Filters row ── */}
@@ -94,15 +88,14 @@ function Library() {
                 counts={counts}
             />
 
-
-            {/* ── Loading State ── */}
+            {/* ── Loading ── */}
             {loading && (
                 <div className="text-center py-20 text-[#7a7a90] font-mono text-sm">
                     Loading your library...
                 </div>
             )}
 
-            {/* ── Error State ── */}
+            {/* ── Error ── */}
             {error && !loading && (
                 <div className="text-center py-20 text-[#ff5c5c] font-mono text-sm">
                     ❌ {error}
@@ -112,8 +105,7 @@ function Library() {
             {/* ── Game Grid ── */}
             {!loading && !error && (
                 filteredGames.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3
-                                    lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                         {filteredGames.map(game => (
                             <GameCard
                                 key={game._id}
@@ -149,7 +141,6 @@ function Library() {
                     onClose={() => setToast(null)}
                 />
             )}
-
         </div>
     )
 }
