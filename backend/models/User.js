@@ -20,8 +20,8 @@ const userSchema = new mongoose.Schema(
         },
         password: {
             type: String,
-            required: true,
             minlength: 6,
+            // Not required — Google OAuth users have no password
         },
         bio: {
             type: String,
@@ -63,17 +63,50 @@ const userSchema = new mongoose.Schema(
         isPro: {
             type: Boolean,
             default: false
-        }
+        },
+
+        // ── Google OAuth ──────────────────────────────────────────
+        googleId: {
+            type: String,
+            default: null,
+            sparse: true,   // allows multiple null values with unique index
+        },
+
+        // ── Email Verification ────────────────────────────────────
+        isEmailVerified: {
+            type: Boolean,
+            default: false,
+        },
+        emailVerifyToken: {
+            type: String,
+            default: null,
+        },
+        emailVerifyExpires: {
+            type: Date,
+            default: null,
+        },
+
+        // ── Password Reset ────────────────────────────────────────
+        resetPasswordToken: {
+            type: String,
+            default: null,
+        },
+        resetPasswordExpires: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true }
 )
 
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return
+    if (!this.password) return   // Google users have no password
     this.password = await bcrypt.hash(this.password, 12)
 })
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
+    if (!this.password) return false
     return await bcrypt.compare(candidatePassword, this.password)
 }
 
