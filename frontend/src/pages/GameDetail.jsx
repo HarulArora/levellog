@@ -6,7 +6,8 @@ import useGames from '../hooks/useGames'
 import AddGameModal from '../components/library/AddGameModal'
 
 // ── Single comment + replies ──
-function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
+function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0 }) {
+    const navigate = useNavigate()
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [replyText, setReplyText] = useState('')
     const [submittingReply, setSubmittingReply] = useState(false)
@@ -35,7 +36,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
     )
 
     const handleLike = async () => {
-        if (!currentUser) return
+        if (!currentUser) { navigate('/login'); return }
         try {
             const res = await api.post(`/comments/${comment._id}/like`)
             setLikes(res.data.likes)
@@ -46,7 +47,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
     }
 
     const handleDislike = async () => {
-        if (!currentUser) return
+        if (!currentUser) { navigate('/login'); return }
         try {
             const res = await api.post(`/comments/${comment._id}/dislike`)
             setLikes(res.data.likes)
@@ -81,7 +82,11 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
         if (!replyText.trim()) return
         setSubmittingReply(true)
         try {
-            const res = await api.post(`/comments/${igdbId}`, { text: replyText, parentId: comment._id })
+            // Always reply to the top-level parent so nesting stays flat
+            const parentId = comment.parentId || comment._id
+            const mentionPrefix = `@${comment.userId?.username} `
+            const finalText = replyText.startsWith(mentionPrefix) ? replyText : mentionPrefix + replyText
+            const res = await api.post(`/comments/${igdbId}`, { text: finalText, parentId })
             onXpToast(res.data.message || '💬 Reply posted · +1 XP', 'gain')
             setReplyText('')
             setShowReplyBox(false)
@@ -103,7 +108,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
     }
 
     return (
-        <div className={comment.parentId ? 'ml-8 mt-3' : ''}>
+        <div className={depth > 0 ? 'ml-8 mt-3' : ''}>
             <div className={`bg-[#111118] border rounded-lg p-4 ${isOwn ? 'border-[#c8ff57]/20' : 'border-[#2a2a35]'}`}>
 
                 {/* Header */}
@@ -118,10 +123,11 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
                             {comment.userId?.username?.charAt(0).toUpperCase() || '?'}
                         </div>
                     )}
-                    <span className={`font-bold text-xs ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
+                    <Link to={`/user/${comment.userId?.username}`}
+                        className={`font-bold text-xs hover:underline ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
                         {comment.userId?.username || 'User'}
                         {isOwn && <span className="ml-1 font-mono text-[9px] text-[#7a7a90] normal-case font-normal">· you</span>}
-                    </span>
+                    </Link>
                     <span className="font-mono text-[9px] text-[#7a7a90] border border-[#2a2a35] rounded px-1 py-0.5">
                         Lv.{comment.userId?.level || 1}
                     </span>
@@ -134,6 +140,13 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
                         </span>
                     </div>
                 </div>
+
+                {/* Reply indicator */}
+                {comment.parentId && comment.replyingToUsername && (
+                    <div className="font-mono text-[10px] text-[#7a7a90] mb-1">
+                        ↩ replying to <span className="text-[#c8ff57]">@{comment.replyingToUsername}</span>
+                    </div>
+                )}
 
                 {/* Body */}
                 {isEditing ? (
@@ -155,30 +168,45 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
                         </div>
                     </div>
                 ) : (
-                    <p className="text-[#c8c8d8] text-sm leading-relaxed">{comment.text}</p>
+                        <p className="text-[#c8c8d8] text-sm leading-relaxed">
+                            {comment.text.split(/(@\w+)/g).map((part, i) =>
+                                /^@\w+$/.test(part) ? (
+                                    <Link key={i} to={`/user/${part.slice(1)}`}
+                                        className="text-[#c8ff57] hover:underline cursor-pointer">
+                                        {part}
+                                    </Link>
+                                ) : part
+                            )}
+                        </p>
                 )}
 
                 {/* Actions */}
                 {!isEditing && (
                     <div className="flex items-center gap-3 mt-3">
                         <button onClick={handleLike}
-                            className={`flex items-center gap-1 font-mono text-[10px] transition-colors
-                                       ${liked ? 'text-[#c8ff57]' : 'text-[#7a7a90] hover:text-[#c8ff57]'}
-                                       ${!currentUser ? 'cursor-default' : 'cursor-pointer'}`}>
+                            className={`flex items-center gap-1 font-mono text-[10px] transition-colors cursor-pointer
+                                       ${liked ? 'text-[#c8ff57]' : 'text-[#7a7a90] hover:text-[#c8ff57]'}`}>
                             👍 {likes > 0 && <span>{likes}</span>}
                         </button>
                         <button onClick={handleDislike}
-                            className={`flex items-center gap-1 font-mono text-[10px] transition-colors
-                                       ${disliked ? 'text-[#ff5c5c]' : 'text-[#7a7a90] hover:text-[#ff5c5c]'}
-                                       ${!currentUser ? 'cursor-default' : 'cursor-pointer'}`}>
+                            className={`flex items-center gap-1 font-mono text-[10px] transition-colors cursor-pointer
+                                       ${disliked ? 'text-[#ff5c5c]' : 'text-[#7a7a90] hover:text-[#ff5c5c]'}`}>
                             👎 {dislikes > 0 && <span>{dislikes}</span>}
                         </button>
-                        {currentUser && !comment.parentId && (
-                            <button onClick={() => setShowReplyBox(!showReplyBox)}
+
+                        {/* Reply button — show for ALL comments if logged in */}
+                        {currentUser && (
+                            <button onClick={() => {
+                                const opening = !showReplyBox
+                                setShowReplyBox(opening)
+                                if (opening) setReplyText(`@${comment.userId?.username} `)
+                                else setReplyText('')
+                            }}
                                 className="font-mono text-[10px] text-[#7a7a90] hover:text-white transition-colors">
                                 ↩ Reply
                             </button>
                         )}
+
                         {isOwn && (
                             <>
                                 <button onClick={() => { setIsEditing(true); setEditingText(comment.text) }}
@@ -200,7 +228,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
                 <div className="ml-8 mt-2">
                     <div className="flex gap-2">
                         <textarea value={replyText} onChange={e => setReplyText(e.target.value)}
-                            placeholder="Write a reply..." rows={2}
+                            placeholder={`Replying to @${comment.userId?.username || 'user'}...`} rows={2}
                             className="flex-1 bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2
                                        text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57]
                                        placeholder:text-[#7a7a90] transition-colors" />
@@ -225,7 +253,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
                 <div className="mt-2 flex flex-col gap-2">
                     {comment.replies.map(reply => (
                         <CommentItem key={reply._id} comment={reply} currentUser={currentUser}
-                            igdbId={igdbId} onRefresh={onRefresh} onXpToast={onXpToast} />
+                            igdbId={igdbId} onRefresh={onRefresh} onXpToast={onXpToast} depth={depth + 1} />
                     ))}
                 </div>
             )}
@@ -353,7 +381,8 @@ function GameDetail() {
     }
 
     const handleLike = async () => {
-        if (!user || liking) return
+        if (!user) { navigate('/login'); return }
+        if (liking) return
         setLiking(true)
         try {
             const res = await api.post('/lists/like', {
@@ -367,7 +396,8 @@ function GameDetail() {
     }
 
     const handleWishlist = async () => {
-        if (!user || wishing) return
+        if (!user) { navigate('/login'); return }
+        if (wishing) return
         setWishing(true)
         try {
             const res = await api.post('/lists/wishlist', {
@@ -380,6 +410,7 @@ function GameDetail() {
     }
 
     const handleOpenListModal = async () => {
+        if (!user) { navigate('/login'); return }
         setShowListModal(true)
         setLoadingLists(true)
         try {
@@ -606,29 +637,23 @@ function GameDetail() {
                                     </Link>
                                 )}
 
-                                {user && (
-                                    <button onClick={handleLike} disabled={liking}
-                                        className={`px-4 py-2 border font-mono text-xs rounded transition-all flex items-center gap-1.5
-                                                   ${liked ? 'border-[#ff5c5c] text-[#ff5c5c] bg-[#ff5c5c]/10' : 'border-white/15 text-[#a0a0b8] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'}`}>
-                                        {liked ? '❤️' : '🤍'} {liked ? 'Liked' : 'Like'}
-                                    </button>
-                                )}
+                                <button onClick={handleLike} disabled={liking}
+                                    className={`px-4 py-2 border font-mono text-xs rounded transition-all flex items-center gap-1.5
+                                               ${liked ? 'border-[#ff5c5c] text-[#ff5c5c] bg-[#ff5c5c]/10' : 'border-white/15 text-[#a0a0b8] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'}`}>
+                                    {liked ? '❤️' : '🤍'} {liked ? 'Liked' : 'Like'}
+                                </button>
 
-                                {user && (
-                                    <button onClick={handleWishlist} disabled={wishing}
-                                        className={`px-4 py-2 border font-mono text-xs rounded transition-all flex items-center gap-1.5
-                                                   ${wishlisted ? 'border-[#5c9fff] text-[#5c9fff] bg-[#5c9fff]/10' : 'border-white/15 text-[#a0a0b8] hover:border-[#5c9fff] hover:text-[#5c9fff]'}`}>
-                                        {wishlisted ? '🎯' : '＋'} {wishlisted ? 'Wishlisted' : 'Wishlist'}
-                                    </button>
-                                )}
+                                <button onClick={handleWishlist} disabled={wishing}
+                                    className={`px-4 py-2 border font-mono text-xs rounded transition-all flex items-center gap-1.5
+                                               ${wishlisted ? 'border-[#5c9fff] text-[#5c9fff] bg-[#5c9fff]/10' : 'border-white/15 text-[#a0a0b8] hover:border-[#5c9fff] hover:text-[#5c9fff]'}`}>
+                                    {wishlisted ? '🎯' : '＋'} {wishlisted ? 'Wishlisted' : 'Wishlist'}
+                                </button>
 
-                                {user && (
-                                    <button onClick={handleOpenListModal}
-                                        className="px-4 py-2 border border-white/15 text-[#a0a0b8] font-mono text-xs rounded
-                                                   hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all flex items-center gap-1.5">
-                                        📋 Add to List
-                                    </button>
-                                )}
+                                <button onClick={handleOpenListModal}
+                                    className="px-4 py-2 border border-white/15 text-[#a0a0b8] font-mono text-xs rounded
+                                               hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all flex items-center gap-1.5">
+                                    📋 Add to List
+                                </button>
 
                                 <button onClick={handleShare}
                                     className={`px-4 py-2 border font-mono text-xs rounded transition-all
@@ -793,7 +818,7 @@ function GameDetail() {
                                         {comments.map(comment => (
                                             <CommentItem key={comment._id} comment={comment}
                                                 currentUser={user} igdbId={igdbId}
-                                                onRefresh={fetchComments} onXpToast={showXpToast} />
+                                                onRefresh={fetchComments} onXpToast={showXpToast} depth={0} />
                                         ))}
                                     </div>
                                 ) : (
