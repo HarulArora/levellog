@@ -1,13 +1,23 @@
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const BASE_URL = process.env.CLIENT_URL || 'http://localhost:5173'
+
+const getTransporter = () => nodemailer.createTransport({
+    host: 'smtp-relay.brevo.com',
+    port: 587,
+    secure: false,
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+    },
+})
 
 // ── Send email verification ───────────────────────────────────────────────────
 export const sendVerificationEmail = async (email, token) => {
     const link = `${BASE_URL}/verify-email?token=${token}`
-    await resend.emails.send({
-        from: 'LevelLog <onboarding@resend.dev>',
+    const transporter = getTransporter()
+    await transporter.sendMail({
+        from: '"LevelLog" <levellog69@gmail.com>',
         to: email,
         subject: 'Verify your LevelLog email',
         html: `
@@ -32,8 +42,9 @@ export const sendVerificationEmail = async (email, token) => {
 // ── Send password reset ───────────────────────────────────────────────────────
 export const sendPasswordResetEmail = async (email, token) => {
     const link = `${BASE_URL}/reset-password?token=${token}`
-    await resend.emails.send({
-        from: 'LevelLog <onboarding@resend.dev>',
+    const transporter = getTransporter()
+    await transporter.sendMail({
+        from: '"LevelLog" <levellog69@gmail.com>',
         to: email,
         subject: 'Reset your LevelLog password',
         html: `
