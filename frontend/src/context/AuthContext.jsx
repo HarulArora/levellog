@@ -11,7 +11,6 @@ const buildUser = (userData) => ({
     bio: userData.bio || '',
     avatar: userData.avatar || '',
     isPrivate: userData.isPrivate || false,
-    isEmailVerified: userData.isEmailVerified || false,
     xp: userData.xp || 0,
     level: userData.level || 1,
     badge: userData.badge || '🎮',
@@ -50,7 +49,7 @@ export function AuthProvider({ children }) {
             const res = await api.post('/auth/signup', { username, email, password })
             const { token, user: userData } = res.data
             _setSession(token, userData)
-            return { success: true, message: res.data.message }
+            return { success: true }
         } catch (err) {
             return {
                 success: false,
@@ -71,7 +70,6 @@ export function AuthProvider({ children }) {
         }
     }
 
-    // Google Sign-In — receives access_token from @react-oauth/google
     const loginWithGoogle = async (accessToken) => {
         try {
             const res = await api.post('/auth/google', { accessToken })
@@ -98,33 +96,6 @@ export function AuthProvider({ children }) {
         }
     }
 
-    const resendVerification = async () => {
-        try {
-            const res = await api.post('/auth/resend-verification')
-            return { success: true, message: res.data.message }
-        } catch (err) {
-            return { success: false, message: err.response?.data?.message || 'Failed to send email' }
-        }
-    }
-
-    const forgotPassword = async (email) => {
-        try {
-            const res = await api.post('/auth/forgot-password', { email })
-            return { success: true, message: res.data.message }
-        } catch (err) {
-            return { success: false, message: err.response?.data?.message || 'Failed to send reset email' }
-        }
-    }
-
-    const resetPassword = async (token, password) => {
-        try {
-            const res = await api.post('/auth/reset-password', { token, password })
-            return { success: true, message: res.data.message }
-        } catch (err) {
-            return { success: false, message: err.response?.data?.message || 'Reset failed' }
-        }
-    }
-
     return (
         <AuthContext.Provider value={{
             user,
@@ -134,9 +105,6 @@ export function AuthProvider({ children }) {
             loginWithGoogle,
             logout,
             refreshUser,
-            resendVerification,
-            forgotPassword,
-            resetPassword,
         }}>
             {children}
         </AuthContext.Provider>

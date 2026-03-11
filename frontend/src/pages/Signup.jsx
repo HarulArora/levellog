@@ -22,7 +22,6 @@ function Signup() {
     const [fieldError, setFieldError] = useState({})
     const [loading, setLoading] = useState(false)
     const [googleLoading, setGoogleLoading] = useState(false)
-    const [signedUp, setSignedUp] = useState(false)
 
     // ── Username availability check ───────────────────────────────────────────
     const [usernameStatus, setUsernameStatus] = useState(null)
@@ -69,7 +68,7 @@ function Signup() {
         setLoading(false)
 
         if (result.success) {
-            setSignedUp(true)
+            navigate('/library')
         } else {
             if (result.field) {
                 setFieldError(prev => ({ ...prev, [result.field]: result.message }))
@@ -79,7 +78,6 @@ function Signup() {
         }
     }
 
-    // ── Google Sign-In ─────────────────────────────────────────────────────────
     const googleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             setGoogleLoading(true)
@@ -99,53 +97,16 @@ function Signup() {
         onError: () => setError('Google sign-in was cancelled or failed'),
     })
 
-    // ── Post-signup screen ─────────────────────────────────────────────────────
-    if (signedUp) {
-        return (
-            <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
-                <div className="w-full max-w-sm text-center">
-                    <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        LEVEL<span className="text-white">LOG</span>
-                    </div>
-                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-8 mt-8">
-                        <div className="text-4xl mb-4">📧</div>
-                        <h2 className="font-black text-xl tracking-widest uppercase mb-3"
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            Check Your Email
-                        </h2>
-                        <p className="text-[#7a7a90] font-mono text-xs leading-relaxed mb-6">
-                            We sent a verification link to<br />
-                            <span className="text-[#c8ff57]">{formData.email}</span>.<br /><br />
-                            Click the link to activate your account. The link expires in 24 hours.
-                        </p>
-                        <Link to="/login"
-                            className="block w-full py-3 bg-[#c8ff57] text-black font-bold text-sm
-                                       rounded hover:bg-[#d4ff6e] transition-all text-center">
-                            Go to Login
-                        </Link>
-                        <p className="text-[#3a3a50] font-mono text-[10px] mt-4">
-                            Didn't get it? Check your spam folder.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
 
-                {/* Logo */}
                 <div className="text-center mb-8">
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         LEVEL<span className="text-white">LOG</span>
                     </div>
-                    <p className="text-[#7a7a90] font-mono text-xs">
-                        Start your game diary today
-                    </p>
+                    <p className="text-[#7a7a90] font-mono text-xs">Start your game diary today</p>
                 </div>
 
                 <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
@@ -174,14 +135,12 @@ function Signup() {
                         )}
                     </button>
 
-                    {/* Divider */}
                     <div className="flex items-center gap-3 mb-4">
                         <div className="flex-1 h-px bg-[#2a2a35]" />
                         <span className="font-mono text-[10px] text-[#3a3a50] uppercase tracking-wider">or</span>
                         <div className="flex-1 h-px bg-[#2a2a35]" />
                     </div>
 
-                    {/* Global error */}
                     {error && (
                         <div className="bg-[#ff5c5c]/10 border border-[#ff5c5c]/30
                                         text-[#ff5c5c] font-mono text-xs p-3 rounded mb-4">

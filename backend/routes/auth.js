@@ -7,7 +7,6 @@ import Notification from '../models/Notification.js'
 import FollowRequest from '../models/FollowRequest.js'
 import protect from '../middleware/auth.js'
 import { awardXP, deductXP } from '../utils/xp.js'
-import { sendVerificationEmail, sendPasswordResetEmail } from '../utils/email.js'
 
 const router = express.Router()
 
@@ -20,7 +19,6 @@ const userPayload = (user) => ({
     username: user.username,
     email: user.email,
     isPrivate: user.isPrivate,
-    isEmailVerified: user.isEmailVerified,
     avatar: user.avatar || '',
     bio: user.bio || '',
     xp: user.xp || 0,
@@ -79,28 +77,16 @@ router.post('/signup', async (req, res) => {
             })
         }
 
-        const emailVerifyToken = crypto.randomBytes(32).toString('hex')
-        const emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000)
-
         const user = await User.create({
             username: username.trim(),
             email: email.toLowerCase().trim(),
             password,
-            emailVerifyToken,
-            emailVerifyExpires,
-            isEmailVerified: false,
         })
-
-        try {
-            await sendVerificationEmail(user.email, emailVerifyToken)
-        } catch (emailErr) {
-            console.error('Failed to send verification email:', emailErr.message)
-        }
 
         const token = createToken(user._id)
         res.status(201).json({
             success: true,
-            message: 'Account created! Please check your email to verify your account.',
+            message: 'Account created successfully!',
             token,
             user: userPayload(user),
         })
@@ -171,7 +157,6 @@ router.post('/google', async (req, res) => {
             if (!user.googleId) {
                 user.googleId = googleId
                 if (!user.avatar && picture) user.avatar = picture
-                if (!user.isEmailVerified) user.isEmailVerified = true
                 await user.save()
             }
         } else {
@@ -192,7 +177,6 @@ router.post('/google', async (req, res) => {
                 password: crypto.randomBytes(32).toString('hex'),
                 googleId,
                 avatar: picture || '',
-                isEmailVerified: true,
             })
         }
 
@@ -201,117 +185,6 @@ router.post('/google', async (req, res) => {
     } catch (error) {
         console.error('Google auth error:', error)
         res.status(500).json({ success: false, message: 'Google sign-in failed', error: error.message })
-    }
-})
-
-
-// ── GET /api/auth/verify-email?token=xxx ─────────────────────────────────────
-router.get('/verify-email', async (req, res) => {
-    try {
-        const { token } = req.query
-        if (!token) {
-            return res.status(400).json({ success: false, message: 'No token provided' })
-        }
-
-        const user = await User.findOne({
-            emailVerifyToken: token,
-            emailVerifyExpires: { $gt: new Date() },
-        })
-
-        if (!user) {
-            return res.status(400).json({ success: false, message: 'Token is invalid or has expired' })
-        }
-
-        user.isEmailVerified = true
-        user.emailVerifyToken = null
-        user.emailVerifyExpires = null
-        await user.save()
-
-        res.json({ success: true, message: 'Email verified successfully! You can now log in.' })
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
-    }
-})
-
-
-// ── POST /api/auth/resend-verification ───────────────────────────────────────
-router.post('/resend-verification', protect, async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id)
-        if (user.isEmailVerified) {
-            return res.status(400).json({ success: false, message: 'Email is already verified' })
-        }
-
-        const emailVerifyToken = crypto.randomBytes(32).toString('hex')
-        user.emailVerifyToken = emailVerifyToken
-        user.emailVerifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000)
-        await user.save()
-
-        await sendVerificationEmail(user.email, emailVerifyToken)
-        res.json({ success: true, message: 'Verification email sent!' })
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
-    }
-})
-
-
-// ── POST /api/auth/forgot-password ───────────────────────────────────────────
-router.post('/forgot-password', async (req, res) => {
-    try {
-        const { email } = req.body
-        if (!email) {
-            return res.status(400).json({ success: false, message: 'Please provide your email' })
-        }
-
-        const user = await User.findOne({ email: email.toLowerCase() })
-        if (!user || (user.googleId && !user.password)) {
-            return res.json({ success: true, message: 'If that email exists, a reset link has been sent.' })
-        }
-
-        const resetToken = crypto.randomBytes(32).toString('hex')
-        user.resetPasswordToken = resetToken
-        user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000)
-        await user.save()
-
-        console.log('SMTP_USER:', process.env.SMTP_USER, 'SMTP_PASS:', process.env.SMTP_PASS ? 'SET' : 'NOT SET')
-
-        await sendPasswordResetEmail(user.email, resetToken)
-        res.json({ success: true, message: 'If that email exists, a reset link has been sent.' })
-    } catch (err) {
-        console.error('FORGOT PASSWORD ERROR:', err)
-        res.status(500).json({ success: false, message: err.message })
-    }
-})
-
-
-// ── POST /api/auth/reset-password ────────────────────────────────────────────
-router.post('/reset-password', async (req, res) => {
-    try {
-        const { token, password } = req.body
-        if (!token || !password) {
-            return res.status(400).json({ success: false, message: 'Token and new password are required' })
-        }
-        if (password.length < 6) {
-            return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' })
-        }
-
-        const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpires: { $gt: new Date() },
-        })
-
-        if (!user) {
-            return res.status(400).json({ success: false, message: 'Reset link is invalid or has expired' })
-        }
-
-        user.password = password
-        user.resetPasswordToken = null
-        user.resetPasswordExpires = null
-        await user.save()
-
-        res.json({ success: true, message: 'Password reset successfully! You can now log in.' })
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
     }
 })
 
@@ -505,7 +378,6 @@ router.put('/profile', protect, async (req, res) => {
                 bio: updatedUser.bio,
                 avatar: updatedUser.avatar,
                 isPrivate: updatedUser.isPrivate,
-                isEmailVerified: updatedUser.isEmailVerified,
                 xp: updatedUser.xp,
                 level: updatedUser.level,
                 badge: updatedUser.badge,
