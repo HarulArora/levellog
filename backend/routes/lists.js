@@ -17,7 +17,7 @@ router.get('/me', protect, async (req, res) => {
             GameLike.find({ userId: req.user._id }).sort({ createdAt: -1 }),
             Wishlist.find({ userId: req.user._id }).sort({ createdAt: -1 }),
             GameReview.find({ userId: req.user._id }).sort({ createdAt: -1 }),
-            User.findById(req.user._id).select('xp level badge isPro username')
+            User.findById(req.user._id).select('xp level badge username')
         ])
         res.json({ success: true, customLists, likes, wishlist, reviews, user })
     } catch (err) {
@@ -25,7 +25,17 @@ router.get('/me', protect, async (req, res) => {
     }
 })
 
-// ── POST /api/lists/custom ── requires level 2
+// ── GET /api/lists/user/:userId ── fetch another user's lists (for profile page)
+router.get('/user/:userId', async (req, res) => {
+    try {
+        const lists = await GameList.find({ userId: req.params.userId }).sort({ createdAt: -1 })
+        res.json({ success: true, lists })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
+// ── POST /api/lists/custom ── requires level 2, max 2 lists
 router.post('/custom', protect, async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
@@ -38,15 +48,12 @@ router.post('/custom', protect, async (req, res) => {
             })
         }
 
-        if (!user.isPro) {
-            const existing = await GameList.countDocuments({ userId: req.user._id })
-            if (existing >= 1) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Free users can only create 1 custom list. Upgrade to Pro for unlimited lists.',
-                    requiresPro: true
-                })
-            }
+        const existing = await GameList.countDocuments({ userId: req.user._id })
+        if (existing >= 2) {
+            return res.status(403).json({
+                success: false,
+                message: 'You can have up to 2 custom lists. Delete one to create another.'
+            })
         }
 
         const { name, description, isPublic } = req.body
@@ -65,7 +72,25 @@ router.post('/custom', protect, async (req, res) => {
     }
 })
 
-// ── PUT /api/lists/custom/:id/game ──
+// ── PUT /api/lists/custom/:id ── edit list name/description/visibility
+router.put('/custom/:id', protect, async (req, res) => {
+    try {
+        const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id })
+        if (!list) return res.status(404).json({ success: false, message: 'List not found' })
+
+        const { name, description, isPublic } = req.body
+        if (name !== undefined) list.name = name.trim()
+        if (description !== undefined) list.description = description.trim()
+        if (isPublic !== undefined) list.isPublic = isPublic
+
+        await list.save()
+        res.json({ success: true, list })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
+// ── PUT /api/lists/custom/:id/game ── add or remove a game
 router.put('/custom/:id/game', protect, async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
@@ -82,10 +107,10 @@ router.put('/custom/:id/game', protect, async (req, res) => {
 
         const { igdbId, gameTitle, gameCover, genre, action } = req.body
         if (action === 'add') {
-            const exists = list.games.find(g => g.igdbId === igdbId)
+            const exists = list.games.find(g => String(g.igdbId) === String(igdbId))
             if (!exists) list.games.push({ igdbId, gameTitle, gameCover, genre })
         } else if (action === 'remove') {
-            list.games = list.games.filter(g => g.igdbId !== igdbId)
+            list.games = list.games.filter(g => String(g.igdbId) !== String(igdbId))
         }
 
         await list.save()
@@ -133,7 +158,7 @@ router.post('/like', protect, async (req, res) => {
     }
 })
 
-// ── POST /api/lists/wishlist ── no XP (wishlist is free)
+// ── POST /api/lists/wishlist ──
 router.post('/wishlist', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, genre, releaseYear } = req.body
@@ -151,7 +176,7 @@ router.post('/wishlist', protect, async (req, res) => {
     }
 })
 
-// ── POST /api/lists/review ── kept for legacy data, no XP changes
+// ── POST /api/lists/review ──
 router.post('/review', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, review, rating } = req.body
