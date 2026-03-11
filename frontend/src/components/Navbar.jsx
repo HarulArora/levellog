@@ -10,6 +10,7 @@ function Navbar() {
     const { unreadCount, setUnreadCount } = useNotifications()
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
+    const [dealsBadge, setDealsBadge] = useState(0)
     const dropdownRef = useRef(null)
 
     const links = [
@@ -19,6 +20,18 @@ function Navbar() {
         { name: 'LIBRARY', path: '/library' },
         { name: 'LISTS', path: '/lists' },
     ]
+
+    // Listen for new deals from Deals page
+    useEffect(() => {
+        const handler = (e) => setDealsBadge(prev => prev + e.detail.count)
+        window.addEventListener('levellog:new-deals', handler)
+        return () => window.removeEventListener('levellog:new-deals', handler)
+    }, [])
+
+    // Clear badge when visiting /deals
+    useEffect(() => {
+        if (location.pathname === '/deals') setDealsBadge(0)
+    }, [location.pathname])
 
     useEffect(() => {
         const handler = (e) => {
@@ -43,6 +56,12 @@ function Navbar() {
 
     const handleNotificationClick = () => {
         setUnreadCount(0)
+        setMenuOpen(false)
+        setDropdownOpen(false)
+    }
+
+    const handleDealsClick = () => {
+        setDealsBadge(0)
         setMenuOpen(false)
         setDropdownOpen(false)
     }
@@ -79,17 +98,28 @@ function Navbar() {
 
                 {/* Desktop links */}
                 <ul className="hidden md:flex gap-6 list-none">
-                    {links.map(link => (
-                        <li key={link.path}>
-                            <Link to={link.path}
-                                className={`text-xs font-semibold tracking-widest uppercase transition-colors
-                                           ${location.pathname === link.path
-                                        ? 'text-[#c8ff57]'
-                                        : 'text-[#7a7a90] hover:text-[#c8ff57]'}`}>
-                                {link.name}
-                            </Link>
-                        </li>
-                    ))}
+                    {links.map(link => {
+                        const isDeals = link.path === '/deals'
+                        const isActive = location.pathname === link.path
+                        return (
+                            <li key={link.path} className="relative">
+                                <Link
+                                    to={link.path}
+                                    onClick={isDeals ? handleDealsClick : handleLinkClick}
+                                    className={`text-xs font-semibold tracking-widest uppercase transition-colors
+                                               ${isActive ? 'text-[#c8ff57]' : 'text-[#7a7a90] hover:text-[#c8ff57]'}`}
+                                >
+                                    {link.name}
+                                </Link>
+                                {/* Deals new-deals badge */}
+                                {isDeals && dealsBadge > 0 && (
+                                    <div className="absolute -top-2 -right-3 w-4 h-4 bg-[#c8ff57] rounded-full flex items-center justify-center font-mono text-[9px] text-black font-bold pointer-events-none">
+                                        {dealsBadge > 9 ? '9+' : dealsBadge}
+                                    </div>
+                                )}
+                            </li>
+                        )
+                    })}
                 </ul>
 
                 {/* Desktop right */}
@@ -124,7 +154,6 @@ function Navbar() {
                                             </div>
                                         </div>
 
-                                        {/* Menu items — Stats & Edit Profile removed */}
                                         <div className="py-1">
                                             <Link to={`/user/${user.username}`} onClick={handleLinkClick}
                                                 className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-sm">
@@ -178,13 +207,25 @@ function Navbar() {
             {menuOpen && (
                 <div className="md:hidden border-t border-[#2a2a35] bg-[#0a0a0f] px-5 py-4 flex flex-col gap-4">
 
-                    {links.map(link => (
-                        <Link key={link.path} to={link.path} onClick={handleLinkClick}
-                            className={`text-sm font-semibold tracking-widest uppercase
-                                       ${location.pathname === link.path ? 'text-[#c8ff57]' : 'text-[#7a7a90]'}`}>
-                            {link.name}
-                        </Link>
-                    ))}
+                    {links.map(link => {
+                        const isDeals = link.path === '/deals'
+                        return (
+                            <Link
+                                key={link.path}
+                                to={link.path}
+                                onClick={isDeals ? handleDealsClick : handleLinkClick}
+                                className={`text-sm font-semibold tracking-widest uppercase flex items-center gap-2
+                                           ${location.pathname === link.path ? 'text-[#c8ff57]' : 'text-[#7a7a90]'}`}
+                            >
+                                {link.name}
+                                {isDeals && dealsBadge > 0 && (
+                                    <span className="bg-[#c8ff57] text-black rounded-full px-2 text-[9px] font-bold font-mono">
+                                        {dealsBadge > 9 ? '9+' : dealsBadge}
+                                    </span>
+                                )}
+                            </Link>
+                        )
+                    })}
 
                     {user && (
                         <Link to="/notifications" onClick={handleNotificationClick}
@@ -202,7 +243,6 @@ function Navbar() {
 
                     {user ? (
                         <div className="flex flex-col gap-1">
-                            {/* Mobile user info */}
                             <div className="flex items-center gap-3 py-2">
                                 {user.avatar ? (
                                     <img src={user.avatar} alt={user.username} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2a2a35]" />
@@ -217,7 +257,6 @@ function Navbar() {
                                 </div>
                             </div>
 
-                            {/* My Profile only — Stats & Edit Profile removed */}
                             <Link to={`/user/${user.username}`} onClick={handleLinkClick}
                                 className="flex items-center gap-3 py-2.5 text-[#a0a0b8] hover:text-white transition-colors">
                                 <span>👤</span>
