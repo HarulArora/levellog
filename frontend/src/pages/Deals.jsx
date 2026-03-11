@@ -376,18 +376,31 @@ export default function Deals() {
 
             const parseEpicData = (data) => {
                 const all = data?.data?.Catalog?.searchStore?.elements || []
+                const now = new Date()
+
                 const freeNow = all.filter(g => {
-                    const offers = g.promotions?.promotionalOffers?.[0]?.promotionalOffers || []
-                    return offers.some(o =>
-                        o.discountSetting?.discountPercentage === 0 && o.endDate
-                    )
+                    // Method 1: promotional offer with discountPercentage 0 that's currently active
+                    const activePromo = (g.promotions?.promotionalOffers?.[0]?.promotionalOffers || [])
+                        .some(o => {
+                            const start = new Date(o.startDate)
+                            const end = new Date(o.endDate)
+                            return o.discountSetting?.discountPercentage === 0 && start <= now && end > now
+                        })
+
+                    // Method 2: discountPrice is literally 0 (e.g. Turnip Boy style)
+                    const priceIsZero = g.price?.totalPrice?.discountPrice === 0 &&
+                        g.price?.totalPrice?.originalPrice > 0
+
+                    return activePromo || priceIsZero
                 })
+
                 const upcoming = all.filter(g => {
-                    const hasUpcoming = (g.promotions?.upcomingPromotionalOffers?.[0]?.promotionalOffers || []).length > 0
-                    const isFreeNow = (g.promotions?.promotionalOffers?.[0]?.promotionalOffers || [])
+                    const hasUpcoming = (g.promotions?.upcomingPromotionalOffers?.[0]?.promotionalOffers || [])
                         .some(o => o.discountSetting?.discountPercentage === 0)
+                    const isFreeNow = freeNow.some(f => f.id === g.id)
                     return hasUpcoming && !isFreeNow
                 })
+
                 return { freeNow, upcoming }
             }
 
