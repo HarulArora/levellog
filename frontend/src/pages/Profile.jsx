@@ -31,6 +31,9 @@ function Profile() {
 
     const [games, setGames] = useState([])
 
+    // ── ADDED ──
+    const [lists, setLists] = useState([])
+    const [selectedList, setSelectedList] = useState(null)
 
     const [loading, setLoading] = useState(true)
 
@@ -122,6 +125,23 @@ function Profile() {
     }, [user, isOwnProfile, isFollowing])
 
 
+    // ── ADDED: visibility rules for lists ──
+    // Public profile  → Lists tab visible to everyone; only public lists shown to others
+    // Private profile → Lists tab visible only to followers; only public lists shown to them
+    // Private list    → never shown to anyone except the owner
+    const canSeeLists = useMemo(() => {
+        if (!user) return false
+        if (isOwnProfile) return true
+        if (user.isPrivate) return isFollowing
+        return true
+    }, [user, isOwnProfile, isFollowing])
+
+    const visibleLists = useMemo(() => {
+        if (!lists.length) return []
+        if (isOwnProfile) return lists
+        return lists.filter(l => l.isPublic)
+    }, [lists, isOwnProfile])
+
 
     // ── FETCH PROFILE ──
 
@@ -173,11 +193,21 @@ function Profile() {
 
                 setGames(gamesRes.data.games)
 
+                // ── ADDED: fetch this user's lists ──
+                try {
+                    const listsRes = await api.get(`/lists/user/${fetchedUser._id}`)
+                    setLists(listsRes.data.lists || [])
+                } catch {
+                    setLists([])
+                }
+
 
             } else {
 
 
                 setGames([])
+
+                setLists([])
 
 
             }
@@ -213,6 +243,9 @@ function Profile() {
 
 
             setGames([])
+
+            setLists([])           // ── ADDED
+            setSelectedList(null)  // ── ADDED
 
 
             setError(null)
@@ -1076,13 +1109,16 @@ function Profile() {
 
                         { id: 'stats', label: '📊 Stats' },
 
+                        // ── ADDED: Lists tab ──
+                        ...(canSeeLists ? [{ id: 'lists', label: '📋 Lists' }] : []),
+
                     ].map(tab => (
 
                         <button
 
                             key={tab.id}
 
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => { setActiveTab(tab.id); setSelectedList(null) }}
 
                             className={`font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-lg border transition-all
 
@@ -1496,6 +1532,122 @@ function Profile() {
 
                 </div>
 
+            )}
+
+
+            {/* ── ADDED: Lists Tab ── */}
+            {canSeeGames && activeTab === 'lists' && (
+                <div className="flex flex-col gap-4">
+
+                    {selectedList && (
+                        <button onClick={() => setSelectedList(null)}
+                            className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors font-mono text-xs flex items-center gap-1 self-start">
+                            ← Back to Lists
+                        </button>
+                    )}
+
+                    {selectedList ? (
+                        // ── Single list detail ──
+                        <div className="flex flex-col gap-4">
+                            <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center text-2xl flex-shrink-0">📋</div>
+                                    <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h2 className="font-black text-xl text-white tracking-widest uppercase"
+                                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{selectedList.name}</h2>
+                                            <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm
+                                                             ${selectedList.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
+                                                {selectedList.isPublic ? 'Public' : 'Private'}
+                                            </span>
+                                        </div>
+                                        {selectedList.description && (
+                                            <div className="font-mono text-xs text-[#7a7a90] mt-1">{selectedList.description}</div>
+                                        )}
+                                        <div className="font-mono text-[10px] text-[#7a7a90] mt-1">{selectedList.games?.length || 0} games</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {selectedList.games?.length > 0 ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                    {selectedList.games.map(game => (
+                                        <Link key={game.igdbId} to={game.igdbId ? `/game/${game.igdbId}` : '#'}
+                                            className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden
+                                                       hover:border-[#c8ff57]/50 transition-all group">
+                                            {game.gameCover ? (
+                                                <img src={game.gameCover} alt={game.gameTitle}
+                                                    className="w-full h-[140px] object-cover group-hover:opacity-90 transition-opacity" />
+                                            ) : (
+                                                <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center text-3xl">🎮</div>
+                                            )}
+                                            <div className="p-2">
+                                                <div className="text-white font-semibold text-xs truncate group-hover:text-[#c8ff57] transition-colors">
+                                                    {game.gameTitle}
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-16 gap-3 bg-[#111118] border border-[#2a2a35] rounded-lg">
+                                    <div className="text-4xl">📋</div>
+                                    <div className="text-[#7a7a90] font-mono text-sm">No games in this list yet</div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        // ── All lists overview ──
+                        visibleLists.length > 0 ? (
+                            visibleLists.map(list => (
+                                <div key={list._id} onClick={() => setSelectedList(list)}
+                                    className="bg-[#111118] border border-[#2a2a35] rounded-lg hover:border-[#c8ff57]/30 transition-all overflow-hidden cursor-pointer">
+                                    <div className="flex items-center gap-4 p-4">
+                                        <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center text-2xl flex-shrink-0">📋</div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-white font-semibold text-sm truncate">{list.name}</div>
+                                                <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm
+                                                                 ${list.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
+                                                    {list.isPublic ? 'Public' : 'Private'}
+                                                </span>
+                                            </div>
+                                            {list.description && (
+                                                <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5 truncate">{list.description}</div>
+                                            )}
+                                            <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5">{list.games?.length || 0} games</div>
+                                        </div>
+                                        <span className="font-mono text-[10px] text-[#7a7a90]">→</span>
+                                    </div>
+                                    {list.games?.length > 0 && (
+                                        <div className="px-4 pb-4 flex gap-2 flex-wrap">
+                                            {list.games.slice(0, 6).map(game => (
+                                                game.gameCover ? (
+                                                    <img key={game.igdbId} src={game.gameCover} alt={game.gameTitle}
+                                                        className="w-10 h-14 object-cover rounded hover:opacity-80 transition-all" />
+                                                ) : (
+                                                    <div key={game.igdbId} className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center text-sm">🎮</div>
+                                                )
+                                            ))}
+                                            {list.games.length > 6 && (
+                                                <div className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center font-mono text-[9px] text-[#7a7a90]">
+                                                    +{list.games.length - 6}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-16 gap-3 bg-[#111118] border border-[#2a2a35] rounded-lg">
+                                <div className="text-4xl">📋</div>
+                                <div className="text-white font-semibold text-sm">No public lists</div>
+                                <div className="text-[#7a7a90] font-mono text-[10px] text-center">
+                                    {user.username} hasn't made any public lists yet
+                                </div>
+                            </div>
+                        )
+                    )}
+                </div>
             )}
 
 
