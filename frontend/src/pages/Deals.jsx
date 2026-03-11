@@ -75,11 +75,46 @@ const FILTER_STORES = [
 const DEALS_PER_PAGE = 30
 const ALL_STORE_IDS = ['1', '7', '11', '15', '3', '25', '35', '21', '6', '8', '13']
 
-// Route every CheapShark request through corsproxy.io to avoid CORS + rate limit
-const PROXY = 'https://corsproxy.io/?url='
+// ─── Proxy helpers ────────────────────────────────────────────────────────────
+// Try multiple CORS proxies in order until one succeeds.
+// Each proxy function receives the raw target URL and returns a Response.
 
-function proxyUrl(url) {
-    return `${PROXY}${encodeURIComponent(url)}`
+const PROXY_LIST = [
+    // 1. corsproxy.io  (works on most hosts; sometimes rate-limits deployed sites)
+    (url) => fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) }),
+    // 2. allorigins – returns {contents, status}
+    async (url) => {
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) })
+        if (!res.ok) throw new Error(`allorigins ${res.status}`)
+        const { contents } = await res.json()
+        // Wrap in a synthetic Response so callers can do .json()
+        return new Response(contents, { headers: { 'Content-Type': 'application/json' } })
+    },
+    // 3. thingproxy (reliable for production deployments)
+    (url) => fetch(`https://thingproxy.freeboard.io/fetch/${url}`, { signal: AbortSignal.timeout(7000) }),
+    // 4. htmldriven cors-proxy
+    (url) => fetch(`https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) }),
+    // 5. Direct (works if the target has open CORS headers – e.g. CheapShark does)
+    (url) => fetch(url, { signal: AbortSignal.timeout(8000) }),
+]
+
+/**
+ * Fetch JSON from `targetUrl` by trying each proxy in PROXY_LIST until success.
+ * Returns parsed JSON or throws if all fail.
+ */
+async function fetchWithProxies(targetUrl) {
+    let lastErr
+    for (const proxyFn of PROXY_LIST) {
+        try {
+            const res = await proxyFn(targetUrl)
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const json = await res.json()
+            return json
+        } catch (e) {
+            lastErr = e
+        }
+    }
+    throw lastErr || new Error('All proxies failed')
 }
 
 function getTimeLeft(endDate) {
@@ -104,8 +139,20 @@ async function fetchWithDelay(urls, delayMs = 300) {
     const results = []
     for (const url of urls) {
         try {
-            const res = await fetch(url)
-            const json = await res.json()
+            // CheapShark supports direct CORS, so try without proxy first,
+            // fall back to proxy chain on failure.
+            let json
+            try {
+                const res = await fetch(url.replace(/^https:\/\/corsproxy\.io\/\?url=/, '').replace(/^[^?]*\?url=/, ''), { signal: AbortSignal.timeout(6000) })
+                if (!res.ok) throw new Error(`direct ${res.status}`)
+                json = await res.json()
+            } catch {
+                // url might already be a proxied URL or direct failed – unwrap & retry via proxy chain
+                const target = (() => {
+                    try { return decodeURIComponent(url.split('?url=')[1] || url) } catch { return url }
+                })()
+                json = await fetchWithProxies(target)
+            }
             results.push(json)
         } catch {
             results.push(null)
@@ -331,7 +378,6 @@ export default function Deals() {
                 const all = data?.data?.Catalog?.searchStore?.elements || []
                 const freeNow = all.filter(g => {
                     const offers = g.promotions?.promotionalOffers?.[0]?.promotionalOffers || []
-                    // Must have active promo at 0% AND an endDate (so it's limited-time, not permanently free)
                     return offers.some(o =>
                         o.discountSetting?.discountPercentage === 0 && o.endDate
                     )
@@ -345,20 +391,27 @@ export default function Deals() {
                 return { freeNow, upcoming }
             }
 
-            const fetchViaProxy = async (proxyFn) => {
-                const res = await proxyFn()
-                const json = await res.json()
-                const raw = typeof json.contents === 'string' ? JSON.parse(json.contents) : json
-                return parseEpicData(raw)
+            // Try every proxy in sequence for Epic API
+            const tryProxies = async () => {
+                for (const proxyFn of PROXY_LIST) {
+                    try {
+                        const res = await proxyFn(epicUrl)
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+                        const raw = await res.json()
+                        // allorigins wraps in { contents }
+                        const data = raw.contents ? JSON.parse(raw.contents) : raw
+                        const result = parseEpicData(data)
+                        if (result.freeNow.length > 0 || result.upcoming.length > 0) return result
+                    } catch {
+                        // try next proxy
+                    }
+                }
+                throw new Error('All Epic proxies failed')
             }
 
-            const proxy1 = () => fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(epicUrl)}`, { signal: AbortSignal.timeout(6000) })
-            const proxy2 = () => fetch(`https://corsproxy.io/?url=${encodeURIComponent(epicUrl)}`, { signal: AbortSignal.timeout(6000) })
-
-            // GamerPower as fallback
+            // GamerPower as final fallback
             const fetchGamerPower = async () => {
-                const res = await fetch(proxyUrl('https://www.gamerpower.com/api/giveaways?platform=epic-games-store&type=game'), { signal: AbortSignal.timeout(5000) })
-                const data = await res.json()
+                const data = await fetchWithProxies('https://www.gamerpower.com/api/giveaways?platform=epic-games-store&type=game')
                 if (!Array.isArray(data) || !data.length) throw new Error('empty')
                 return {
                     freeNow: data.slice(0, 4).map(g => ({
@@ -372,11 +425,7 @@ export default function Deals() {
                 }
             }
 
-            const result = await Promise.any([
-                fetchViaProxy(proxy1),
-                fetchViaProxy(proxy2),
-                fetchGamerPower(),
-            ])
+            const result = await Promise.any([tryProxies(), fetchGamerPower()])
             setEpicGames(result)
         } catch {
             setEpicGames({ freeNow: [], upcoming: [] })
@@ -391,29 +440,29 @@ export default function Deals() {
             setFetchStatus('Fetching deals...')
             let data = []
 
+            // CheapShark supports open CORS — direct fetch works without a proxy.
+            // We build direct URLs here; fetchWithDelay will try direct first, then fall back.
             if (storeFilter === 'all') {
-                // Fetch 1 page per store sequentially to avoid 429 — 11 requests with 200ms gap
                 const urls = ALL_STORE_IDS.map(id => {
                     const p = new URLSearchParams({ pageSize: 60, sortBy: 'Savings', desc: 1, onSale: 1, storeID: id, pageNumber: 0 })
                     if (freeOnly) p.append('upperPrice', '0')
-                    return proxyUrl(`https://www.cheapshark.com/api/1.0/deals?${p}`)
+                    return `https://www.cheapshark.com/api/1.0/deals?${p}`
                 })
 
                 setFetchStatus('Loading deals from all stores...')
-                const results = await fetchWithDelay(urls, 200)
+                const results = await fetchWithDelay(urls, 150)
                 for (const r of results) {
                     if (Array.isArray(r)) data = data.concat(r)
                 }
             } else {
-                // Single store: fetch 2 pages sequentially
                 const urls = [0, 1].map(pageNum => {
                     const p = new URLSearchParams({ pageSize: 60, sortBy: 'Savings', desc: 1, onSale: 1, storeID: storeFilter, pageNumber: pageNum })
                     if (freeOnly) p.append('upperPrice', '0')
-                    return proxyUrl(`https://www.cheapshark.com/api/1.0/deals?${p}`)
+                    return `https://www.cheapshark.com/api/1.0/deals?${p}`
                 })
 
                 setFetchStatus('Loading deals...')
-                const results = await fetchWithDelay(urls, 300)
+                const results = await fetchWithDelay(urls, 200)
                 for (const r of results) {
                     if (Array.isArray(r)) data = data.concat(r)
                 }
