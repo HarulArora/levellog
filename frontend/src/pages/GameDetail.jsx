@@ -6,7 +6,6 @@ import useGames from '../hooks/useGames'
 import AddGameModal from '../components/library/AddGameModal'
 
 // ── Single comment + replies ──
-// ✅ Added gameTitle prop — fixes reply button (game was undefined inside CommentItem)
 function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) {
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [replyText, setReplyText] = useState('')
@@ -93,7 +92,6 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
         setSubmittingReply(true)
         try {
             const topParentId = comment.parentId || comment._id
-            // ✅ gameTitle now comes from prop, not from undefined `game` variable
             const res = await api.post(`/comments/${igdbId}`, {
                 text: replyText,
                 parentId: topParentId,
@@ -121,15 +119,27 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
         return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     }
 
+    // ✅ @username mentions are now clickable links to /profile/:username
     const renderText = (text) => {
         if (!text) return null
         const parts = text.split(/(@\w+)/g)
         return parts.map((part, i) =>
             part.startsWith('@')
-                ? <span key={i} className="text-[#c8ff57] font-semibold">{part}</span>
+                ? (
+                    <Link
+                        key={i}
+                        to={`/user/${part.slice(1)}`}
+                        className="text-[#c8ff57] font-semibold hover:underline"
+                    >
+                        {part}
+                    </Link>
+                )
                 : <span key={i}>{part}</span>
         )
     }
+
+    const username = comment.userId?.username
+    const profilePath = username ? `/user/${username}` : null
 
     return (
         <div className={indentClass}>
@@ -138,20 +148,47 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
 
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-2">
-                        {comment.userId?.avatar ? (
-                            <img src={comment.userId.avatar} alt={comment.userId.username}
-                                className="w-7 h-7 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35]" />
+                        {/* ✅ Avatar is now a clickable link to the user's profile */}
+                        {profilePath ? (
+                            <Link to={profilePath} className="flex-shrink-0 hover:opacity-80 transition-opacity">
+                                {comment.userId?.avatar ? (
+                                    <img src={comment.userId.avatar} alt={username}
+                                        className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a35]" />
+                                ) : (
+                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black
+                                                    ${isOwn ? 'bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] text-black' : 'bg-[#2a2a35] text-white'}`}
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                        {username?.charAt(0).toUpperCase() || '?'}
+                                    </div>
+                                )}
+                            </Link>
                         ) : (
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
-                                            ${isOwn ? 'bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] text-black' : 'bg-[#2a2a35] text-white'}`}
-                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                {comment.userId?.username?.charAt(0).toUpperCase() || '?'}
-                            </div>
+                            comment.userId?.avatar ? (
+                                <img src={comment.userId.avatar} alt={username}
+                                    className="w-7 h-7 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35]" />
+                            ) : (
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
+                                                ${isOwn ? 'bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] text-black' : 'bg-[#2a2a35] text-white'}`}
+                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                    {username?.charAt(0).toUpperCase() || '?'}
+                                </div>
+                            )
                         )}
-                        <span className={`font-bold text-xs ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
-                            {comment.userId?.username || 'User'}
-                            {isOwn && <span className="ml-1 font-mono text-[9px] text-[#7a7a90] normal-case font-normal">· you</span>}
-                        </span>
+
+                        {/* ✅ Username is now a clickable link to the user's profile */}
+                        {profilePath ? (
+                            <Link to={profilePath}
+                                className={`font-bold text-xs hover:underline ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
+                                {username || 'User'}
+                                {isOwn && <span className="ml-1 font-mono text-[9px] text-[#7a7a90] normal-case font-normal">· you</span>}
+                            </Link>
+                        ) : (
+                            <span className={`font-bold text-xs ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
+                                {username || 'User'}
+                                {isOwn && <span className="ml-1 font-mono text-[9px] text-[#7a7a90] normal-case font-normal">· you</span>}
+                            </span>
+                        )}
+
                         <span className="font-mono text-[9px] text-[#7a7a90] border border-[#2a2a35] rounded px-1 py-0.5">
                             Lv.{comment.userId?.level || 1}
                         </span>
@@ -259,7 +296,6 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
                     </div>
                 )}
 
-                {/* ✅ gameTitle passed down to nested replies too */}
                 {comment.replies?.length > 0 && (
                     <div className="mt-2 flex flex-col gap-2">
                         {comment.replies.map(reply => (
@@ -841,7 +877,6 @@ function GameDetail() {
 
                                 {comments.length > 0 ? (
                                     <div className="flex flex-col gap-3">
-                                        {/* ✅ gameTitle passed to CommentItem */}
                                         {comments.map(comment => (
                                             <CommentItem key={comment._id} comment={comment}
                                                 currentUser={user} igdbId={igdbId}
