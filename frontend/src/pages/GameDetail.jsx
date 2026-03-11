@@ -6,7 +6,8 @@ import useGames from '../hooks/useGames'
 import AddGameModal from '../components/library/AddGameModal'
 
 // ── Single comment + replies ──
-function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
+// ✅ Added gameTitle prop — fixes reply button (game was undefined inside CommentItem)
+function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) {
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [replyText, setReplyText] = useState('')
     const [submittingReply, setSubmittingReply] = useState(false)
@@ -33,6 +34,16 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
         comment.userId?._id === currentUser.id ||
         comment.userId?._id === currentUser._id
     )
+
+    const indentClass = depth > 0 ? 'ml-6 mt-2' : ''
+
+    const handleOpenReply = () => {
+        const mentionName = comment.userId?.username
+        if (mentionName) {
+            setReplyText(`@${mentionName} `)
+        }
+        setShowReplyBox(true)
+    }
 
     const handleLike = async () => {
         if (!currentUser) return
@@ -81,7 +92,15 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
         if (!replyText.trim()) return
         setSubmittingReply(true)
         try {
-            const res = await api.post(`/comments/${igdbId}`, { text: replyText, parentId: comment._id })
+            const topParentId = comment.parentId || comment._id
+            // ✅ gameTitle now comes from prop, not from undefined `game` variable
+            const res = await api.post(`/comments/${igdbId}`, {
+                text: replyText,
+                parentId: topParentId,
+                replyToId: comment._id,
+                replyToUserId: comment.userId?._id,
+                gameTitle,
+            })
             onXpToast(res.data.message || '💬 Reply posted · +1 XP', 'gain')
             setReplyText('')
             setShowReplyBox(false)
@@ -102,133 +121,162 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast }) {
         return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     }
 
-    return (
-        <div className={comment.parentId ? 'ml-8 mt-3' : ''}>
-            <div className={`bg-[#111118] border rounded-lg p-4 ${isOwn ? 'border-[#c8ff57]/20' : 'border-[#2a2a35]'}`}>
+    const renderText = (text) => {
+        if (!text) return null
+        const parts = text.split(/(@\w+)/g)
+        return parts.map((part, i) =>
+            part.startsWith('@')
+                ? <span key={i} className="text-[#c8ff57] font-semibold">{part}</span>
+                : <span key={i}>{part}</span>
+        )
+    }
 
-                {/* Header */}
-                <div className="flex items-center gap-2 mb-2">
-                    {comment.userId?.avatar ? (
-                        <img src={comment.userId.avatar} alt={comment.userId.username}
-                            className="w-7 h-7 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35]" />
+    return (
+        <div className={indentClass}>
+            <div className={depth > 0 ? 'border-l-2 border-[#2a2a35] pl-3' : ''}>
+                <div className={`bg-[#111118] border rounded-lg p-4 ${isOwn ? 'border-[#c8ff57]/20' : 'border-[#2a2a35]'}`}>
+
+                    {/* Header */}
+                    <div className="flex items-center gap-2 mb-2">
+                        {comment.userId?.avatar ? (
+                            <img src={comment.userId.avatar} alt={comment.userId.username}
+                                className="w-7 h-7 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35]" />
+                        ) : (
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
+                                            ${isOwn ? 'bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] text-black' : 'bg-[#2a2a35] text-white'}`}
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                {comment.userId?.username?.charAt(0).toUpperCase() || '?'}
+                            </div>
+                        )}
+                        <span className={`font-bold text-xs ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
+                            {comment.userId?.username || 'User'}
+                            {isOwn && <span className="ml-1 font-mono text-[9px] text-[#7a7a90] normal-case font-normal">· you</span>}
+                        </span>
+                        <span className="font-mono text-[9px] text-[#7a7a90] border border-[#2a2a35] rounded px-1 py-0.5">
+                            Lv.{comment.userId?.level || 1}
+                        </span>
+                        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+                            {isEdited && (
+                                <span className="font-mono text-[9px] text-[#7a7a90] italic">edited</span>
+                            )}
+                            <span className="font-mono text-[9px] text-[#7a7a90]">
+                                {timeAgo(comment.createdAt)}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Body */}
+                    {isEditing ? (
+                        <div className="mt-2">
+                            <textarea value={editingText} onChange={e => setEditingText(e.target.value)} rows={2}
+                                className="w-full bg-[#18181f] border border-[#c8ff57]/30 rounded px-3 py-2
+                                           text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] transition-colors" />
+                            <div className="flex gap-2 mt-2">
+                                <button onClick={handleEdit} disabled={submittingEdit || !editingText.trim()}
+                                    className="px-3 py-1 bg-[#c8ff57] text-black font-bold text-[10px] rounded
+                                               hover:bg-[#d4ff6e] transition-all disabled:opacity-50">
+                                    {submittingEdit ? 'Saving...' : 'Save'}
+                                </button>
+                                <button onClick={() => setIsEditing(false)}
+                                    className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded
+                                               hover:border-white hover:text-white transition-all">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
                     ) : (
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
-                                        ${isOwn ? 'bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] text-black' : 'bg-[#2a2a35] text-white'}`}
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            {comment.userId?.username?.charAt(0).toUpperCase() || '?'}
+                        <p className="text-[#c8c8d8] text-sm leading-relaxed">{renderText(comment.text)}</p>
+                    )}
+
+                    {/* Actions */}
+                    {!isEditing && (
+                        <div className="flex items-center gap-3 mt-3">
+                            <button onClick={handleLike}
+                                className={`flex items-center gap-1 font-mono text-[10px] transition-colors
+                                           ${liked ? 'text-[#c8ff57]' : 'text-[#7a7a90] hover:text-[#c8ff57]'}
+                                           ${!currentUser ? 'cursor-default' : 'cursor-pointer'}`}>
+                                👍 {likes > 0 && <span>{likes}</span>}
+                            </button>
+                            <button onClick={handleDislike}
+                                className={`flex items-center gap-1 font-mono text-[10px] transition-colors
+                                           ${disliked ? 'text-[#ff5c5c]' : 'text-[#7a7a90] hover:text-[#ff5c5c]'}
+                                           ${!currentUser ? 'cursor-default' : 'cursor-pointer'}`}>
+                                👎 {dislikes > 0 && <span>{dislikes}</span>}
+                            </button>
+
+                            {currentUser && (
+                                <button onClick={handleOpenReply}
+                                    className="font-mono text-[10px] text-[#7a7a90] hover:text-white transition-colors">
+                                    ↩ Reply
+                                </button>
+                            )}
+
+                            {isOwn && (
+                                <>
+                                    <button onClick={() => { setIsEditing(true); setEditingText(comment.text) }}
+                                        className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57] transition-colors ml-auto">
+                                        ✏ Edit
+                                    </button>
+                                    <button onClick={handleDelete}
+                                        className="font-mono text-[10px] text-[#7a7a90] hover:text-[#ff5c5c] transition-colors">
+                                        🗑 Delete
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
-                    <span className={`font-bold text-xs ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
-                        {comment.userId?.username || 'User'}
-                        {isOwn && <span className="ml-1 font-mono text-[9px] text-[#7a7a90] normal-case font-normal">· you</span>}
-                    </span>
-                    <span className="font-mono text-[9px] text-[#7a7a90] border border-[#2a2a35] rounded px-1 py-0.5">
-                        Lv.{comment.userId?.level || 1}
-                    </span>
-                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                        {isEdited && (
-                            <span className="font-mono text-[9px] text-[#7a7a90] italic">edited</span>
-                        )}
-                        <span className="font-mono text-[9px] text-[#7a7a90]">
-                            {timeAgo(comment.createdAt)}
-                        </span>
-                    </div>
                 </div>
 
-                {/* Body */}
-                {isEditing ? (
-                    <div className="mt-2">
-                        <textarea value={editingText} onChange={e => setEditingText(e.target.value)} rows={2}
-                            className="w-full bg-[#18181f] border border-[#c8ff57]/30 rounded px-3 py-2
-                                       text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] transition-colors" />
-                        <div className="flex gap-2 mt-2">
-                            <button onClick={handleEdit} disabled={submittingEdit || !editingText.trim()}
-                                className="px-3 py-1 bg-[#c8ff57] text-black font-bold text-[10px] rounded
-                                           hover:bg-[#d4ff6e] transition-all disabled:opacity-50">
-                                {submittingEdit ? 'Saving...' : 'Save'}
-                            </button>
-                            <button onClick={() => setIsEditing(false)}
-                                className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded
-                                           hover:border-white hover:text-white transition-all">
-                                Cancel
-                            </button>
+                {/* Reply box */}
+                {showReplyBox && (
+                    <div className="mt-2 ml-2">
+                        <div className="flex gap-2">
+                            <textarea
+                                value={replyText}
+                                onChange={e => setReplyText(e.target.value)}
+                                placeholder={`Reply to @${comment.userId?.username}...`}
+                                rows={2}
+                                autoFocus
+                                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleReply() }}
+                                className="flex-1 bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2
+                                           text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57]
+                                           placeholder:text-[#7a7a90] transition-colors"
+                            />
+                            <div className="flex flex-col gap-1">
+                                <button onClick={handleReply} disabled={!replyText.trim() || submittingReply}
+                                    className="px-3 py-1.5 bg-[#c8ff57] text-black font-bold text-[10px] rounded
+                                               hover:bg-[#d4ff6e] transition-all disabled:opacity-50">
+                                    {submittingReply ? '...' : 'Reply'}
+                                </button>
+                                <button onClick={() => { setShowReplyBox(false); setReplyText('') }}
+                                    className="px-3 py-1.5 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded
+                                               hover:border-white transition-all">
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
+                        <p className="font-mono text-[9px] text-[#7a7a90] mt-1">Ctrl+Enter to post</p>
                     </div>
-                ) : (
-                    <p className="text-[#c8c8d8] text-sm leading-relaxed">{comment.text}</p>
                 )}
 
-                {/* Actions */}
-                {!isEditing && (
-                    <div className="flex items-center gap-3 mt-3">
-                        <button onClick={handleLike}
-                            className={`flex items-center gap-1 font-mono text-[10px] transition-colors
-                                       ${liked ? 'text-[#c8ff57]' : 'text-[#7a7a90] hover:text-[#c8ff57]'}
-                                       ${!currentUser ? 'cursor-default' : 'cursor-pointer'}`}>
-                            👍 {likes > 0 && <span>{likes}</span>}
-                        </button>
-                        <button onClick={handleDislike}
-                            className={`flex items-center gap-1 font-mono text-[10px] transition-colors
-                                       ${disliked ? 'text-[#ff5c5c]' : 'text-[#7a7a90] hover:text-[#ff5c5c]'}
-                                       ${!currentUser ? 'cursor-default' : 'cursor-pointer'}`}>
-                            👎 {dislikes > 0 && <span>{dislikes}</span>}
-                        </button>
-                        {currentUser && !comment.parentId && (
-                            <button onClick={() => setShowReplyBox(!showReplyBox)}
-                                className="font-mono text-[10px] text-[#7a7a90] hover:text-white transition-colors">
-                                ↩ Reply
-                            </button>
-                        )}
-                        {isOwn && (
-                            <>
-                                <button onClick={() => { setIsEditing(true); setEditingText(comment.text) }}
-                                    className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57] transition-colors ml-auto">
-                                    ✏ Edit
-                                </button>
-                                <button onClick={handleDelete}
-                                    className="font-mono text-[10px] text-[#7a7a90] hover:text-[#ff5c5c] transition-colors">
-                                    🗑 Delete
-                                </button>
-                            </>
-                        )}
+                {/* ✅ gameTitle passed down to nested replies too */}
+                {comment.replies?.length > 0 && (
+                    <div className="mt-2 flex flex-col gap-2">
+                        {comment.replies.map(reply => (
+                            <CommentItem
+                                key={reply._id}
+                                comment={reply}
+                                currentUser={currentUser}
+                                igdbId={igdbId}
+                                onRefresh={onRefresh}
+                                onXpToast={onXpToast}
+                                depth={Math.min(depth + 1, 2)}
+                                gameTitle={gameTitle}
+                            />
+                        ))}
                     </div>
                 )}
             </div>
-
-            {/* Reply box */}
-            {showReplyBox && (
-                <div className="ml-8 mt-2">
-                    <div className="flex gap-2">
-                        <textarea value={replyText} onChange={e => setReplyText(e.target.value)}
-                            placeholder="Write a reply..." rows={2}
-                            className="flex-1 bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2
-                                       text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57]
-                                       placeholder:text-[#7a7a90] transition-colors" />
-                        <div className="flex flex-col gap-1">
-                            <button onClick={handleReply} disabled={!replyText.trim() || submittingReply}
-                                className="px-3 py-1.5 bg-[#c8ff57] text-black font-bold text-[10px] rounded
-                                           hover:bg-[#d4ff6e] transition-all disabled:opacity-50">
-                                {submittingReply ? '...' : 'Reply'}
-                            </button>
-                            <button onClick={() => { setShowReplyBox(false); setReplyText('') }}
-                                className="px-3 py-1.5 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded
-                                           hover:border-white transition-all">
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Replies */}
-            {comment.replies?.length > 0 && (
-                <div className="mt-2 flex flex-col gap-2">
-                    {comment.replies.map(reply => (
-                        <CommentItem key={reply._id} comment={reply} currentUser={currentUser}
-                            igdbId={igdbId} onRefresh={onRefresh} onXpToast={onXpToast} />
-                    ))}
-                </div>
-            )}
         </div>
     )
 }
@@ -403,7 +451,10 @@ function GameDetail() {
         if (!commentText.trim() || submittingComment) return
         setSubmittingComment(true)
         try {
-            const res = await api.post(`/comments/${igdbId}`, { text: commentText.trim() })
+            const res = await api.post(`/comments/${igdbId}`, {
+                text: commentText.trim(),
+                gameTitle: game?.title,
+            })
             showXpToast(res.data.message || '💬 Comment posted · +1 XP', 'gain')
             setCommentText('')
             await fetchComments()
@@ -790,10 +841,14 @@ function GameDetail() {
 
                                 {comments.length > 0 ? (
                                     <div className="flex flex-col gap-3">
+                                        {/* ✅ gameTitle passed to CommentItem */}
                                         {comments.map(comment => (
                                             <CommentItem key={comment._id} comment={comment}
                                                 currentUser={user} igdbId={igdbId}
-                                                onRefresh={fetchComments} onXpToast={showXpToast} />
+                                                onRefresh={fetchComments} onXpToast={showXpToast}
+                                                depth={0}
+                                                gameTitle={game?.title}
+                                            />
                                         ))}
                                     </div>
                                 ) : (

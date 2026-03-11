@@ -15,8 +15,14 @@ const notificationSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ['follow', 'follow_request', 'request_accepted'],
+            // ✅ added comment_reply
+            enum: ['follow', 'follow_request', 'request_accepted', 'comment_reply'],
             required: true
+        },
+        // ✅ stores igdbId + text preview for reply notifications
+        meta: {
+            type: mongoose.Schema.Types.Mixed,
+            default: {}
         },
         read: {
             type: Boolean,
@@ -29,5 +35,4 @@ const notificationSchema = new mongoose.Schema(
 )
 
 const Notification = mongoose.model('Notification', notificationSchema)
-
 export default Notification

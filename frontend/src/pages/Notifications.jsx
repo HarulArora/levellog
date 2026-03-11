@@ -40,9 +40,7 @@ function Notifications() {
     const handleMarkAllRead = async () => {
         try {
             await api.patch('/notifications/mark-read')
-            setNotifications(prev =>
-                prev.map(n => ({ ...n, read: true }))
-            )
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })))
         } catch (err) {
             console.error('Mark read error:', err)
         }
@@ -67,9 +65,7 @@ function Notifications() {
             await api.delete('/notifications/delete-selected', {
                 data: { ids: Array.from(selected) }
             })
-            setNotifications(prev =>
-                prev.filter(n => !selected.has(n._id))
-            )
+            setNotifications(prev => prev.filter(n => !selected.has(n._id)))
             setSelected(new Set())
             setSelectMode(false)
         } catch (err) {
@@ -126,44 +122,65 @@ function Notifications() {
         }
     }
 
-    // ── Notification icon config ──
+    // ── Notification config ──
     const notifConfig = {
         follow: {
             icon: '👤',
             bg: 'bg-[#c8ff57]/15',
             getText: (n) => (
                 <>
-                    <span className="text-[#c8ff57] font-bold">
-                        {n.sender?.username}
-                    </span>
+                    <span className="text-[#c8ff57] font-bold">{n.sender?.username}</span>
                     {' started following you'}
                 </>
-            )
+            ),
+            getLink: () => null,
         },
         follow_request: {
             icon: '🔔',
             bg: 'bg-[#5c9fff]/15',
             getText: (n) => (
                 <>
-                    <span className="text-[#c8ff57] font-bold">
-                        {n.sender?.username}
-                    </span>
+                    <span className="text-[#c8ff57] font-bold">{n.sender?.username}</span>
                     {' sent you a follow request'}
                 </>
-            )
+            ),
+            getLink: () => null,
         },
         request_accepted: {
             icon: '✅',
             bg: 'bg-[#c8ff57]/15',
             getText: (n) => (
                 <>
-                    <span className="text-[#c8ff57] font-bold">
-                        {n.sender?.username}
-                    </span>
+                    <span className="text-[#c8ff57] font-bold">{n.sender?.username}</span>
                     {' accepted your follow request'}
                 </>
-            )
-        }
+            ),
+            getLink: () => null,
+        },
+        // ✅ NEW — reply notification
+        comment_reply: {
+            icon: '💬',
+            bg: 'bg-[#ff9f5c]/15',
+            getText: (n) => (
+                <>
+                    <span className="text-[#c8ff57] font-bold">{n.sender?.username}</span>
+                    {' replied to your comment'}
+                    {/* ✅ show game name */}
+                    {n.meta?.gameTitle && (
+                        <span className="text-[#7a7a90]"> on </span>
+                    )}
+                    {n.meta?.gameTitle && (
+                        <span className="text-white font-semibold">{n.meta.gameTitle}</span>
+                    )}
+                    {n.meta?.preview && (
+                        <span className="block font-mono text-[10px] text-[#7a7a90] mt-0.5 truncate max-w-[300px]">
+                            "{n.meta.preview}"
+                        </span>
+                    )}
+                </>
+            ),
+            getLink: (n) => n.meta?.igdbId ? `/game/${n.meta.igdbId}` : null,
+        },
     }
 
     const unreadCount = notifications.filter(n => !n.read).length
@@ -172,15 +189,12 @@ function Notifications() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
                 <div className="text-5xl">🔔</div>
-                <div
-                    className="text-white font-black text-2xl tracking-widest uppercase"
-                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                >
+                <div className="text-white font-black text-2xl tracking-widest uppercase"
+                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                     Login to see notifications
                 </div>
                 <Link to="/login">
-                    <button className="px-6 py-3 bg-[#c8ff57] text-black font-bold
-                             text-sm rounded hover:bg-[#d4ff6e] transition-all">
+                    <button className="px-6 py-3 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all">
                         Login
                     </button>
                 </Link>
@@ -200,19 +214,14 @@ function Notifications() {
         <div className="max-w-[700px] mx-auto px-5 md:px-10 py-8 md:py-10">
 
             {/* ── Header ── */}
-            <div className="flex items-center justify-between mb-6
-                      pb-4 border-b border-[#2a2a35]">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#2a2a35]">
                 <div className="flex items-center gap-3">
-                    <h2
-                        className="font-black text-2xl md:text-3xl tracking-widest
-                       uppercase text-white"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                    >
+                    <h2 className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
+                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         Notifications
                     </h2>
                     {unreadCount > 0 && (
-                        <span className="bg-[#ff5c5c] text-white font-mono text-xs
-                             font-bold px-2 py-0.5 rounded-full">
+                        <span className="bg-[#ff5c5c] text-white font-mono text-xs font-bold px-2 py-0.5 rounded-full">
                             {unreadCount}
                         </span>
                     )}
@@ -223,131 +232,91 @@ function Notifications() {
             <div className="flex gap-2 mb-5">
                 <button
                     onClick={() => { setActiveTab('notifications'); setSelectMode(false); setSelected(new Set()) }}
-                    className={`px-4 py-2 rounded font-mono text-xs uppercase
-                     tracking-wider border transition-all
+                    className={`px-4 py-2 rounded font-mono text-xs uppercase tracking-wider border transition-all
                      ${activeTab === 'notifications'
                             ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/06'
-                            : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'
-                        }`}
+                            : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'}`}
                 >
                     Notifications
                     {unreadCount > 0 && (
-                        <span className="ml-2 bg-[#ff5c5c] text-white
-                             text-[9px] px-1.5 py-0.5 rounded-full">
+                        <span className="ml-2 bg-[#ff5c5c] text-white text-[9px] px-1.5 py-0.5 rounded-full">
                             {unreadCount}
                         </span>
                     )}
                 </button>
                 <button
                     onClick={() => { setActiveTab('requests'); setSelectMode(false); setSelected(new Set()) }}
-                    className={`px-4 py-2 rounded font-mono text-xs uppercase
-                     tracking-wider border transition-all
+                    className={`px-4 py-2 rounded font-mono text-xs uppercase tracking-wider border transition-all
                      ${activeTab === 'requests'
                             ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/06'
-                            : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'
-                        }`}
+                            : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'}`}
                 >
                     Follow Requests
                     {requests.length > 0 && (
-                        <span className="ml-2 bg-[#5c9fff] text-white
-                             text-[9px] px-1.5 py-0.5 rounded-full">
+                        <span className="ml-2 bg-[#5c9fff] text-white text-[9px] px-1.5 py-0.5 rounded-full">
                             {requests.length}
                         </span>
                     )}
                 </button>
             </div>
 
-            {/* ══════════════════════════════════
-          NOTIFICATIONS TAB
-      ══════════════════════════════════ */}
+            {/* ══ NOTIFICATIONS TAB ══ */}
             {activeTab === 'notifications' && (
                 <>
                     {notifications.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2 mb-4">
-
-                            {/* Select mode toggle */}
                             <button
-                                onClick={() => {
-                                    setSelectMode(!selectMode)
-                                    setSelected(new Set())
-                                }}
-                                className={`px-3 py-1.5 font-mono text-[11px] uppercase
-                           tracking-wider border rounded transition-all
-                           ${selectMode
-                                        ? 'border-[#c8ff57] text-[#c8ff57]'
-                                        : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'
-                                    }`}
+                                onClick={() => { setSelectMode(!selectMode); setSelected(new Set()) }}
+                                className={`px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border rounded transition-all
+                           ${selectMode ? 'border-[#c8ff57] text-[#c8ff57]' : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'}`}
                             >
                                 {selectMode ? '✕ Cancel' : '☑ Select'}
                             </button>
 
-                            {/* Select all (only in select mode) */}
                             {selectMode && (
-                                <button
-                                    onClick={handleSelectAll}
-                                    className="px-3 py-1.5 font-mono text-[11px] uppercase
-                             tracking-wider border border-[#2a2a35]
-                             text-[#7a7a90] rounded hover:border-[#c8ff57]
-                             hover:text-[#c8ff57] transition-all"
-                                >
-                                    {selected.size === notifications.length
-                                        ? 'Deselect All'
-                                        : 'Select All'
-                                    }
+                                <button onClick={handleSelectAll}
+                                    className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border border-[#2a2a35] text-[#7a7a90] rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
+                                    {selected.size === notifications.length ? 'Deselect All' : 'Select All'}
                                 </button>
                             )}
 
-                            {/* Delete selected (only if something selected) */}
                             {selectMode && selected.size > 0 && (
-                                <button
-                                    onClick={handleDeleteSelected}
-                                    className="px-3 py-1.5 font-mono text-[11px] uppercase
-                             tracking-wider border border-[#ff5c5c]/40
-                             text-[#ff5c5c] rounded hover:border-[#ff5c5c]
-                             transition-all"
-                                >
+                                <button onClick={handleDeleteSelected}
+                                    className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border border-[#ff5c5c]/40 text-[#ff5c5c] rounded hover:border-[#ff5c5c] transition-all">
                                     🗑 Delete ({selected.size})
                                 </button>
                             )}
 
-                            {/* Mark all read */}
                             {unreadCount > 0 && (
-                                <button
-                                    onClick={handleMarkAllRead}
-                                    className="px-3 py-1.5 font-mono text-[11px] uppercase
-                             tracking-wider border border-[#2a2a35]
-                             text-[#7a7a90] rounded hover:border-[#5c9fff]
-                             hover:text-[#5c9fff] transition-all"
-                                >
+                                <button onClick={handleMarkAllRead}
+                                    className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border border-[#2a2a35] text-[#7a7a90] rounded hover:border-[#5c9fff] hover:text-[#5c9fff] transition-all">
                                     ✓ Mark All Read
                                 </button>
                             )}
 
-                            {/* Delete all */}
-                            <button
-                                onClick={handleDeleteAll}
-                                className="px-3 py-1.5 font-mono text-[11px] uppercase
-                           tracking-wider border border-[#ff5c5c]/30
-                           text-[#ff5c5c]/70 rounded hover:border-[#ff5c5c]
-                           hover:text-[#ff5c5c] transition-all ml-auto"
-                            >
+                            <button onClick={handleDeleteAll}
+                                className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border border-[#ff5c5c]/30 text-[#ff5c5c]/70 rounded hover:border-[#ff5c5c] hover:text-[#ff5c5c] transition-all ml-auto">
                                 🗑 Delete All
                             </button>
-
                         </div>
                     )}
 
                     {notifications.length > 0 ? (
-                        <div className="flex flex-col divide-y divide-[#2a2a35]
-                            border border-[#2a2a35] rounded-lg overflow-hidden">
+                        <div className="flex flex-col divide-y divide-[#2a2a35] border border-[#2a2a35] rounded-lg overflow-hidden">
                             {notifications.map(notif => {
                                 const config = notifConfig[notif.type] || notifConfig.follow
                                 const isSelected = selected.has(notif._id)
                                 const isUnread = !notif.read
+                                const link = config.getLink?.(notif)
+
+                                // Wrap in Link if there's a destination (e.g. comment_reply → game page)
+                                const WrapperEl = link ? Link : 'div'
+                                const wrapperProps = link ? { to: link } : {}
 
                                 return (
-                                    <div
+                                    <WrapperEl
                                         key={notif._id}
+                                        {...wrapperProps}
                                         onClick={() => {
                                             if (selectMode) {
                                                 toggleSelect(notif._id)
@@ -355,8 +324,8 @@ function Notifications() {
                                                 handleMarkOneRead(notif._id)
                                             }
                                         }}
-                                        className={`flex items-center gap-4 px-5 py-4 transition-all
-                               ${selectMode ? 'cursor-pointer' : ''}
+                                        className={`flex items-center gap-4 px-5 py-4 transition-all no-underline
+                               ${selectMode ? 'cursor-pointer' : link ? 'cursor-pointer' : ''}
                                ${isSelected
                                                 ? 'bg-[#c8ff57]/08 border-l-2 border-l-[#c8ff57]'
                                                 : isUnread
@@ -364,50 +333,35 @@ function Notifications() {
                                                     : 'bg-[#111118] border-l-2 border-l-transparent hover:bg-[#18181f]'
                                             }`}
                                     >
-
                                         {/* Checkbox (select mode) */}
                                         {selectMode && (
-                                            <div className={`w-4 h-4 rounded border flex-shrink-0
-                                       flex items-center justify-center transition-all
-                                       ${isSelected
-                                                    ? 'bg-[#c8ff57] border-[#c8ff57]'
-                                                    : 'border-[#2a2a35]'
-                                                }`}>
-                                                {isSelected && (
-                                                    <span className="text-black text-[10px] font-bold">✓</span>
-                                                )}
+                                            <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all
+                                       ${isSelected ? 'bg-[#c8ff57] border-[#c8ff57]' : 'border-[#2a2a35]'}`}>
+                                                {isSelected && <span className="text-black text-[10px] font-bold">✓</span>}
                                             </div>
                                         )}
 
-                                        {/* Unread dot (not in select mode) */}
+                                        {/* Unread dot */}
                                         {!selectMode && (
-                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 transition-all
-                                       ${isUnread
-                                                    ? 'bg-[#5c9fff]'
-                                                    : 'bg-transparent'
-                                                }`}
-                                            />
+                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 transition-all ${isUnread ? 'bg-[#5c9fff]' : 'bg-transparent'}`} />
                                         )}
 
                                         {/* Icon */}
-                                        <div className={`w-9 h-9 rounded-lg flex items-center
-                                     justify-center text-sm flex-shrink-0
-                                     ${config.bg}`}>
+                                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${config.bg}`}>
                                             {config.icon}
                                         </div>
 
                                         {/* Text */}
-                                        <div className="flex-1 text-sm text-[#7a7a90]">
+                                        <div className="flex-1 text-sm text-[#7a7a90] min-w-0">
                                             {config.getText(notif)}
                                             {isUnread && (
-                                                <span className="ml-2 font-mono text-[9px] uppercase
-                                         tracking-wider text-[#5c9fff]">
+                                                <span className="ml-2 font-mono text-[9px] uppercase tracking-wider text-[#5c9fff]">
                                                     New
                                                 </span>
                                             )}
                                         </div>
 
-                                        {/* Time + actions */}
+                                        {/* Time */}
                                         <div className="flex items-center gap-3 flex-shrink-0">
                                             <span className="font-mono text-[10px] text-[#7a7a90]">
                                                 {new Date(notif.createdAt).toLocaleDateString('en-US', {
@@ -415,83 +369,54 @@ function Notifications() {
                                                 })}
                                             </span>
                                         </div>
-
-                                    </div>
+                                    </WrapperEl>
                                 )
                             })}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 gap-3">
                             <div className="text-5xl">🔔</div>
-                            <div
-                                className="text-white font-black text-xl tracking-widest uppercase"
-                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                            >
+                            <div className="text-white font-black text-xl tracking-widest uppercase"
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                 All Clear
                             </div>
-                            <div className="text-[#7a7a90] font-mono text-sm">
-                                No notifications yet
-                            </div>
+                            <div className="text-[#7a7a90] font-mono text-sm">No notifications yet</div>
                         </div>
                     )}
                 </>
             )}
 
-            {/* ══════════════════════════════════
-          FOLLOW REQUESTS TAB
-      ══════════════════════════════════ */}
+            {/* ══ FOLLOW REQUESTS TAB ══ */}
             {activeTab === 'requests' && (
                 <>
                     {requests.length > 0 ? (
-                        <div className="flex flex-col divide-y divide-[#2a2a35]
-                            border border-[#2a2a35] rounded-lg overflow-hidden">
+                        <div className="flex flex-col divide-y divide-[#2a2a35] border border-[#2a2a35] rounded-lg overflow-hidden">
                             {requests.map(req => (
-                                <div
-                                    key={req._id}
-                                    className="flex items-center gap-4 px-5 py-4
-                             bg-[#111118] hover:bg-[#18181f] transition-all"
-                                >
-                                    {/* Avatar */}
+                                <div key={req._id}
+                                    className="flex items-center gap-4 px-5 py-4 bg-[#111118] hover:bg-[#18181f] transition-all">
                                     {req.sender?.avatar ? (
                                         <img src={req.sender.avatar} alt={req.sender.username}
-                                            className="w-9 h-9 rounded-full object-cover flex-shrink-0
-                   ring-2 ring-[#2a2a35]" />
+                                            className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-2 ring-[#2a2a35]" />
                                     ) : (
-                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br
-                    from-[#c8ff57] to-[#5c9fff]
-                    flex items-center justify-center
-                    font-black text-sm text-black flex-shrink-0"
+                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] flex items-center justify-center font-black text-sm text-black flex-shrink-0"
                                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                             {req.sender?.username?.charAt(0).toUpperCase()}
                                         </div>
                                     )}
-
-                                    {/* Text */}
                                     <div className="flex-1 text-sm text-[#7a7a90]">
-                                        <Link
-                                            to={`/user/${req.sender?.username}`}
-                                            className="text-[#c8ff57] font-bold hover:underline"
-                                        >
+                                        <Link to={`/user/${req.sender?.username}`}
+                                            className="text-[#c8ff57] font-bold hover:underline">
                                             {req.sender?.username}
                                         </Link>
                                         {' wants to follow you'}
                                     </div>
-
-                                    {/* Actions */}
                                     <div className="flex gap-2 flex-shrink-0">
-                                        <button
-                                            onClick={() => handleAccept(req._id)}
-                                            className="px-3 py-1 bg-[#c8ff57] text-black font-bold
-                                 text-xs rounded hover:bg-[#d4ff6e] transition-all"
-                                        >
+                                        <button onClick={() => handleAccept(req._id)}
+                                            className="px-3 py-1 bg-[#c8ff57] text-black font-bold text-xs rounded hover:bg-[#d4ff6e] transition-all">
                                             Accept
                                         </button>
-                                        <button
-                                            onClick={() => handleDecline(req._id)}
-                                            className="px-3 py-1 border border-[#ff5c5c]/40 text-[#ff5c5c]
-                                 text-xs font-semibold rounded
-                                 hover:border-[#ff5c5c] transition-all"
-                                        >
+                                        <button onClick={() => handleDecline(req._id)}
+                                            className="px-3 py-1 border border-[#ff5c5c]/40 text-[#ff5c5c] text-xs font-semibold rounded hover:border-[#ff5c5c] transition-all">
                                             Decline
                                         </button>
                                     </div>
@@ -501,20 +426,15 @@ function Notifications() {
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 gap-3">
                             <div className="text-5xl">👤</div>
-                            <div
-                                className="text-white font-black text-xl tracking-widest uppercase"
-                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                            >
+                            <div className="text-white font-black text-xl tracking-widest uppercase"
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                 No Requests
                             </div>
-                            <div className="text-[#7a7a90] font-mono text-sm">
-                                No pending follow requests
-                            </div>
+                            <div className="text-[#7a7a90] font-mono text-sm">No pending follow requests</div>
                         </div>
                     )}
                 </>
             )}
-
         </div>
     )
 }
