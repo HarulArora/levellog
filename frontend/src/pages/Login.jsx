@@ -25,7 +25,6 @@ function Login() {
         setLoading(true)
         const result = await login(formData.email, formData.password)
         setLoading(false)
-
         if (result.success) {
             navigate('/library')
         } else {
@@ -56,15 +55,12 @@ function Login() {
         <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
 
-                {/* Logo */}
                 <div className="text-center mb-8">
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         LEVEL<span className="text-white">LOG</span>
                     </div>
-                    <p className="text-[#7a7a90] font-mono text-xs">
-                        Welcome back, gamer
-                    </p>
+                    <p className="text-[#7a7a90] font-mono text-xs">Welcome back, gamer</p>
                 </div>
 
                 <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
@@ -93,14 +89,12 @@ function Login() {
                         )}
                     </button>
 
-                    {/* Divider */}
                     <div className="flex items-center gap-3 mb-4">
                         <div className="flex-1 h-px bg-[#2a2a35]" />
                         <span className="font-mono text-[10px] text-[#3a3a50] uppercase tracking-wider">or</span>
                         <div className="flex-1 h-px bg-[#2a2a35]" />
                     </div>
 
-                    {/* Error */}
                     {error && (
                         <div className="bg-[#ff5c5c]/10 border border-[#ff5c5c]/30
                                         text-[#ff5c5c] font-mono text-xs p-3 rounded mb-4">
@@ -108,7 +102,6 @@ function Login() {
                         </div>
                     )}
 
-                    {/* Email */}
                     <div className="mb-4">
                         <label className="block font-mono text-xs uppercase tracking-wider
                                           text-[#7a7a90] mb-2">Email</label>
@@ -125,8 +118,7 @@ function Login() {
                         />
                     </div>
 
-                    {/* Password */}
-                    <div className="mb-2">
+                    <div className="mb-6">
                         <label className="block font-mono text-xs uppercase tracking-wider
                                           text-[#7a7a90] mb-2">Password</label>
                         <input
@@ -140,16 +132,6 @@ function Login() {
                                        focus:outline-none focus:border-[#c8ff57]
                                        placeholder:text-[#7a7a90] transition-colors"
                         />
-                    </div>
-
-                    {/* Forgot password */}
-                    <div className="flex justify-end mb-6">
-                        <Link
-                            to="/forgot-password"
-                            className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57] transition-colors"
-                        >
-                            Forgot password?
-                        </Link>
                     </div>
 
                     <button
