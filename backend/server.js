@@ -9,6 +9,7 @@ import notificationsRouter from './routes/notifications.js'
 import listsRouter from './routes/lists.js'
 import commentsRouter from './routes/comments.js'
 
+// import paymentRouter from './routes/payment.js'
 dotenv.config()
 
 const app = express()
@@ -29,6 +30,7 @@ app.use('/api/igdb', igdbRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/lists', listsRouter)
 app.use('/api/comments', commentsRouter)
+// app.use('/api/payment', paymentRouter)
 
 app.get('/', (req, res) => {
     res.json({ message: '🎮 LevelLog API is running!' })
