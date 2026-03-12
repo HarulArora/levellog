@@ -72,15 +72,23 @@ function FollowListModal({ userId, type, onClose }) {
                            bg-[#18181f] border border-[#2a2a35]
                            hover:border-[#c8ff57]/50 transition-all"
                             >
-                                <div
-                                    className="w-10 h-10 rounded-full bg-gradient-to-br
-                              from-[#c8ff57] to-[#5c9fff]
-                              flex items-center justify-center
-                              font-black text-sm text-black flex-shrink-0"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                >
-                                    {u.username.charAt(0).toUpperCase()}
-                                </div>
+                                {u.avatar ? (
+                                    <img
+                                        src={u.avatar}
+                                        alt={u.username}
+                                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35]"
+                                    />
+                                ) : (
+                                    <div
+                                        className="w-10 h-10 rounded-full bg-gradient-to-br
+          from-[#c8ff57] to-[#5c9fff]
+          flex items-center justify-center
+          font-black text-sm text-black flex-shrink-0"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                                    >
+                                        {u.username.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                                 <div className="flex-1 min-w-0">
                                     <div className="text-white font-semibold text-sm truncate">
                                         {u.username}
