@@ -75,33 +75,19 @@ const FILTER_STORES = [
 const DEALS_PER_PAGE = 30
 const ALL_STORE_IDS = ['1', '7', '11', '15', '3', '25', '35', '21', '6', '8', '13']
 
-// ─── Proxy helpers ────────────────────────────────────────────────────────────
-// Try multiple CORS proxies in order until one succeeds.
-// Each proxy function receives the raw target URL and returns a Response.
-
 const PROXY_LIST = [
-    // 1. corsproxy.io  (works on most hosts; sometimes rate-limits deployed sites)
     (url) => fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) }),
-    // 2. allorigins – returns {contents, status}
     async (url) => {
         const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) })
         if (!res.ok) throw new Error(`allorigins ${res.status}`)
         const { contents } = await res.json()
-        // Wrap in a synthetic Response so callers can do .json()
         return new Response(contents, { headers: { 'Content-Type': 'application/json' } })
     },
-    // 3. thingproxy (reliable for production deployments)
     (url) => fetch(`https://thingproxy.freeboard.io/fetch/${url}`, { signal: AbortSignal.timeout(7000) }),
-    // 4. htmldriven cors-proxy
     (url) => fetch(`https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) }),
-    // 5. Direct (works if the target has open CORS headers – e.g. CheapShark does)
     (url) => fetch(url, { signal: AbortSignal.timeout(8000) }),
 ]
 
-/**
- * Fetch JSON from `targetUrl` by trying each proxy in PROXY_LIST until success.
- * Returns parsed JSON or throws if all fail.
- */
 async function fetchWithProxies(targetUrl) {
     let lastErr
     for (const proxyFn of PROXY_LIST) {
@@ -117,37 +103,16 @@ async function fetchWithProxies(targetUrl) {
     throw lastErr || new Error('All proxies failed')
 }
 
-function getTimeLeft(endDate) {
-    const diff = new Date(endDate) - new Date()
-    if (diff <= 0) return null
-    const days = Math.floor(diff / 864e5)
-    const hours = Math.floor((diff % 864e5) / 36e5)
-    const mins = Math.floor((diff % 36e5) / 6e4)
-    if (days > 0) return `${days}d ${hours}h left`
-    if (hours > 0) return `${hours}h ${mins}m left`
-    return `${mins}m left`
-}
-
-function mcColor(n) {
-    if (n >= 75) return '#c8ff57'
-    if (n >= 50) return '#5c9fff'
-    return '#ff5c5c'
-}
-
-// Sequential fetch with delay to avoid rate limiting
 async function fetchWithDelay(urls, delayMs = 300) {
     const results = []
     for (const url of urls) {
         try {
-            // CheapShark supports direct CORS, so try without proxy first,
-            // fall back to proxy chain on failure.
             let json
             try {
                 const res = await fetch(url.replace(/^https:\/\/corsproxy\.io\/\?url=/, '').replace(/^[^?]*\?url=/, ''), { signal: AbortSignal.timeout(6000) })
                 if (!res.ok) throw new Error(`direct ${res.status}`)
                 json = await res.json()
             } catch {
-                // url might already be a proxied URL or direct failed – unwrap & retry via proxy chain
                 const target = (() => {
                     try { return decodeURIComponent(url.split('?url=')[1] || url) } catch { return url }
                 })()
@@ -160,6 +125,12 @@ async function fetchWithDelay(urls, delayMs = 300) {
         if (delayMs) await new Promise(r => setTimeout(r, delayMs))
     }
     return results
+}
+
+function mcColor(n) {
+    if (n >= 75) return '#c8ff57'
+    if (n >= 50) return '#5c9fff'
+    return '#ff5c5c'
 }
 
 function DealSkeleton() {
@@ -176,83 +147,6 @@ function DealSkeleton() {
                 <div style={{ height: 18, background: '#18181f', borderRadius: 3, width: '22%' }} />
             </div>
         </div>
-    )
-}
-
-function EpicSkeleton() {
-    return (
-        <div style={{
-            background: '#111118', border: '1px solid #2a2a35', borderRadius: 8,
-            overflow: 'hidden', animation: 'pulse 1.5s ease-in-out infinite',
-        }}>
-            <div style={{ height: 140, background: '#18181f' }} />
-            <div style={{ padding: '10px 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ height: 9, background: '#18181f', borderRadius: 3, width: '50%' }} />
-                <div style={{ height: 12, background: '#18181f', borderRadius: 3, width: '75%' }} />
-                <div style={{ height: 16, background: '#18181f', borderRadius: 3, width: '28%' }} />
-            </div>
-        </div>
-    )
-}
-
-function EpicFreeCard({ game, isNext }) {
-    const offers = isNext
-        ? game.promotions?.upcomingPromotionalOffers?.[0]?.promotionalOffers?.[0]
-        : game.promotions?.promotionalOffers?.[0]?.promotionalOffers?.[0]
-    const endDate = game._gamerpower ? game.promotions?.promotionalOffers?.[0]?.promotionalOffers?.[0]?.endDate : offers?.endDate
-    const startDate = offers?.startDate
-    const timeLeft = endDate ? getTimeLeft(endDate) : null
-
-    const slug = game.catalogNs?.mappings?.[0]?.pageSlug || game.productSlug || game.urlSlug
-    const url = game._url || (slug ? `https://store.epicgames.com/en-US/p/${slug}` : 'https://store.epicgames.com/en-US/free-games')
-    const img = game._gamerpower
-        ? game.keyImages?.[0]?.url
-        : (game.keyImages?.find(i => i.type === 'OfferImageWide' || i.type === 'DieselStoreFrontWide')?.url || game.keyImages?.[0]?.url)
-
-    const origPrice = game.price?.totalPrice?.fmtPrice?.originalPrice
-    const origVal = origPrice && origPrice !== '0' && origPrice !== 'Free' ? origPrice : null
-    const dateLabel = startDate
-        ? `Free from ${new Date(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-        : null
-
-    return (
-        <a href={url} target="_blank" rel="noopener noreferrer"
-            style={{
-                display: 'block', textDecoration: 'none', color: 'inherit',
-                background: '#111118',
-                border: `1px solid ${isNext ? '#2a2a35' : 'rgba(200,255,87,0.3)'}`,
-                borderRadius: 8, overflow: 'hidden', transition: 'all 0.22s',
-                opacity: isNext ? 0.7 : 1,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = isNext ? '#5c9fff' : '#c8ff57'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)'; e.currentTarget.style.opacity = '1' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = isNext ? '#2a2a35' : 'rgba(200,255,87,0.3)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.opacity = isNext ? '0.7' : '1' }}
-        >
-            <div style={{ height: 140, background: '#18181f', position: 'relative', overflow: 'hidden' }}>
-                {img && <img src={img} alt={game.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #111118 0%, transparent 55%)' }} />
-                <div style={{ position: 'absolute', top: 8, left: 8, background: isNext ? 'rgba(92,159,255,0.92)' : '#c8ff57', color: '#000', fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 9, letterSpacing: '1.5px', padding: '3px 8px', borderRadius: 3 }}>
-                    {isNext ? '⏳ COMING SOON' : '🎁 FREE NOW'}
-                </div>
-                {timeLeft && !isNext && (
-                    <div style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(0,0,0,0.85)', border: '1px solid #2a2a35', fontFamily: "'DM Mono', monospace", fontSize: 9, color: '#ff9f5c', padding: '2px 8px', borderRadius: 3 }}>
-                        ⏱ {timeLeft}
-                    </div>
-                )}
-                {isNext && dateLabel && (
-                    <div style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(0,0,0,0.85)', border: '1px solid #2a2a35', fontFamily: "'DM Mono', monospace", fontSize: 9, color: '#5c9fff', padding: '2px 8px', borderRadius: 3 }}>
-                        📅 {dateLabel}
-                    </div>
-                )}
-            </div>
-            <div style={{ padding: '10px 14px 14px' }}>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: '#9ca3af', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '1px' }}>⬛ Epic Games Store</div>
-                <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13, color: '#e8e8f0', marginBottom: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{game.title}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {origVal && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#7a7a90', textDecoration: 'line-through' }}>{origVal}</span>}
-                    <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: isNext ? '#5c9fff' : '#c8ff57', letterSpacing: 1, lineHeight: 1 }}>{isNext ? 'SOON' : 'FREE'}</span>
-                </div>
-            </div>
-        </a>
     )
 }
 
@@ -357,9 +251,7 @@ function Pagination({ page, totalPages, onPage }) {
 
 export default function Deals() {
     const [deals, setDeals] = useState([])
-    const [epicGames, setEpicGames] = useState({ freeNow: [], upcoming: [] })
     const [dealsLoading, setDealsLoading] = useState(true)
-    const [epicLoading, setEpicLoading] = useState(true)
     const [storeFilter, setStoreFilter] = useState('all')
     const [freeOnly, setFreeOnly] = useState(false)
     const [search, setSearch] = useState('')
@@ -369,92 +261,12 @@ export default function Deals() {
     const [fetchStatus, setFetchStatus] = useState('')
     const prevIds = useRef(new Set())
 
-    const fetchEpic = useCallback(async () => {
-        try {
-            setEpicLoading(true)
-            const epicUrl = 'https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US'
-
-            const parseEpicData = (data) => {
-                const all = data?.data?.Catalog?.searchStore?.elements || []
-                const now = new Date()
-
-                const freeNow = all.filter(g => {
-                    // Method 1: promotional offer with discountPercentage 0 that's currently active
-                    const activePromo = (g.promotions?.promotionalOffers?.[0]?.promotionalOffers || [])
-                        .some(o => {
-                            const start = new Date(o.startDate)
-                            const end = new Date(o.endDate)
-                            return o.discountSetting?.discountPercentage === 0 && start <= now && end > now
-                        })
-
-                    // Method 2: discountPrice is literally 0 (e.g. Turnip Boy style)
-                    const priceIsZero = g.price?.totalPrice?.discountPrice === 0 &&
-                        g.price?.totalPrice?.originalPrice > 0
-
-                    return activePromo || priceIsZero
-                })
-
-                const upcoming = all.filter(g => {
-                    const hasUpcoming = (g.promotions?.upcomingPromotionalOffers?.[0]?.promotionalOffers || [])
-                        .some(o => o.discountSetting?.discountPercentage === 0)
-                    const isFreeNow = freeNow.some(f => f.id === g.id)
-                    return hasUpcoming && !isFreeNow
-                })
-
-                return { freeNow, upcoming }
-            }
-
-            // Try every proxy in sequence for Epic API
-            const tryProxies = async () => {
-                for (const proxyFn of PROXY_LIST) {
-                    try {
-                        const res = await proxyFn(epicUrl)
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-                        const raw = await res.json()
-                        // allorigins wraps in { contents }
-                        const data = raw.contents ? JSON.parse(raw.contents) : raw
-                        const result = parseEpicData(data)
-                        if (result.freeNow.length > 0 || result.upcoming.length > 0) return result
-                    } catch {
-                        // try next proxy
-                    }
-                }
-                throw new Error('All Epic proxies failed')
-            }
-
-            // GamerPower as final fallback
-            const fetchGamerPower = async () => {
-                const data = await fetchWithProxies('https://www.gamerpower.com/api/giveaways?platform=epic-games-store&type=game')
-                if (!Array.isArray(data) || !data.length) throw new Error('empty')
-                return {
-                    freeNow: data.slice(0, 4).map(g => ({
-                        id: g.id, title: g.title,
-                        keyImages: [{ url: g.image }],
-                        price: { totalPrice: { fmtPrice: { originalPrice: g.worth } } },
-                        promotions: { promotionalOffers: [{ promotionalOffers: [{ endDate: g.end_date, discountSetting: { discountPercentage: 0 } }] }] },
-                        _gamerpower: true, _url: g.open_giveaway_url,
-                    })),
-                    upcoming: [],
-                }
-            }
-
-            const result = await Promise.any([tryProxies(), fetchGamerPower()])
-            setEpicGames(result)
-        } catch {
-            setEpicGames({ freeNow: [], upcoming: [] })
-        } finally {
-            setEpicLoading(false)
-        }
-    }, [])
-
     const fetchDeals = useCallback(async () => {
         try {
             setDealsLoading(true)
             setFetchStatus('Fetching deals...')
             let data = []
 
-            // CheapShark supports open CORS — direct fetch works without a proxy.
-            // We build direct URLs here; fetchWithDelay will try direct first, then fall back.
             if (storeFilter === 'all') {
                 const urls = ALL_STORE_IDS.map(id => {
                     const p = new URLSearchParams({ pageSize: 60, sortBy: 'Savings', desc: 1, onSale: 1, storeID: id, pageNumber: 0 })
@@ -481,7 +293,6 @@ export default function Deals() {
                 }
             }
 
-            // Deduplicate
             const seen = new Set()
             data = data.filter(d => {
                 if (!d?.dealID || seen.has(d.dealID)) return false
@@ -489,10 +300,8 @@ export default function Deals() {
                 return true
             })
 
-            // Sort by savings
             data.sort((a, b) => parseFloat(b.savings) - parseFloat(a.savings))
 
-            // Filter out 0% savings unless free
             const cleaned = data.filter(d => {
                 const sale = parseFloat(d.salePrice)
                 const normal = parseFloat(d.normalPrice)
@@ -500,7 +309,6 @@ export default function Deals() {
                 return sale === 0 || (pct > 0 && normal > sale)
             })
 
-            // Detect new deals on auto-refresh
             const fresh = cleaned.filter(d => prevIds.current.size > 0 && !prevIds.current.has(d.dealID))
             prevIds.current = new Set(cleaned.map(d => d.dealID))
 
@@ -526,17 +334,15 @@ export default function Deals() {
         }
     }, [storeFilter, freeOnly])
 
-    useEffect(() => { fetchEpic() }, [fetchEpic])
-
     useEffect(() => {
         setPage(1)
         fetchDeals()
     }, [fetchDeals])
 
     useEffect(() => {
-        const t = setInterval(() => { fetchDeals(); fetchEpic() }, 5 * 60 * 1000)
+        const t = setInterval(() => { fetchDeals() }, 5 * 60 * 1000)
         return () => clearInterval(t)
-    }, [fetchDeals, fetchEpic])
+    }, [fetchDeals])
 
     useEffect(() => {
         if ('Notification' in window && Notification.permission === 'default')
@@ -560,9 +366,6 @@ export default function Deals() {
         .deals-grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
         @media (min-width: 640px)  { .deals-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
         @media (min-width: 1024px) { .deals-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
-        .epic-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
-        @media (min-width: 640px)  { .epic-grid { grid-template-columns: repeat(3, 1fr); } }
-        @media (min-width: 1024px) { .epic-grid { grid-template-columns: repeat(4, 1fr); } }
         .filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .sec-title { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 3px; margin: 0; color: #e8e8f0; }
         .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #2a2a35; flex-wrap: wrap; }
@@ -583,7 +386,7 @@ export default function Deals() {
                             </span>
                         )}
                         <button
-                            onClick={() => { fetchDeals(); fetchEpic() }}
+                            onClick={() => fetchDeals()}
                             className="pill"
                             style={{ border: '1px solid #2a2a35', color: '#7a7a90' }}
                             onMouseEnter={e => { e.currentTarget.style.borderColor = '#c8ff57'; e.currentTarget.style.color = '#c8ff57' }}
@@ -593,49 +396,6 @@ export default function Deals() {
                 </div>
 
                 <NewDealsBanner deals={newDeals} onDismiss={() => setNewDeals([])} />
-
-                {/* EPIC FREE GAMES */}
-                <div style={{ marginBottom: 48 }}>
-                    <div className="sec-head">
-                        <h2 className="sec-title">🎁 EPIC — FREE GAMES</h2>
-                        <a href="https://store.epicgames.com/en-US/free-games" target="_blank" rel="noopener noreferrer"
-                            style={{ marginLeft: 'auto', fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#c8ff57', textDecoration: 'none' }}>
-                            View on Epic →
-                        </a>
-                    </div>
-                    {epicLoading ? (
-                        <div className="epic-grid">{[1, 2, 3, 4].map(i => <EpicSkeleton key={i} />)}</div>
-                    ) : (epicGames.freeNow?.length > 0 || epicGames.upcoming?.length > 0) ? (
-                        <>
-                            {epicGames.freeNow?.length > 0 && (
-                                <>
-                                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#c8ff57', letterSpacing: '2px', marginBottom: 12, textTransform: 'uppercase' }}>🟢 Free Now</div>
-                                    <div className="epic-grid" style={{ marginBottom: epicGames.upcoming?.length > 0 ? 28 : 0 }}>
-                                        {epicGames.freeNow.map(g => <EpicFreeCard key={g.id} game={g} isNext={false} />)}
-                                    </div>
-                                </>
-                            )}
-                            {epicGames.upcoming?.length > 0 && (
-                                <>
-                                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#5c9fff', letterSpacing: '2px', marginBottom: 12, textTransform: 'uppercase' }}>⏳ Coming Soon</div>
-                                    <div className="epic-grid">
-                                        {epicGames.upcoming.map(g => <EpicFreeCard key={g.id} game={g} isNext={true} />)}
-                                    </div>
-                                </>
-                            )}
-                        </>
-                    ) : (
-                        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#7a7a90', padding: '28px', textAlign: 'center', background: '#111118', border: '1px solid #2a2a35', borderRadius: 8 }}>
-                            🎮 No free Epic games right now — new ones drop every Thursday at 11AM ET
-                        </div>
-                    )}
-                </div>
-
-                {/* PC DEALS */}
-                <div className="sec-head">
-                    <h2 className="sec-title">💸 GAME DEALS</h2>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#7a7a90' }}>Steam · GOG · Humble · Fanatical · GMG & more</span>
-                </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
                     <div className="filter-row">
