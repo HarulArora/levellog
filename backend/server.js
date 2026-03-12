@@ -31,6 +31,8 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/lists', listsRouter)
 app.use('/api/comments', commentsRouter)
 // app.use('/api/payment', paymentRouter)
+app.get('/health', (req, res) => res.send('OK'))
+
 
 app.get('/', (req, res) => {
     res.json({ message: '🎮 LevelLog API is running!' })
