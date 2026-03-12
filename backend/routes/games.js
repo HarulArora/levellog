@@ -165,7 +165,7 @@ router.put('/:id', protect, async (req, res) => {
         const game = await Game.findOneAndUpdate(
             { _id: req.params.id, userId: req.user._id },
             req.body,
-            { new: true }
+            { returnDocument: 'after' }
         )
 
         let updatedUser = null

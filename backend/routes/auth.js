@@ -680,7 +680,7 @@ router.put('/profile', protect, async (req, res) => {
         if (avatar !== undefined) updates.avatar = avatar
 
 
-        const updatedUser = await User.findByIdAndUpdate(req.user._id, { $set: updates }, { new: true })
+        const updatedUser = await User.findByIdAndUpdate(req.user._id, { $set: updates }, { returnDocument: 'after' })
 
         res.json({
 
@@ -716,6 +716,27 @@ router.put('/profile', protect, async (req, res) => {
 
     }
 
+})
+
+
+
+// ── GET /api/auth/suggestions ─────────────────────────────────────────────────
+router.get('/suggestions', protect, async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.user._id).select('following followers')
+        if (!currentUser) return res.status(404).json({ success: false, message: 'User not found' })
+
+        // Exclude: yourself + people you already follow
+        const excludeIds = [req.user._id, ...currentUser.following]
+
+        const users = await User.find({ _id: { $nin: excludeIds } })
+            .select('username avatar bio level badge isPrivate followers following')
+            .limit(50)
+
+        res.json({ success: true, users })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch suggestions', error: error.message })
+    }
 })
 
 

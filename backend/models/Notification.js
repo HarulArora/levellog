@@ -1,5 +1,4 @@
 import mongoose from 'mongoose'
-
 const notificationSchema = new mongoose.Schema(
     {
         recipient: {
@@ -15,11 +14,9 @@ const notificationSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            // ✅ added comment_reply
             enum: ['follow', 'follow_request', 'request_accepted', 'comment_reply'],
             required: true
         },
-        // ✅ stores igdbId + text preview for reply notifications
         meta: {
             type: mongoose.Schema.Types.Mixed,
             default: {}
@@ -33,6 +30,9 @@ const notificationSchema = new mongoose.Schema(
         timestamps: true
     }
 )
+
+notificationSchema.index({ recipient: 1, read: 1 })   // unread count badge
+notificationSchema.index({ recipient: 1, createdAt: -1 }) // fetch latest notifications
 
 const Notification = mongoose.model('Notification', notificationSchema)
 export default Notification
