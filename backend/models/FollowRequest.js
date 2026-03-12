@@ -1,5 +1,4 @@
 import mongoose from 'mongoose'
-
 const followRequestSchema = new mongoose.Schema(
     {
         sender: {
@@ -23,6 +22,8 @@ const followRequestSchema = new mongoose.Schema(
     }
 )
 
-const FollowRequest = mongoose.model('FollowRequest', followRequestSchema)
+followRequestSchema.index({ sender: 1, recipient: 1 }, { unique: true })  // prevent duplicate requests
+followRequestSchema.index({ recipient: 1, status: 1 })                    // fetch pending requests for a user
 
+const FollowRequest = mongoose.model('FollowRequest', followRequestSchema)
 export default FollowRequest

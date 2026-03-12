@@ -626,23 +626,9 @@ function Profile() {
 
 
                             <h1
-
-
-                                className="font-black text-3xl md:text-4xl tracking-widest
-
-
-       uppercase text-white"
-
-
-                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-
-
+                                className="font-black text-3xl md:text-4xl tracking-widest text-white"
                             >
-
-
                                 {user.username}
-
-
                             </h1>
 
 

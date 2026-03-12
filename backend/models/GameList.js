@@ -1,5 +1,4 @@
 import mongoose from 'mongoose'
-
 const gameListSchema = new mongoose.Schema(
     {
         userId: {
@@ -35,6 +34,8 @@ const gameListSchema = new mongoose.Schema(
     { timestamps: true }
 )
 
-const GameList = mongoose.model('GameList', gameListSchema)
+gameListSchema.index({ userId: 1 })          // fetch all lists by a user
+gameListSchema.index({ userId: 1, isPublic: 1 }) // fetch only public lists for a profile
 
+const GameList = mongoose.model('GameList', gameListSchema)
 export default GameList
