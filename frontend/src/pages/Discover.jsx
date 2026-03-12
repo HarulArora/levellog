@@ -309,9 +309,28 @@ export default function Discover() {
             if (activeGenre) params.set('genre', activeGenre.igdb)
             const res = await api.get(`/igdb/discover?${params}`)
             const data = res.data
-            setGames(data.games || [])
+            const fetchedGames = data.games || []
             setTotalPages(data.totalPages || 1)
             setTotal(data.total || 0)
+
+            // Fetch YOUR platform's avg ratings for these games
+            const ids = fetchedGames.map(g => g.id).filter(Boolean)
+            if (ids.length > 0) {
+                try {
+                    const statsRes = await api.post('/games/stats/batch', { igdbIds: ids })
+                    const stats = statsRes.data.stats || {}
+                    // Override game.avgRating with your platform's avgRating
+                    const enriched = fetchedGames.map(g => ({
+                        ...g,
+                        avgRating: stats[g.id]?.avgRating || null
+                    }))
+                    setGames(enriched)
+                } catch {
+                    setGames(fetchedGames)
+                }
+            } else {
+                setGames(fetchedGames)
+            }
         } catch (err) {
             console.error(err)
             setGames([])
