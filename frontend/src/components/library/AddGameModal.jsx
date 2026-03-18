@@ -250,7 +250,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
                             <div>
 
-                                <div className="font-semibold text-sm">
+                                <div className="font-semibold text-sm text-white">
 
                                     {formData.title}
 

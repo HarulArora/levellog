@@ -1,29 +1,16 @@
 import mongoose from 'mongoose'
+
 const followRequestSchema = new mongoose.Schema(
     {
-        sender: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
-            required: true
-        },
-        recipient: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
-            required: true
-        },
-        status: {
-            type: String,
-            enum: ['pending', 'accepted', 'declined'],
-            default: 'pending'
-        }
+        sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        status: { type: String, enum: ['pending', 'declined'], default: 'pending' },
+        // removed 'accepted' — accepted requests get deleted and moved to Follow collection
     },
-    {
-        timestamps: true
-    }
+    { timestamps: true }
 )
 
-followRequestSchema.index({ sender: 1, recipient: 1 }, { unique: true })  // prevent duplicate requests
-followRequestSchema.index({ recipient: 1, status: 1 })                    // fetch pending requests for a user
+followRequestSchema.index({ sender: 1, recipient: 1 }, { unique: true })
+followRequestSchema.index({ recipient: 1, status: 1 })
 
-const FollowRequest = mongoose.model('FollowRequest', followRequestSchema)
-export default FollowRequest
+export default mongoose.model('FollowRequest', followRequestSchema)

@@ -1,6 +1,7 @@
 import express from 'express'
 import { protect } from '../middleware/auth.js'
 import GameList from '../models/GameList.js'
+import GameListEntry from '../models/GameListEntry.js'
 import GameLike from '../models/GameLike.js'
 import Wishlist from '../models/Wishlist.js'
 import GameReview from '../models/GameReview.js'
@@ -9,7 +10,7 @@ import { awardXP, deductXP } from '../utils/xp.js'
 
 const router = express.Router()
 
-// ── GET /api/lists/me ──
+// ── GET /api/lists/me ──────────────────────────────────────────────────────────
 router.get('/me', protect, async (req, res) => {
     try {
         const [customLists, likes, wishlist, reviews, user] = await Promise.all([
@@ -17,44 +18,49 @@ router.get('/me', protect, async (req, res) => {
             GameLike.find({ userId: req.user._id }).sort({ createdAt: -1 }),
             Wishlist.find({ userId: req.user._id }).sort({ createdAt: -1 }),
             GameReview.find({ userId: req.user._id }).sort({ createdAt: -1 }),
-            User.findById(req.user._id).select('xp level badge username')
+            User.findById(req.user._id).select('xp level badge username'),
         ])
-        res.json({ success: true, customLists, likes, wishlist, reviews, user })
+
+        // attach entries to each list
+        const listIds = customLists.map(l => l._id)
+        const allEntries = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 })
+        const listsWithGames = customLists.map(list => ({
+            ...list.toObject(),
+            games: allEntries.filter(e => e.listId.toString() === list._id.toString())
+        }))
+
+        res.json({ success: true, customLists: listsWithGames, likes, wishlist, reviews, user })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── GET /api/lists/user/:userId ── fetch another user's lists (for profile page)
+// ── GET /api/lists/user/:userId ────────────────────────────────────────────────
 router.get('/user/:userId', async (req, res) => {
     try {
         const lists = await GameList.find({ userId: req.params.userId }).sort({ createdAt: -1 })
-        res.json({ success: true, lists })
+        const listIds = lists.map(l => l._id)
+        const allEntries = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 })
+        const listsWithGames = lists.map(list => ({
+            ...list.toObject(),
+            games: allEntries.filter(e => e.listId.toString() === list._id.toString())
+        }))
+        res.json({ success: true, lists: listsWithGames })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── POST /api/lists/custom ── requires level 2, max 2 lists
+// ── POST /api/lists/custom ────────────────────────────────────────────────────
 router.post('/custom', protect, async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
-
-        if (user.level < 2) {
-            return res.status(403).json({
-                success: false,
-                message: 'You need to reach Level 2 (5 XP) to create a custom list',
-                locked: true
-            })
-        }
+        if (user.level < 2)
+            return res.status(403).json({ success: false, message: 'You need Level 2 to create a custom list', locked: true })
 
         const existing = await GameList.countDocuments({ userId: req.user._id })
-        if (existing >= 2) {
-            return res.status(403).json({
-                success: false,
-                message: 'You can have up to 2 custom lists. Delete one to create another.'
-            })
-        }
+        if (existing >= 2)
+            return res.status(403).json({ success: false, message: 'You can have up to 2 custom lists.' })
 
         const { name, description, isPublic } = req.body
         if (!name?.trim()) return res.status(400).json({ success: false, message: 'List name is required' })
@@ -63,16 +69,17 @@ router.post('/custom', protect, async (req, res) => {
             userId: req.user._id,
             name: name.trim(),
             description: description?.trim() || '',
-            isPublic: isPublic !== false
+            isPublic: isPublic !== false,
+            gameCount: 0,
         })
 
-        res.status(201).json({ success: true, list })
+        res.status(201).json({ success: true, list: { ...list.toObject(), games: [] } })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── PUT /api/lists/custom/:id ── edit list name/description/visibility
+// ── PUT /api/lists/custom/:id ──────────────────────────────────────────────────
 router.put('/custom/:id', protect, async (req, res) => {
     try {
         const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id })
@@ -90,47 +97,52 @@ router.put('/custom/:id', protect, async (req, res) => {
     }
 })
 
-// ── PUT /api/lists/custom/:id/game ── add or remove a game
+// ── PUT /api/lists/custom/:id/game ── add or remove a game ────────────────────
 router.put('/custom/:id/game', protect, async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
-        if (user.level < 2) {
-            return res.status(403).json({
-                success: false,
-                message: 'Reach Level 2 to use custom lists.',
-                locked: true
-            })
-        }
+        if (user.level < 2)
+            return res.status(403).json({ success: false, message: 'Reach Level 2 to use custom lists.', locked: true })
 
         const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id })
         if (!list) return res.status(404).json({ success: false, message: 'List not found' })
 
         const { igdbId, gameTitle, gameCover, genre, action } = req.body
+
         if (action === 'add') {
-            const exists = list.games.find(g => String(g.igdbId) === String(igdbId))
-            if (!exists) list.games.push({ igdbId, gameTitle, gameCover, genre })
+            try {
+                await GameListEntry.create({ listId: list._id, igdbId, gameTitle, gameCover, genre })
+                await GameList.findByIdAndUpdate(list._id, { $inc: { gameCount: 1 } })
+            } catch (e) {
+                if (e.code === 11000) {
+                    // already in list — silent ignore
+                }
+            }
         } else if (action === 'remove') {
-            list.games = list.games.filter(g => String(g.igdbId) !== String(igdbId))
+            const deleted = await GameListEntry.findOneAndDelete({ listId: list._id, igdbId })
+            if (deleted) await GameList.findByIdAndUpdate(list._id, { $inc: { gameCount: -1 } })
         }
 
-        await list.save()
-        res.json({ success: true, list })
+        const entries = await GameListEntry.find({ listId: list._id }).sort({ createdAt: -1 })
+        const updatedList = await GameList.findById(list._id)
+        res.json({ success: true, list: { ...updatedList.toObject(), games: entries } })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── DELETE /api/lists/custom/:id ──
+// ── DELETE /api/lists/custom/:id ──────────────────────────────────────────────
 router.delete('/custom/:id', protect, async (req, res) => {
     try {
-        await GameList.findOneAndDelete({ _id: req.params.id, userId: req.user._id })
+        const list = await GameList.findOneAndDelete({ _id: req.params.id, userId: req.user._id })
+        if (list) await GameListEntry.deleteMany({ listId: list._id })
         res.json({ success: true, message: 'List deleted' })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── POST /api/lists/like ── +1 XP on like, -1 XP on unlike
+// ── POST /api/lists/like ──────────────────────────────────────────────────────
 router.post('/like', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, genre } = req.body
@@ -140,8 +152,7 @@ router.post('/like', protect, async (req, res) => {
             await GameLike.findByIdAndDelete(existing._id)
             const updatedUser = await deductXP(req.user._id, 1)
             return res.json({
-                success: true, liked: false,
-                message: 'Like removed · -1 XP',
+                success: true, liked: false, message: 'Like removed · -1 XP',
                 xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge
             })
         }
@@ -149,8 +160,7 @@ router.post('/like', protect, async (req, res) => {
         await GameLike.create({ userId: req.user._id, igdbId: Number(igdbId), gameTitle, gameCover, genre })
         const updatedUser = await awardXP(req.user._id, 1)
         res.json({
-            success: true, liked: true,
-            message: 'Game liked · +1 XP',
+            success: true, liked: true, message: 'Game liked · +1 XP',
             xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge
         })
     } catch (err) {
@@ -158,7 +168,7 @@ router.post('/like', protect, async (req, res) => {
     }
 })
 
-// ── POST /api/lists/wishlist ──
+// ── POST /api/lists/wishlist ──────────────────────────────────────────────────
 router.post('/wishlist', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, genre, releaseYear } = req.body
@@ -176,7 +186,7 @@ router.post('/wishlist', protect, async (req, res) => {
     }
 })
 
-// ── POST /api/lists/review ──
+// ── POST /api/lists/review ────────────────────────────────────────────────────
 router.post('/review', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, review, rating } = req.body
@@ -184,37 +194,36 @@ router.post('/review', protect, async (req, res) => {
 
         const igdbIdNum = Number(igdbId)
         const existing = await GameReview.findOne({ userId: req.user._id, igdbId: igdbIdNum })
-        let savedReview = null
 
         if (existing) {
             existing.review = review.trim()
             if (rating !== undefined) existing.rating = Number(rating)
             await existing.save()
-            savedReview = existing
-        } else {
-            savedReview = await GameReview.create({
-                userId: req.user._id, igdbId: igdbIdNum,
-                gameTitle, gameCover, review: review.trim(), rating: Number(rating) || 0
-            })
+            if (rating !== undefined && rating > 0) {
+                const Game = (await import('../models/Game.js')).default
+                await Game.findOneAndUpdate({ userId: req.user._id, igdbId: igdbIdNum }, { rating: Number(rating) })
+            }
+            return res.json({ success: true, review: existing, message: 'Review updated' })
         }
 
+        const savedReview = await GameReview.create({
+            userId: req.user._id, igdbId: igdbIdNum,
+            gameTitle, gameCover, review: review.trim(), rating: Number(rating) || 0
+        })
         if (rating !== undefined && rating > 0) {
             const Game = (await import('../models/Game.js')).default
             await Game.findOneAndUpdate({ userId: req.user._id, igdbId: igdbIdNum }, { rating: Number(rating) })
         }
-
-        res.json({ success: true, review: savedReview, message: existing ? 'Review updated' : 'Review posted' })
+        res.json({ success: true, review: savedReview, message: 'Review posted' })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── DELETE /api/lists/review/:igdbId ──
+// ── DELETE /api/lists/review/:igdbId ─────────────────────────────────────────
 router.delete('/review/:igdbId', protect, async (req, res) => {
     try {
-        const deleted = await GameReview.findOneAndDelete({
-            userId: req.user._id, igdbId: Number(req.params.igdbId)
-        })
+        const deleted = await GameReview.findOneAndDelete({ userId: req.user._id, igdbId: Number(req.params.igdbId) })
         if (!deleted) return res.status(404).json({ success: false, message: 'Review not found' })
         res.json({ success: true, message: 'Review deleted' })
     } catch (err) {
@@ -222,7 +231,7 @@ router.delete('/review/:igdbId', protect, async (req, res) => {
     }
 })
 
-// ── GET /api/lists/review/:igdbId ──
+// ── GET /api/lists/review/:igdbId ─────────────────────────────────────────────
 router.get('/review/:igdbId', async (req, res) => {
     try {
         const reviews = await GameReview.find({ igdbId: Number(req.params.igdbId) })
@@ -234,7 +243,7 @@ router.get('/review/:igdbId', async (req, res) => {
     }
 })
 
-// ── GET /api/lists/like/:igdbId ──
+// ── GET /api/lists/like/:igdbId ───────────────────────────────────────────────
 router.get('/like/:igdbId', protect, async (req, res) => {
     try {
         const like = await GameLike.findOne({ userId: req.user._id, igdbId: Number(req.params.igdbId) })
@@ -244,7 +253,7 @@ router.get('/like/:igdbId', protect, async (req, res) => {
     }
 })
 
-// ── GET /api/lists/wishlist/:igdbId ──
+// ── GET /api/lists/wishlist/:igdbId ───────────────────────────────────────────
 router.get('/wishlist/:igdbId', protect, async (req, res) => {
     try {
         const item = await Wishlist.findOne({ userId: req.user._id, igdbId: Number(req.params.igdbId) })

@@ -13,21 +13,46 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
     const [editingText, setEditingText] = useState('')
     const [isEditing, setIsEditing] = useState(false)
     const [submittingEdit, setSubmittingEdit] = useState(false)
-    const [likes, setLikes] = useState(comment.likes?.length || 0)
-    const [dislikes, setDislikes] = useState(comment.dislikes?.length || 0)
     const [isEdited, setIsEdited] = useState(comment.edited || false)
-    const [liked, setLiked] = useState(
-        currentUser ? comment.likes?.some(id =>
-            id === currentUser.id || id === currentUser._id ||
-            id?._id === currentUser.id || id?._id === currentUser._id
-        ) : false
+
+    // ── Use likeCount/dislikeCount from new backend ──────────────────
+    const [likes, setLikes] = useState(
+        comment.likeCount ?? comment.likes?.length ?? 0
     )
-    const [disliked, setDisliked] = useState(
-        currentUser ? comment.dislikes?.some(id =>
-            id === currentUser.id || id === currentUser._id ||
-            id?._id === currentUser.id || id?._id === currentUser._id
-        ) : false
+    const [dislikes, setDislikes] = useState(
+        comment.dislikeCount ?? comment.dislikes?.length ?? 0
     )
+    const [liked, setLiked] = useState(false)
+    const [disliked, setDisliked] = useState(false)
+
+    // ── Fetch whether current user liked this comment ─────────────────
+    useEffect(() => {
+        if (!currentUser) return
+        const fetchLikeState = async () => {
+            try {
+                const res = await api.get(`/comments/${comment._id}/like-status`)
+                setLiked(res.data.liked || false)
+                setDisliked(res.data.disliked || false)
+            } catch {
+                // fallback — check old array if backend doesn't have endpoint yet
+                if (comment.likes) {
+                    const uid = currentUser.id || currentUser._id
+                    setLiked(comment.likes.some(id =>
+                        id === uid || id?._id === uid ||
+                        id?.toString() === uid?.toString()
+                    ))
+                }
+                if (comment.dislikes) {
+                    const uid = currentUser.id || currentUser._id
+                    setDisliked(comment.dislikes.some(id =>
+                        id === uid || id?._id === uid ||
+                        id?.toString() === uid?.toString()
+                    ))
+                }
+            }
+        }
+        fetchLikeState()
+    }, [comment._id, currentUser])
 
     const isOwn = currentUser && (
         comment.userId?._id === currentUser.id ||
@@ -38,9 +63,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
 
     const handleOpenReply = () => {
         const mentionName = comment.userId?.username
-        if (mentionName) {
-            setReplyText(`@${mentionName} `)
-        }
+        if (mentionName) setReplyText(`@${mentionName} `)
         setShowReplyBox(true)
     }
 
@@ -119,21 +142,12 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
         return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     }
 
-    // ✅ @username mentions are now clickable links to /profile/:username
     const renderText = (text) => {
         if (!text) return null
         const parts = text.split(/(@\w+)/g)
         return parts.map((part, i) =>
             part.startsWith('@')
-                ? (
-                    <Link
-                        key={i}
-                        to={`/user/${part.slice(1)}`}
-                        className="text-[#c8ff57] font-semibold hover:underline"
-                    >
-                        {part}
-                    </Link>
-                )
+                ? <Link key={i} to={`/user/${part.slice(1)}`} className="text-[#c8ff57] font-semibold hover:underline">{part}</Link>
                 : <span key={i}>{part}</span>
         )
     }
@@ -148,7 +162,6 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
 
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-2">
-                        {/* ✅ Avatar is now a clickable link to the user's profile */}
                         {profilePath ? (
                             <Link to={profilePath} className="flex-shrink-0 hover:opacity-80 transition-opacity">
                                 {comment.userId?.avatar ? (
@@ -175,7 +188,6 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
                             )
                         )}
 
-                        {/* ✅ Username is now a clickable link to the user's profile */}
                         {profilePath ? (
                             <Link to={profilePath}
                                 className={`font-bold text-xs hover:underline ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
@@ -193,12 +205,8 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
                             Lv.{comment.userId?.level || 1}
                         </span>
                         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                            {isEdited && (
-                                <span className="font-mono text-[9px] text-[#7a7a90] italic">edited</span>
-                            )}
-                            <span className="font-mono text-[9px] text-[#7a7a90]">
-                                {timeAgo(comment.createdAt)}
-                            </span>
+                            {isEdited && <span className="font-mono text-[9px] text-[#7a7a90] italic">edited</span>}
+                            <span className="font-mono text-[9px] text-[#7a7a90]">{timeAgo(comment.createdAt)}</span>
                         </div>
                     </div>
 
