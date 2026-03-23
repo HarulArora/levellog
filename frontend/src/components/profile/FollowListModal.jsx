@@ -157,7 +157,7 @@ function FollowListModal({ userId, type, onClose }) {
                                         {u.username}
                                     </div>
                                     <div className="font-mono text-[10px] text-[#7a7a90] mt-[2px]">
-                                        {u.followers?.length || 0} followers
+                                        {u.followerCount ?? 0} followers
                                         {u.isPrivate && ' · 🔒 Private'}
                                     </div>
                                 </div>

@@ -14,6 +14,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
     const [isEditing, setIsEditing] = useState(false)
     const [submittingEdit, setSubmittingEdit] = useState(false)
     const [isEdited, setIsEdited] = useState(comment.edited || false)
+    const [repliesVisible, setRepliesVisible] = useState(true)
 
     // ── Use likeCount/dislikeCount from new backend ──────────────────
     const [likes, setLikes] = useState(
@@ -60,6 +61,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
     )
 
     const indentClass = depth > 0 ? 'ml-6 mt-2' : ''
+    const replyCount = comment.replies?.length || 0
 
     const handleOpenReply = () => {
         const mentionName = comment.userId?.username
@@ -125,6 +127,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
             onXpToast(res.data.message || '💬 Reply posted · +1 XP', 'gain')
             setReplyText('')
             setShowReplyBox(false)
+            setRepliesVisible(true) // auto-expand when a new reply is posted
             onRefresh()
         } catch (err) { console.error('Reply error:', err) }
         finally { setSubmittingReply(false) }
@@ -256,6 +259,23 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
                                 </button>
                             )}
 
+                            {/* Hide/Show replies toggle — only on top-level comments with replies */}
+                            {depth === 0 && replyCount > 0 && (
+                                <button
+                                    onClick={() => setRepliesVisible(v => !v)}
+                                    className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57] transition-colors flex items-center gap-1"
+                                >
+                                    <span
+                                        className="inline-block transition-transform duration-200"
+                                        style={{ transform: repliesVisible ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                                    >▶</span>
+                                    {repliesVisible
+                                        ? `Hide ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
+                                        : `Show ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
+                                    }
+                                </button>
+                            )}
+
                             {isOwn && (
                                 <>
                                     <button onClick={() => { setIsEditing(true); setEditingText(comment.text) }}
@@ -304,20 +324,29 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
                     </div>
                 )}
 
-                {comment.replies?.length > 0 && (
-                    <div className="mt-2 flex flex-col gap-2">
-                        {comment.replies.map(reply => (
-                            <CommentItem
-                                key={reply._id}
-                                comment={reply}
-                                currentUser={currentUser}
-                                igdbId={igdbId}
-                                onRefresh={onRefresh}
-                                onXpToast={onXpToast}
-                                depth={Math.min(depth + 1, 2)}
-                                gameTitle={gameTitle}
-                            />
-                        ))}
+                {/* Replies — collapsible */}
+                {replyCount > 0 && (
+                    <div
+                        className="overflow-hidden transition-all duration-300"
+                        style={{
+                            maxHeight: repliesVisible ? '9999px' : '0px',
+                            opacity: repliesVisible ? 1 : 0,
+                        }}
+                    >
+                        <div className="mt-2 flex flex-col gap-2">
+                            {comment.replies.map(reply => (
+                                <CommentItem
+                                    key={reply._id}
+                                    comment={reply}
+                                    currentUser={currentUser}
+                                    igdbId={igdbId}
+                                    onRefresh={onRefresh}
+                                    onXpToast={onXpToast}
+                                    depth={Math.min(depth + 1, 2)}
+                                    gameTitle={gameTitle}
+                                />
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
