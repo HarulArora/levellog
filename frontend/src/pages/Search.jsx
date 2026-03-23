@@ -4,7 +4,6 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 
 function Search() {
-
     const { user: currentUser } = useAuth()
     const [query, setQuery] = useState('')
     const [results, setResults] = useState([])
@@ -24,12 +23,23 @@ function Search() {
             setResults(filtered)
 
             if (currentUser) {
+                // ── check follow state per user via API ──────────────────
                 const states = {}
-                filtered.forEach(u => {
-                    const currentId = (currentUser.id || currentUser._id || '').toString()
-                    const isFollowing = u.followers?.some(id => id.toString() === currentId)
-                    states[u._id] = isFollowing ? 'following' : 'none'
-                })
+                await Promise.all(
+                    filtered.map(async (u) => {
+                        try {
+                            const profileRes = await api.get(`/auth/profile/${u.username}`)
+                            const profileData = profileRes.data.user
+                            if (profileData.isFollowedByMe) {
+                                states[u._id] = 'following'
+                            } else {
+                                states[u._id] = 'none'
+                            }
+                        } catch {
+                            states[u._id] = 'none'
+                        }
+                    })
+                )
                 setFollowStates(states)
             }
         } catch (err) {
@@ -53,12 +63,22 @@ function Search() {
             if (prevState === 'following') {
                 await api.post(`/auth/unfollow/${targetUser._id}`)
                 setFollowStates(prev => ({ ...prev, [targetUser._id]: 'none' }))
+                setResults(prev => prev.map(u =>
+                    u._id === targetUser._id
+                        ? { ...u, followerCount: Math.max(0, (u.followerCount || 0) - 1) }
+                        : u
+                ))
             } else if (prevState === 'none') {
                 const res = await api.post(`/auth/follow/${targetUser._id}`)
                 if (res.data.type === 'request_sent') {
                     setFollowStates(prev => ({ ...prev, [targetUser._id]: 'requested' }))
                 } else {
                     setFollowStates(prev => ({ ...prev, [targetUser._id]: 'following' }))
+                    setResults(prev => prev.map(u =>
+                        u._id === targetUser._id
+                            ? { ...u, followerCount: (u.followerCount || 0) + 1 }
+                            : u
+                    ))
                 }
             }
         } catch (err) {
@@ -71,10 +91,8 @@ function Search() {
 
             {/* Header */}
             <div className="flex items-baseline gap-4 mb-6 pb-4 border-b border-[#2a2a35]">
-                <h2
-                    className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
-                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                >
+                <h2 className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
+                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                     Find Friends
                 </h2>
             </div>
@@ -95,8 +113,7 @@ function Search() {
                                transition-colors placeholder:text-[#7a7a90]"
                 />
                 {loading && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2
-                                     text-[#7a7a90] font-mono text-xs">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7a7a90] font-mono text-xs">
                         searching...
                     </span>
                 )}
@@ -125,30 +142,20 @@ function Search() {
                     {results.map(u => {
                         const state = followStates[u._id] || 'none'
                         return (
-                            <div
-                                key={u._id}
-                                className="bg-[#111118] border border-[#2a2a35] rounded-lg
-                                           p-4 flex items-center gap-3
-                                           hover:border-[#c8ff57]/30 transition-all"
-                            >
+                            <div key={u._id}
+                                className="bg-[#111118] border border-[#2a2a35] rounded-lg p-4
+                                           flex items-center gap-3 hover:border-[#c8ff57]/30 transition-all">
+
                                 {/* Avatar */}
                                 <Link to={`/user/${u.username}`} className="flex-shrink-0">
                                     {u.avatar ? (
-                                        <img
-                                            src={u.avatar}
-                                            alt={u.username}
-                                            className="w-10 h-10 rounded-full object-cover
-                                                       ring-2 ring-[#2a2a35] hover:opacity-80 transition-opacity"
-                                        />
+                                        <img src={u.avatar} alt={u.username}
+                                            className="w-10 h-10 rounded-full object-cover ring-2 ring-[#2a2a35] hover:opacity-80 transition-opacity" />
                                     ) : (
-                                        <div
-                                            className="w-10 h-10 rounded-full bg-gradient-to-br
-                                                       from-[#c8ff57] to-[#5c9fff]
-                                                       flex items-center justify-center
-                                                       font-black text-base text-black
-                                                       hover:opacity-80 transition-opacity"
-                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                        >
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff]
+                                                        flex items-center justify-center font-black text-base text-black
+                                                        hover:opacity-80 transition-opacity"
+                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                             {u.username.charAt(0).toUpperCase()}
                                         </div>
                                     )}
@@ -157,8 +164,7 @@ function Search() {
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
                                     <Link to={`/user/${u.username}`}>
-                                        <div className="text-white font-bold text-sm
-                                                        hover:text-[#c8ff57] transition-colors truncate">
+                                        <div className="text-white font-bold text-sm hover:text-[#c8ff57] transition-colors truncate">
                                             {u.username}
                                         </div>
                                     </Link>
@@ -168,17 +174,16 @@ function Search() {
                                             Lv.{u.level || 1}
                                         </span>
                                         <span className="font-mono text-[9px] text-[#7a7a90]">·</span>
+                                        {/* ── uses followerCount now ── */}
                                         <span className="font-mono text-[9px] text-[#7a7a90]">
-                                            {u.followers?.length || 0} followers
+                                            {u.followerCount || 0} followers
                                         </span>
                                         {u.isPrivate && (
                                             <span className="font-mono text-[9px] text-[#ff5c5c]">🔒</span>
                                         )}
                                     </div>
                                     {u.bio && (
-                                        <div className="text-[#7a7a90] text-xs mt-1 truncate">
-                                            {u.bio}
-                                        </div>
+                                        <div className="text-[#7a7a90] text-xs mt-1 truncate">{u.bio}</div>
                                     )}
                                 </div>
 
@@ -187,27 +192,22 @@ function Search() {
                                     <button
                                         onClick={() => handleFollow(u)}
                                         disabled={state === 'requested'}
-                                        className={`px-4 py-2 text-xs font-bold rounded
-                                                   transition-all flex-shrink-0 disabled:opacity-70
+                                        className={`px-4 py-2 text-xs font-bold rounded transition-all flex-shrink-0 disabled:opacity-70
                                                    ${state === 'following'
                                                 ? 'border border-[#2a2a35] text-[#7a7a90] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'
                                                 : state === 'requested'
                                                     ? 'border border-[#ff9f5c]/50 text-[#ff9f5c] cursor-not-allowed'
-                                                    : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e]'
-                                            }`}
+                                                    : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e]'}`}
                                     >
                                         {state === 'following'
                                             ? 'Unfollow'
                                             : state === 'requested'
                                                 ? '⏳ Requested'
-                                                : u.isPrivate ? '+ Request' : '+ Follow'
-                                        }
+                                                : u.isPrivate ? '+ Request' : '+ Follow'}
                                     </button>
                                 ) : (
                                     <Link to="/login">
-                                        <button className="px-4 py-2 text-xs font-bold rounded
-                                                           bg-[#c8ff57] text-black hover:bg-[#d4ff6e]
-                                                           transition-all flex-shrink-0">
+                                        <button className="px-4 py-2 text-xs font-bold rounded bg-[#c8ff57] text-black hover:bg-[#d4ff6e] transition-all flex-shrink-0">
                                             Follow
                                         </button>
                                     </Link>
@@ -222,10 +222,8 @@ function Search() {
             {query.trim().length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                     <div className="text-5xl">🎮</div>
-                    <div
-                        className="text-white font-black text-xl tracking-widest uppercase"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                    >
+                    <div className="text-white font-black text-xl tracking-widest uppercase"
+                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         Find Your Friends
                     </div>
                     <div className="text-[#7a7a90] font-mono text-sm text-center max-w-sm">
@@ -234,7 +232,6 @@ function Search() {
                     </div>
                 </div>
             )}
-
         </div>
     )
 }

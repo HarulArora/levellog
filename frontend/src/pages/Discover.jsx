@@ -50,20 +50,21 @@ const PLAT_COLORS = {
 }
 
 const STATUS_COLORS = {
-    // lowercase — matches DB values exactly
     playing: { color: '#c8ff57', label: 'Playing' },
     completed: { color: '#5c9fff', label: 'Completed' },
     dropped: { color: '#ff5c5c', label: 'Dropped' },
     wishlist: { color: '#c45cff', label: 'Wishlist' },
     backlog: { color: '#ff9f5c', label: 'Backlog' },
     paused: { color: '#c45cff', label: 'Paused' },
-    // also Title Case just in case
+    planned: { color: '#ff9f5c', label: 'Planned' },   // ← ADD THIS
+    // Title Case duplicates
     Playing: { color: '#c8ff57', label: 'Playing' },
     Completed: { color: '#5c9fff', label: 'Completed' },
     Dropped: { color: '#ff5c5c', label: 'Dropped' },
     Wishlist: { color: '#c45cff', label: 'Wishlist' },
     Backlog: { color: '#ff9f5c', label: 'Backlog' },
     Paused: { color: '#c45cff', label: 'Paused' },
+    Planned: { color: '#ff9f5c', label: 'Planned' },   // ← ADD THIS
 }
 
 function PlatBadge({ name }) {
