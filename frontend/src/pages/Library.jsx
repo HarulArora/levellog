@@ -272,54 +272,46 @@ function Library() {
 
 function Pagination({ currentPage, totalPages, onPageChange }) {
     const getPageNumbers = () => {
-        if (totalPages <= 7) {
-            return Array.from({ length: totalPages }, (_, i) => i + 1)
-        }
-
-        const leftSibling = Math.max(currentPage - 1, 1)
-        const rightSibling = Math.min(currentPage + 1, totalPages)
-
-        const showLeftDots = leftSibling > 3
-        const showRightDots = rightSibling < totalPages - 2
-
-        if (!showLeftDots && showRightDots)
-            return [...Array.from({ length: 5 }, (_, i) => i + 1), '...', totalPages]
-
-        if (showLeftDots && !showRightDots)
-            return [1, '...', ...Array.from({ length: 5 }, (_, i) => totalPages - 4 + i)]
-
-        return [1, '...', leftSibling, currentPage, rightSibling, '...', totalPages]
+        if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1)
+        if (currentPage <= 3) return [1, 2, 3, '...', totalPages]
+        if (currentPage >= totalPages - 2) return [1, '...', totalPages - 2, totalPages - 1, totalPages]
+        return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages]
     }
 
     const pageNumbers = getPageNumbers()
 
-    const btnBase = `flex items-center justify-center h-9 px-3 font-mono text-sm rounded border transition-all duration-150`
+    const btnBase = `flex items-center justify-center h-8 sm:h-9 font-mono rounded border transition-all duration-150`
     const btnInactive = `text-[#7a7a90] border-[#2a2a35] bg-transparent hover:text-white hover:border-[#7a7a90]`
     const btnActive = `text-black bg-[#c8ff57] border-[#c8ff57] font-bold`
     const btnDisabled = `text-[#3a3a50] border-[#1e1e28] bg-transparent cursor-not-allowed`
-    const btnNav = `text-[#7a7a90] border-[#2a2a35] bg-transparent hover:text-white hover:border-[#7a7a90] px-4`
 
     return (
-        <div className="flex items-center justify-center gap-2 mt-8 pt-4 border-t border-[#2a2a35]">
+        <div className="flex items-center justify-center gap-1 mt-8 pt-4 border-t border-[#2a2a35] flex-wrap">
+
+            {/* Prev */}
             <button
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className={`${btnBase} ${currentPage === 1 ? btnDisabled : btnNav}`}
+                className={`${btnBase} px-2.5 sm:px-4 text-xs sm:text-sm ${currentPage === 1 ? btnDisabled : `${btnInactive}`}`}
                 aria-label="Previous page"
             >
-                ← Prev
+                ← <span className="hidden sm:inline ml-1">Prev</span>
             </button>
 
+            {/* Page numbers */}
             {pageNumbers.map((page, idx) =>
                 page === '...' ? (
-                    <span key={`dots-${idx}`} className="font-mono text-sm text-[#3a3a50] px-1 select-none">
-                        ...
+                    <span
+                        key={`dots-${idx}`}
+                        className="font-mono text-sm text-[#3a3a50] w-6 text-center select-none"
+                    >
+                        …
                     </span>
                 ) : (
                     <button
                         key={page}
                         onClick={() => onPageChange(page)}
-                        className={`${btnBase} min-w-[36px] ${page === currentPage ? btnActive : btnInactive}`}
+                        className={`${btnBase} w-8 sm:w-9 text-xs sm:text-sm ${page === currentPage ? btnActive : btnInactive}`}
                         aria-label={`Page ${page}`}
                         aria-current={page === currentPage ? 'page' : undefined}
                     >
@@ -328,13 +320,14 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
                 )
             )}
 
+            {/* Next */}
             <button
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className={`${btnBase} ${currentPage === totalPages ? btnDisabled : btnNav}`}
+                className={`${btnBase} px-2.5 sm:px-4 text-xs sm:text-sm ${currentPage === totalPages ? btnDisabled : `${btnInactive}`}`}
                 aria-label="Next page"
             >
-                Next →
+                <span className="hidden sm:inline mr-1">Next</span> →
             </button>
         </div>
     )
