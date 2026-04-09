@@ -185,7 +185,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
                     >
 
-                        {existingEntry ? 'Edit Game' : preselectedGame ? 'Log This Game' : 'Log a Game'}
+                        {existingEntry ? 'Edit Game' : preselectedGame ? 'Add to Deck' : 'Add to Deck'}
 
                     </h3>
 

@@ -1,9 +1,11 @@
 import { useState, useMemo, useCallback, lazy, Suspense } from 'react'
-import useGames from '../hooks/useGames'
+import { useGamesContext } from '../context/GamesContext'
 import GameCard from '../components/library/GameCard'
 import FilterBar from '../components/library/FilterBar'
 import Toast from '../components/ui/Toast'
 import { Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 // Heavy modals are lazy-loaded — not bundled until first open
 const AddGameModal = lazy(() => import('../components/library/AddGameModal'))
@@ -24,7 +26,9 @@ function SkeletonCard() {
 }
 
 function Library() {
-    const { games, loading, error, addGame, deleteGame } = useGames()
+    const { games, loading, error, addGame, deleteGame } = useGamesContext()
+    const { user } = useAuth()
+    const navigate = useNavigate()
     const [activeFilter, setActiveFilter] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedQ, setDebouncedQ] = useState('')
@@ -120,11 +124,14 @@ function Library() {
                         {filteredGames.length} games
                     </span>
                     <button
-                        onClick={() => setShowModal(true)}
+                        onClick={() => {
+                            if (!user) { navigate('/login'); return }
+                            setShowModal(true)
+                        }}
                         className="ml-auto px-3 py-2 bg-[#c8ff57] text-black font-bold text-sm
                                    rounded hover:bg-[#d4ff6e] transition-all whitespace-nowrap shrink-0"
                     >
-                        + Log Game
+                        + Add to Deck
                     </button>
                 </div>
 

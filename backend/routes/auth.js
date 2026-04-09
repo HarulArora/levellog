@@ -11,6 +11,16 @@ import { awardXP, deductXP } from '../utils/xp.js'
 
 const router = express.Router()
 
+// Simple profanity list for common offensive terms
+const BLOOCKED_WORDS = ['admin', 'moderator', 'support', 'questdeck', 'levellog', 'staff', 'offensive', 'slur', 'nazi', 'fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy']
+
+const isProfane = (str) => {
+    const s = str.toLowerCase()
+    return BLOOCKED_WORDS.some(word => s.includes(word))
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/
+
 const createToken = (userId) =>
     jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' })
 
@@ -33,10 +43,13 @@ router.get('/check-username', async (req, res) => {
         const { username } = req.query
         if (!username || username.trim().length < 3)
             return res.json({ available: false, message: 'Min 3 characters' })
-        if (username.trim().length > 20)
-            return res.json({ available: false, message: 'Max 20 characters' })
+        if (username.trim().length > 12)
+            return res.json({ available: false, message: 'Max 12 characters' })
         if (!/^[a-zA-Z0-9_]+$/.test(username.trim()))
             return res.json({ available: false, message: 'Letters, numbers, underscores only' })
+        if (isProfane(username))
+            return res.json({ available: false, message: 'Username is not allowed' })
+
         const existing = await User.findOne({ username: username.trim() })
         return res.json(existing
             ? { available: false, message: 'Username already taken' }
@@ -53,7 +66,13 @@ router.post('/signup', async (req, res) => {
         if (!username || !email || !password)
             return res.status(400).json({ success: false, message: 'Please provide username, email and password' })
 
-        const emailExists = await User.findOne({ email: email.toLowerCase() })
+        if (!EMAIL_REGEX.test(email))
+            return res.status(400).json({ success: false, message: 'Please provide a valid email address' })
+
+        if (isProfane(username))
+            return res.status(400).json({ success: false, message: 'Username contains restricted words', field: 'username' })
+
+        const emailExists = await User.findOne({ email: email.toLowerCase().trim() })
         if (emailExists)
             return res.status(400).json({ success: false, message: 'An account with this email already exists.', field: 'email' })
 
@@ -319,9 +338,17 @@ router.get('/search', async (req, res) => {
         const enriched = await Promise.all(users.map(async u => {
             const uObj = u.toObject()
             if (loggedInId) {
-                const f = await Follow.findOne({ followerId: u._id, followingId: loggedInId })
-                uObj.followsMe = !!f
+                const [follow, sentReq, followedBy] = await Promise.all([
+                    Follow.findOne({ followerId: loggedInId, followingId: u._id }),
+                    FollowRequest.findOne({ sender: loggedInId, recipient: u._id, status: 'pending' }),
+                    Follow.findOne({ followerId: u._id, followingId: loggedInId })
+                ])
+                uObj.isFollowedByMe = !!follow
+                uObj.isRequestedByMe = !!sentReq
+                uObj.followsMe = !!followedBy
             } else {
+                uObj.isFollowedByMe = false
+                uObj.isRequestedByMe = false
                 uObj.followsMe = false
             }
             return uObj
@@ -363,16 +390,16 @@ router.put('/profile', protect, async (req, res) => {
 
         if (username !== undefined) {
             const trimmed = username.trim()
-            if (trimmed.length < 3 || trimmed.length > 20)
-                return res.status(400).json({ success: false, message: 'Username must be 3–20 characters' })
+            if (trimmed.length < 3 || trimmed.length > 12)
+                return res.status(400).json({ success: false, message: 'Username must be 3–12 characters' })
             const existing = await User.findOne({ username: trimmed, _id: { $ne: req.user._id } })
             if (existing)
                 return res.status(400).json({ success: false, message: 'Username already taken' })
             updates.username = trimmed
         }
         if (bio !== undefined) {
-            if (bio.length > 200)
-                return res.status(400).json({ success: false, message: 'Bio max 200 characters' })
+            if (bio.length > 150)
+                return res.status(400).json({ success: false, message: 'Bio max 150 characters' })
             updates.bio = bio.trim()
         }
         if (avatar !== undefined) updates.avatar = avatar
@@ -430,8 +457,17 @@ router.get('/suggestions', protect, async (req, res) => {
             const uObj = u.toObject()
             const idStr = u._id.toString()
             uObj.mutualCount = mutualCounts[idStr] || 0
-            const f = await Follow.findOne({ followerId: u._id, followingId: req.user._id })
-            uObj.followsMe = !!f
+
+            const [follow, sentReq, followsMe] = await Promise.all([
+                Follow.findOne({ followerId: req.user._id, followingId: u._id }),
+                FollowRequest.findOne({ sender: req.user._id, recipient: u._id, status: 'pending' }),
+                Follow.findOne({ followerId: u._id, followingId: req.user._id })
+            ])
+
+            uObj.isFollowedByMe = !!follow
+            uObj.isRequestedByMe = !!sentReq
+            uObj.followsMe = !!followsMe
+            
             return uObj
         }))
 

@@ -14,7 +14,7 @@ function useDebounce(value, delay) {
 }
 
 function isValidEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/.test(email)
 }
 
 function Signup() {
@@ -135,13 +135,18 @@ function Signup() {
     return (
         <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
+                <button onClick={() => navigate(-1)}
+                    className="flex items-center gap-2 font-mono text-xs text-[#7a7a90]
+                               hover:text-[#c8ff57] transition-colors mb-6">
+                    ← BACK
+                </button>
 
                 <div className="text-center mb-8">
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        LEVEL<span className="text-white">LOG</span>
+                        QUEST<span className="text-white">DECK</span>
                     </div>
-                    <p className="text-[#7a7a90] font-mono text-xs">Start your game diary today</p>
+                    <p className="text-[#7a7a90] font-mono text-xs">Start your gaming odyssey today</p>
                 </div>
 
                 <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
@@ -196,7 +201,7 @@ function Signup() {
                             placeholder="Letters, numbers, underscore"
                             value={formData.username}
                             onChange={e => handleChange('username', e.target.value)}
-                            maxLength={20}
+                            maxLength={12}
                             className={`w-full bg-[#18181f] border rounded
                                         px-3 py-2 text-sm text-white
                                         focus:outline-none transition-colors

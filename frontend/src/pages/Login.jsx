@@ -67,10 +67,15 @@ function Login() {
     return (
         <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
+                <button onClick={() => navigate(-1)}
+                    className="flex items-center gap-2 font-mono text-xs text-[#7a7a90]
+                               hover:text-[#c8ff57] transition-colors mb-6">
+                    ← BACK
+                </button>
                 <div className="text-center mb-8">
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        LEVEL<span className="text-white">LOG</span>
+                        QUEST<span className="text-white">DECK</span>
                     </div>
                     <p className="text-[#7a7a90] font-mono text-xs">Welcome back, gamer</p>
                 </div>
@@ -166,7 +171,7 @@ function Login() {
                                    rounded hover:bg-[#d4ff6e] transition-all
                                    disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {loading ? 'Logging in...' : 'Login'}
+                        {loading ? 'Connecting...' : 'Login'}
                     </button>
                     <p className="text-center text-[#7a7a90] font-mono text-xs mt-4">
                         No account?{' '}

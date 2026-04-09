@@ -1,8 +1,12 @@
 import express from 'express'
 import Game from '../models/Game.js'
 import GameLike from '../models/GameLike.js'
+import Wishlist from '../models/Wishlist.js'
 import { protect } from '../middleware/auth.js'
 import { awardXP, deductXP } from '../utils/xp.js'
+import { updateGlobalStats } from '../utils/stats.js'
+import { updateUserStats } from '../utils/userStats.js'
+import GlobalStats from '../models/GlobalStats.js'
 
 const router = express.Router()
 
@@ -59,56 +63,52 @@ router.get('/activity/:userId', protect, async (req, res) => {
     }
 })
 
-// ── GET /api/games/stats/:igdbId ── MUST be before /:id
+// ── GET /api/games/stats/:igdbId ── O(1) Lookup (Optimized)
 router.get('/stats/:igdbId', async (req, res) => {
     try {
         const igdbId = Number(req.params.igdbId)
-        const [loggedCount, ratingData, likeCount] = await Promise.all([
-            Game.countDocuments({ igdbId }),
-            Game.aggregate([
-                { $match: { igdbId, rating: { $gt: 0 } } },
-                { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } }
-            ]),
-            GameLike.countDocuments({ igdbId })
-        ])
-        const avgRating = ratingData[0] ? parseFloat(ratingData[0].avg.toFixed(1)) : null
-        const ratingCount = ratingData[0]?.count || 0
-        res.json({ success: true, stats: { loggedCount, avgRating, ratingCount, likeCount } })
+        const stats = await GlobalStats.findOne({ igdbId })
+        
+        // Return default zeros if no stats record exists yet
+        res.json({ 
+            success: true, 
+            stats: stats || { 
+                loggedCount: 0, 
+                avgRating: null, 
+                ratingCount: 0, 
+                likeCount: 0, 
+                wishlistCount: 0 
+            } 
+        })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
 })
 
-// ── POST /api/games/stats/batch ── MUST be before POST /
+// ── POST /api/games/stats/batch ── O(N) where N is batch size (Optimized)
 router.post('/stats/batch', async (req, res) => {
     try {
         const { igdbIds } = req.body
         if (!igdbIds?.length) return res.json({ success: true, stats: {} })
         const ids = igdbIds.map(Number)
-        const [reviewData, likeCounts, logCounts] = await Promise.all([
-            Game.aggregate([
-                { $match: { igdbId: { $in: ids }, rating: { $gt: 0 } } },
-                { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
-            ]),
-            GameLike.aggregate([
-                { $match: { igdbId: { $in: ids } } },
-                { $group: { _id: '$igdbId', count: { $sum: 1 } } }
-            ]),
-            Game.aggregate([
-                { $match: { igdbId: { $in: ids } } },
-                { $group: { _id: '$igdbId', count: { $sum: 1 } } }
-            ])
-        ])
+        
+        const allStats = await GlobalStats.find({ igdbId: { $in: ids } })
+        
         const stats = {}
         ids.forEach(id => {
-            const review = reviewData.find(r => r._id === id)
-            const like = likeCounts.find(l => l._id === id)
-            const log = logCounts.find(l => l._id === id)
-            stats[id] = {
-                avgRating: review ? parseFloat(review.avg.toFixed(1)) : null,
-                ratingCount: review?.count || 0,
-                likeCount: like?.count || 0,
-                loggedCount: log?.count || 0
+            const s = allStats.find(x => x.igdbId === id)
+            stats[id] = s ? {
+                avgRating: s.avgRating || null,
+                ratingCount: s.ratingCount || 0,
+                likeCount: s.likeCount || 0,
+                loggedCount: s.loggedCount || 0,
+                wishlistCount: s.wishlistCount || 0
+            } : {
+                avgRating: null,
+                ratingCount: 0,
+                likeCount: 0,
+                loggedCount: 0,
+                wishlistCount: 0
             }
         })
         res.json({ success: true, stats })
@@ -129,6 +129,26 @@ router.post('/', protect, async (req, res) => {
             title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId
         })
         const savedGame = await newGame.save()
+
+        // ── Global Stats Denormalization ──
+        const statsUpdate = { loggedCount: 1 }
+        if (rating > 0) {
+            statsUpdate.ratingCount = 1
+            statsUpdate.ratingValue = Number(rating)
+        }
+        await updateGlobalStats(igdbId, statsUpdate)
+
+        // ── User Stats Denormalization ──
+        const userStatsUpdate = { 
+            'gameStats.total': 1,
+            [`gameStats.${status}`]: 1,
+            'gameStats.totalHours': Number(hours) || 0
+        }
+        if (rating > 0) {
+            userStatsUpdate['gameStats.ratingCount'] = 1
+            userStatsUpdate['gameStats.totalRatingSum'] = Number(rating)
+        }
+        await updateUserStats(req.user._id, userStatsUpdate)
 
         // +1 XP for logging
         let updatedUser = await awardXP(req.user._id, 1)
@@ -160,7 +180,8 @@ router.put('/:id', protect, async (req, res) => {
         const existingGame = await Game.findOne({ _id: req.params.id, userId: req.user._id })
         if (!existingGame) return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
 
-        const hadRatingBefore = existingGame.rating > 0
+        const oldRating = existingGame.rating || 0
+        const hadRatingBefore = oldRating > 0
         const hasRatingNow = req.body.rating > 0
 
         const game = await Game.findOneAndUpdate(
@@ -168,6 +189,44 @@ router.put('/:id', protect, async (req, res) => {
             req.body,
             { returnDocument: 'after' }
         )
+
+        // ── Global Stats Update ──
+        if (game.igdbId) {
+            const ratingDelta = (Number(req.body.rating) || 0) - oldRating
+            const countDelta = (!hadRatingBefore && hasRatingNow) ? 1 : (hadRatingBefore && !hasRatingNow) ? -1 : 0
+            
+            if (ratingDelta !== 0 || countDelta !== 0) {
+                await updateGlobalStats(game.igdbId, {
+                    ratingCount: countDelta,
+                    ratingValue: ratingDelta
+                })
+            }
+        }
+
+        // ── User Stats Update ──
+        const userStatsUpdate = {}
+        const oldStatus = existingGame.status
+        const newStatus = req.body.status
+        if (newStatus && oldStatus !== newStatus) {
+            userStatsUpdate[`gameStats.${oldStatus}`] = -1
+            userStatsUpdate[`gameStats.${newStatus}`] = 1
+        }
+        const oldHours = existingGame.hours || 0
+        const newHours = Number(req.body.hours)
+        if (!isNaN(newHours) && oldHours !== newHours) {
+            userStatsUpdate['gameStats.totalHours'] = newHours - oldHours
+        }
+        const ratingDelta = (Number(req.body.rating) || 0) - (existingGame.rating || 0)
+        const countDelta = (!hadRatingBefore && hasRatingNow) ? 1 : (hadRatingBefore && !hasRatingNow) ? -1 : 0
+        
+        if (ratingDelta !== 0 || countDelta !== 0) {
+            userStatsUpdate['gameStats.ratingCount'] = countDelta
+            userStatsUpdate['gameStats.totalRatingSum'] = ratingDelta
+        }
+
+        if (Object.keys(userStatsUpdate).length > 0) {
+            await updateUserStats(req.user._id, userStatsUpdate)
+        }
 
         let updatedUser = null
 
@@ -202,6 +261,28 @@ router.delete('/:id', protect, async (req, res) => {
         if (game.rating > 0) xpToDeduct += 1
 
         await game.deleteOne()
+        
+        // ── Global Stats Update ──
+        if (game.igdbId) {
+            await updateGlobalStats(game.igdbId, {
+                loggedCount: -1,
+                ratingCount: game.rating > 0 ? -1 : 0,
+                ratingValue: game.rating > 0 ? -game.rating : 0
+            })
+        }
+
+        // ── User Stats Update ──
+        const userStatsDelete = {
+            'gameStats.total': -1,
+            [`gameStats.${game.status}`]: -1,
+            'gameStats.totalHours': -(game.hours || 0)
+        }
+        if (game.rating > 0) {
+            userStatsDelete['gameStats.ratingCount'] = -1
+            userStatsDelete['gameStats.totalRatingSum'] = -game.rating
+        }
+        await updateUserStats(req.user._id, userStatsDelete)
+
         const updatedUser = await deductXP(req.user._id, xpToDeduct)
 
         res.json({

@@ -285,20 +285,20 @@ function EditProfile() {
                             <label className="font-mono text-xs uppercase tracking-wider text-[#7a7a90]">
                                 Username
                             </label>
-                            <span className={`font-mono text-[10px] tabular-nums ${username.length >= 20
+                            <span className={`font-mono text-[10px] tabular-nums ${username.length >= 12
                                     ? 'text-[#ff5c5c]'
-                                    : username.length >= 16
+                                    : username.length >= 10
                                         ? 'text-[#ffaa57]'
                                         : 'text-[#3a3a50]'
                                 }`}>
-                                {username.length}/20
+                                {username.length}/12
                             </span>
                         </div>
                         <input
                             type="text"
                             value={username}
                             onChange={e => handleUsernameChange(e.target.value)}
-                            maxLength={20}
+                            maxLength={12}
                             placeholder="Letters, numbers, underscore only"
                             className="w-full bg-[#18181f] border border-[#2a2a35] rounded
                                        px-3 py-2.5 text-sm text-white
@@ -317,7 +317,7 @@ function EditProfile() {
                         <textarea
                             value={bio}
                             onChange={e => setBio(e.target.value)}
-                            maxLength={200}
+                            maxLength={150}
                             rows={3}
                             placeholder="Tell people about yourself..."
                             className="w-full bg-[#18181f] border border-[#2a2a35] rounded
@@ -325,8 +325,13 @@ function EditProfile() {
                                        focus:outline-none focus:border-[#c8ff57]
                                        placeholder:text-[#3a3a50] transition-colors"
                         />
-                        <div className="font-mono text-[10px] text-[#7a7a90] mt-1 text-right">
-                            {bio.length}/200
+                        <div className={`font-mono text-[10px] mt-1 text-right tabular-nums ${bio.length >= 150
+                                ? 'text-[#ff5c5c]'
+                                : bio.length >= 135
+                                    ? 'text-[#ffaa57]'
+                                    : 'text-[#7a7a90]'
+                            }`}>
+                            {bio.length}/150
                         </div>
                     </div>
 

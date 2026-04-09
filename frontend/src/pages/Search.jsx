@@ -1,114 +1,33 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import api from '../api/axios'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Search as SearchIcon } from 'lucide-react'
+import useCachedFetch from '../hooks/useCachedFetch'
+import { useFollow } from '../context/FollowContext'
 
 function Search() {
     const { user: currentUser } = useAuth()
+    const navigate = useNavigate()
     const [query, setQuery] = useState('')
-    const [results, setResults] = useState([])
-    const [loading, setLoading] = useState(false)
-    const [followStates, setFollowStates] = useState({})
-    const [suggestions, setSuggestions] = useState([])
-    const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+    const { getFollowStatus, handleFollowToggle, loadingMap } = useFollow()
 
-    const searchUsers = useCallback(async (q) => {
-        if (q.trim().length < 2) {
-            setResults([])
-            return
-        }
-        setLoading(true)
-        try {
-            const res = await api.get(`/auth/search?q=${q.trim()}`)
-            const users = res.data.users
-            const filtered = users.filter(u => u.username !== currentUser?.username)
-            setResults(filtered)
+    // ── CACHED FETCHES ──
+    const { data: suggestionsData, loading: loadingSuggestions } = useCachedFetch(
+        currentUser ? 'friend_suggestions' : null,
+        '/auth/suggestions',
+        { enabled: !!currentUser, ttl: 10 * 60 * 1000 }
+    )
 
-            if (currentUser) {
-                // ── check follow state per user via API ──────────────────
-                const states = {}
-                await Promise.all(
-                    filtered.map(async (u) => {
-                        try {
-                            const profileRes = await api.get(`/auth/profile/${u.username}`)
-                            const profileData = profileRes.data.user
-                            if (profileData.isFollowedByMe) {
-                                states[u._id] = 'following'
-                            } else if (profileData.isRequestedByMe) {
-                                states[u._id] = 'requested'
-                            } else {
-                                states[u._id] = 'none'
-                            }
-                        } catch {
-                            states[u._id] = 'none'
-                        }
-                    })
-                )
-                setFollowStates(states)
-            }
-        } catch (err) {
-            console.error('Search error:', err)
-        } finally {
-            setLoading(false)
-        }
-    }, [currentUser])
+    const searchKey = query.trim().length >= 2 ? `user_search_${query.trim().toLowerCase()}` : null
+    const { data: searchData, loading: loadingSearch } = useCachedFetch(
+        searchKey,
+        searchKey ? `/auth/search?q=${encodeURIComponent(query.trim())}` : null,
+        { enabled: !!searchKey, ttl: 5 * 60 * 1000 }
+    )
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            searchUsers(query)
-        }, 400)
-        return () => clearTimeout(timer)
-    }, [query, searchUsers])
-
-    useEffect(() => {
-        if (!currentUser) return
-        const fetchSuggestions = async () => {
-            setLoadingSuggestions(true)
-            try {
-                const res = await api.get('/auth/suggestions')
-                setSuggestions(res.data.users || [])
-            } catch (err) {
-                console.error('Failed to fetch suggestions:', err)
-            } finally {
-                setLoadingSuggestions(false)
-            }
-        }
-        fetchSuggestions()
-    }, [currentUser])
-
-    const handleFollow = async (targetUser) => {
-        if (!currentUser) return
-        const prevState = followStates[targetUser._id]
-        try {
-            if (prevState === 'following') {
-                await api.post(`/auth/unfollow/${targetUser._id}`)
-                setFollowStates(prev => ({ ...prev, [targetUser._id]: 'none' }))
-                setResults(prev => prev.map(u =>
-                    u._id === targetUser._id
-                        ? { ...u, followerCount: Math.max(0, (u.followerCount || 0) - 1) }
-                        : u
-                ))
-            } else if (prevState === 'requested') {
-                await api.delete(`/auth/follow-request/cancel/${targetUser._id}`)
-                setFollowStates(prev => ({ ...prev, [targetUser._id]: 'none' }))
-            } else if (prevState === 'none') {
-                const res = await api.post(`/auth/follow/${targetUser._id}`)
-                if (res.data.type === 'request_sent') {
-                    setFollowStates(prev => ({ ...prev, [targetUser._id]: 'requested' }))
-                } else {
-                    setFollowStates(prev => ({ ...prev, [targetUser._id]: 'following' }))
-                    setResults(prev => prev.map(u =>
-                        u._id === targetUser._id
-                            ? { ...u, followerCount: (u.followerCount || 0) + 1 }
-                            : u
-                    ))
-                }
-            }
-        } catch (err) {
-            console.error('Follow error:', err)
-        }
-    }
+    const suggestions = suggestionsData?.users || []
+    const results     = (searchData?.users || []).filter(u => u.username !== currentUser?.username)
+    const loading     = loadingSearch
 
     return (
         <div className="max-w-[800px] mx-auto px-5 md:px-10 py-8 md:py-10">
@@ -164,7 +83,8 @@ function Search() {
             {results.length > 0 && (
                 <div className="flex flex-col gap-3">
                     {results.map(u => {
-                        const state = followStates[u._id] || 'none'
+                        const state = getFollowStatus(u)
+                        const isBtnLoading = loadingMap[u._id] || false
                         return (
                             <div key={u._id}
                                 className="bg-[#111118] border border-[#2a2a35] rounded-lg p-4
@@ -219,23 +139,24 @@ function Search() {
                                 {/* Follow button */}
                                 {currentUser ? (
                                     <button
-                                        onClick={() => handleFollow(u)}
-                                        className={`px-4 py-2 text-xs font-bold rounded transition-all flex-shrink-0
+                                        onClick={() => handleFollowToggle(u)}
+                                        disabled={isBtnLoading}
+                                        className={`px-6 py-2.5 text-xs font-bold rounded-lg transition-all flex-shrink-0
                                                    ${state === 'following'
                                                 ? 'border border-[#2a2a35] text-[#7a7a90] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'
                                                 : state === 'requested'
-                                                    ? 'border border-[#ff9f5c]/50 text-[#ff9f5c] cursor-not-allowed'
-                                                    : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e]'}`}
+                                                    ? 'border border-[#ff9f5c]/50 text-[#ff9f5c] hover:bg-[#ff9f5c]/10'
+                                                    : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e] hover:shadow-[0_4px_12px_rgba(200,255,87,0.2)]'}
+                                                   disabled:opacity-50`}
                                     >
-                                        {state === 'following'
-                                            ? 'Unfollow'
-                                            : state === 'requested'
-                                                ? 'Cancel Req.'
-                                                : u.isPrivate ? '+ Request' : '+ Follow'}
+                                        {isBtnLoading ? '...' : 
+                                         state === 'following' ? 'Unfollow' : 
+                                         state === 'requested' ? 'Cancel Req.' : 
+                                         u.isPrivate ? '+ Request' : '+ Follow'}
                                     </button>
                                 ) : (
                                     <Link to="/login">
-                                        <button className="px-4 py-2 text-xs font-bold rounded bg-[#c8ff57] text-black hover:bg-[#d4ff6e] transition-all flex-shrink-0">
+                                        <button className="px-6 py-2.5 text-xs font-bold rounded-lg bg-[#c8ff57] text-black hover:bg-[#d4ff6e] transition-all flex-shrink-0">
                                             Follow
                                         </button>
                                     </Link>
@@ -257,7 +178,8 @@ function Search() {
                             </h3>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                 {suggestions.map(u => {
-                                    const state = followStates[u._id] || 'none'
+                                    const state = getFollowStatus(u)
+                                    const isBtnLoading = loadingMap[u._id] || false
                                     return (
                                         <div key={u._id} className="bg-[#111118] border border-[#2a2a35] rounded-xl p-5 flex flex-col items-center text-center hover:border-[#c8ff57]/30 transition-all shadow-lg group">
                                             <Link to={`/user/${u.username}`} className="mb-4 relative">
@@ -291,21 +213,26 @@ function Search() {
                                                     </div>
                                                 ) : (
                                                     <div className="font-mono text-[10px] text-[#7a7a90] truncate inline-block">
-                                                        Popular on LevelLog
+                                                        Popular on QuestDeck
                                                     </div>
                                                 )}
                                             </div>
 
                                             <button
-                                                onClick={() => handleFollow(u)}
-                                                className={`w-full py-2.5 text-xs font-bold rounded-lg transition-all mt-auto
+                                                onClick={() => handleFollowToggle(u)}
+                                                disabled={isBtnLoading}
+                                                className={`w-full py-3 text-xs font-bold rounded-lg transition-all mt-auto
                                                            ${state === 'following'
                                                                 ? 'border border-[#2a2a35] bg-transparent text-[#7a7a90] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'
                                                                 : state === 'requested'
-                                                                    ? 'border border-[#ff9f5c]/50 bg-transparent text-[#ff9f5c] cursor-not-allowed'
-                                                                    : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e] hover:shadow-[0_0_15px_rgba(200,255,87,0.3)]'}`}
+                                                                    ? 'border border-[#ff9f5c]/50 bg-transparent text-[#ff9f5c] hover:bg-[#ff9f5c]/10'
+                                                                    : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e] hover:shadow-[0_0_15px_rgba(200,255,87,0.3)]'}
+                                                            disabled:opacity-50`}
                                             >
-                                                {state === 'following' ? 'Unfollow' : state === 'requested' ? 'Cancel Req.' : u.isPrivate ? 'Request' : 'Follow'}
+                                                {isBtnLoading ? '...' : 
+                                                 state === 'following' ? 'Unfollow' : 
+                                                 state === 'requested' ? 'Cancel Req.' : 
+                                                 u.isPrivate ? 'Request' : 'Follow'}
                                             </button>
                                         </div>
                                     )
@@ -321,18 +248,18 @@ function Search() {
                             <div className="flex flex-col items-center justify-center py-20 gap-4">
                                 <div className="text-5xl">🎮</div>
                                 <div className="text-white font-black text-xl tracking-widest uppercase"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                    Find Your Friends
+                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                    Find Playmates
                                 </div>
-                                <div className="text-[#7a7a90] font-mono text-sm text-center max-w-sm">
-                                    Search for other gamers by their username and follow them
-                                    to see their games in your activity feed
-                                </div>
+                                <p className="text-[#7a7a90] font-mono text-xs text-center max-w-xs">
+                                    Search for other gamers to build your community and see their odyssey.
+                                </p>
                             </div>
                         )
                     )}
                 </>
             )}
+
         </div>
     )
 }
