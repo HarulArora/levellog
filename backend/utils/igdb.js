@@ -27,6 +27,7 @@ export const searchGames = async (query) => {
 
     const token = await getAccessToken()
 
+    const sanitizedQuery = String(query).replace(/"/g, '\\"')
     const response = await fetch('https://api.igdb.com/v4/games', {
         method: 'POST',
         headers: {
@@ -35,7 +36,7 @@ export const searchGames = async (query) => {
             'Content-Type': 'text/plain'
         },
         body: `
-      search "${query}";
+      search "${sanitizedQuery}";
       fields name, cover.url, genres.name, platforms.name,
              summary, first_release_date, rating;
       limit 20;

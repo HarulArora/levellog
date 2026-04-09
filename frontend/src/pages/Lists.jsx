@@ -2,36 +2,14 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
+import { Search, X, Check, Loader2, List, Trash2, Heart, Target, Sparkles, Flame, Star, Rocket, Gamepad2, Diamond, Crown, Joystick } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 12
 
-const LEVELS = [
-    { level: 1, xpRequired: 0, badge: '🎮', title: 'Newbie' },
-    { level: 2, xpRequired: 5, badge: '🕹️', title: 'Gamer' },
-    { level: 3, xpRequired: 25, badge: '⭐', title: 'Enthusiast' },
-    { level: 4, xpRequired: 60, badge: '🔥', title: 'Veteran' },
-    { level: 5, xpRequired: 100, badge: '💎', title: 'Legend' },
-    { level: 6, xpRequired: 150, badge: '👑', title: 'Elite' },
-    { level: 7, xpRequired: 500, badge: '🚀', title: 'Master' },
-    { level: 8, xpRequired: 1000, badge: '🌟', title: 'Immortal' },
-]
-
 const MAX_CUSTOM_LISTS = 2
 
 // ── Pure helpers (defined outside components — never recreated) ───────────────
-const getLevelInfo = (xp) => {
-    let current = LEVELS[0]
-    let next = LEVELS[1]
-    for (let i = 0; i < LEVELS.length; i++) {
-        if (xp >= LEVELS[i].xpRequired) {
-            current = LEVELS[i]
-            next = LEVELS[i + 1] || null
-        }
-    }
-    return { current, next }
-}
-
 const filterByQuery = (items, query, key = 'gameTitle') => {
     if (!query.trim()) return items
     const q = query.toLowerCase()
@@ -47,23 +25,25 @@ const totalPages = (items) => Math.max(1, Math.ceil(items.length / PAGE_SIZE))
 
 function SearchBar({ value, onChange, placeholder = 'Search...' }) {
     return (
-        <div className="relative mb-4">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a7a90] text-sm pointer-events-none">🔍</span>
+        <div className="relative mb-4 group">
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors pointer-events-none" />
             <input
                 type="text"
                 value={value}
                 onChange={e => onChange(e.target.value)}
                 placeholder={placeholder}
-                className="w-full bg-[#111118] border border-[#2a2a35] rounded
-                           px-3 py-2 pl-9 text-sm text-white
-                           focus:outline-none focus:border-[#c8ff57]
-                           placeholder:text-[#7a7a90] transition-colors"
+                className="w-full bg-[#111118]/80 backdrop-blur-sm border border-[#2a2a35] rounded-xl
+                           px-3 py-2.5 pl-10 text-sm text-white
+                           focus:outline-none focus:border-[#c8ff57]/50
+                           placeholder:text-[#7a7a90] transition-all shadow-sm focus:shadow-[#c8ff57]/5"
             />
             {value && (
                 <button
                     onClick={() => onChange('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7a7a90] hover:text-white transition-colors text-xs"
-                >✕</button>
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] hover:text-[#ff5c5c] transition-colors"
+                >
+                    <X size={14} />
+                </button>
             )}
         </div>
     )
@@ -363,7 +343,7 @@ function ListDetail({ list, onBack, onUpdate, showToast }) {
                             />
                         </>
                     ) : (
-                        <EmptyState icon="🔍" text={`No games match "${listSearch}"`} />
+                        <EmptyState icon={<Search size={40} className="text-[#2a2a35]" strokeWidth={1} />} text={`No games match "${listSearch}"`} />
                     )}
                 </>
             ) : (
@@ -429,11 +409,8 @@ function Lists() {
     const pagedWish = useMemo(() => paginate(filteredWish, wishPage), [filteredWish, wishPage])
 
     const xp = userData?.xp || 0
-    const { current: currentLevel, next: nextLevel } = useMemo(() => getLevelInfo(xp), [xp])
-    const xpProgress = nextLevel
-        ? ((xp - currentLevel.xpRequired) / (nextLevel.xpRequired - currentLevel.xpRequired)) * 100
-        : 100
-    const canCreateList = currentLevel.level >= 2
+    const userLevel = userData?.level || 1
+    const canCreateList = userLevel >= 2
     const atListLimit = customLists.length >= MAX_CUSTOM_LISTS
 
     const handleCreateList = useCallback(async () => {
@@ -508,7 +485,6 @@ function Lists() {
         { id: 'lists', label: 'My Lists', count: customLists.length + 2 },
         { id: 'liked', label: 'Liked Games', count: likes.length },
         { id: 'wishlist', label: 'Wishlist', count: wishlist.length },
-        { id: 'xp', label: 'XP & Level', count: null },
     ]
 
     return (
@@ -531,11 +507,6 @@ function Lists() {
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         {selectedList ? selectedList.name : 'My Lists'}
                     </h2>
-                    <div className="flex items-center gap-2 bg-[#18181f] border border-[#2a2a35] rounded-full px-3 py-1">
-                        <span className="text-sm">{currentLevel.badge}</span>
-                        <span className="font-mono text-[10px] text-[#c8ff57] uppercase tracking-wider">{currentLevel.title}</span>
-                        <span className="font-mono text-[10px] text-[#7a7a90]">{xp} XP</span>
-                    </div>
                 </div>
             </div>
 
@@ -659,10 +630,11 @@ function Lists() {
                     {activeTab === 'liked' && (
                         <div>
                             <div className="flex items-center gap-3 mb-4">
-                                <span className="text-xl">❤️</span>
+                                <Heart size={20} className="text-[#ff5c5c]" />
                                 <h3 className="font-black text-lg tracking-widest uppercase text-white"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Liked Games</h3>
-                                <span className="font-mono text-xs text-[#7a7a90]">{filteredLikes.length} games</span>
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a35] mx-1" />
+                                <span className="font-mono text-[10px] text-[#7a7a90] font-bold uppercase tracking-wider">{filteredLikes.length} games</span>
                             </div>
                             {likes.length > 0 ? (
                                 <>
@@ -686,10 +658,11 @@ function Lists() {
                     {activeTab === 'wishlist' && (
                         <div>
                             <div className="flex items-center gap-3 mb-4">
-                                <span className="text-xl">🎯</span>
+                                <Target size={20} className="text-[#5c9fff]" />
                                 <h3 className="font-black text-lg tracking-widest uppercase text-white"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Wishlist</h3>
-                                <span className="font-mono text-xs text-[#7a7a90]">{filteredWish.length} games</span>
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a35] mx-1" />
+                                <span className="font-mono text-[10px] text-[#7a7a90] font-bold uppercase tracking-wider">{filteredWish.length} games</span>
                             </div>
                             {wishlist.length > 0 ? (
                                 <>
@@ -706,120 +679,6 @@ function Lists() {
                             ) : (
                                 <EmptyState icon="🎯" text="No games wishlisted yet." />
                             )}
-                        </div>
-                    )}
-
-                    {/* ══ XP & LEVEL ══ */}
-                    {activeTab === 'xp' && (
-                        <div className="flex flex-col gap-4">
-                            <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
-                                <div className="flex items-center gap-4 mb-4">
-                                    <div className="text-5xl">{currentLevel.badge}</div>
-                                    <div>
-                                        <div className="font-black text-2xl text-white tracking-widest uppercase"
-                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                            Level {currentLevel.level} — {currentLevel.title}
-                                        </div>
-                                        <div className="font-mono text-sm text-[#c8ff57]">{xp} XP total</div>
-                                    </div>
-                                </div>
-                                {nextLevel ? (
-                                    <>
-                                        <div className="flex justify-between font-mono text-[10px] text-[#7a7a90] mb-1.5">
-                                            <span>Progress to Level {nextLevel.level}</span>
-                                            <span>{xp} / {nextLevel.xpRequired} XP</span>
-                                        </div>
-                                        <div className="w-full bg-[#2a2a35] rounded-full h-2">
-                                            <div className="h-full rounded-full bg-gradient-to-r from-[#c8ff57] to-[#5c9fff] transition-all"
-                                                style={{ width: `${Math.min(xpProgress, 100)}%` }} />
-                                        </div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] mt-1.5">
-                                            {nextLevel.xpRequired - xp} XP needed to reach {nextLevel.badge} {nextLevel.title}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="font-mono text-[10px] text-[#c8ff57]">🎉 Max level reached — you are Immortal!</div>
-                                )}
-                            </div>
-
-                            <div className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden">
-                                <div className="px-4 py-3 border-b border-[#2a2a35]">
-                                    <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest">All Levels</div>
-                                </div>
-                                {LEVELS.map(lvl => {
-                                    const isReached = xp >= lvl.xpRequired
-                                    const isCurrent = currentLevel.level === lvl.level
-                                    return (
-                                        <div key={lvl.level}
-                                            className={`flex items-center gap-4 px-4 py-3 border-b border-[#2a2a35] last:border-0
-                                                       ${isCurrent ? 'bg-[#c8ff57]/05' : ''}`}>
-                                            <div className={`text-2xl ${isReached ? '' : 'grayscale opacity-30'}`}>{lvl.badge}</div>
-                                            <div className="flex-1">
-                                                <div className={`font-semibold text-sm ${isReached ? 'text-white' : 'text-[#7a7a90]'}`}>
-                                                    Level {lvl.level} — {lvl.title}
-                                                </div>
-                                                <div className="font-mono text-[10px] text-[#7a7a90]">{lvl.xpRequired} XP required</div>
-                                            </div>
-                                            {isCurrent && <span className="font-mono text-[9px] text-[#c8ff57] border border-[#c8ff57]/30 rounded px-2 py-0.5 uppercase tracking-wider">Current</span>}
-                                            {isReached && !isCurrent && <span className="font-mono text-[9px] text-[#5c9fff] border border-[#5c9fff]/30 rounded px-2 py-0.5 uppercase tracking-wider">✓ Unlocked</span>}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-
-                            <div className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden">
-                                <div className="px-4 py-3 border-b border-[#2a2a35]">
-                                    <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest">How to Earn XP</div>
-                                </div>
-                                {[
-                                    { action: 'Log a game (any status)', xp: '+1 XP', icon: '🎮' },
-                                    { action: 'Rate a game', xp: '+1 XP', icon: '⭐' },
-                                    { action: 'Like a game', xp: '+1 XP', icon: '❤️' },
-                                    { action: 'Follow someone', xp: '+1 XP', icon: '👥' },
-                                    { action: 'Get followed', xp: '+1 XP', icon: '🌟' },
-                                    { action: 'Comment on a game', xp: '+1 XP', icon: '💬' },
-                                ].map(item => (
-                                    <div key={item.action} className="flex items-center gap-3 px-4 py-3 border-b border-[#2a2a35] last:border-0">
-                                        <span className="text-lg">{item.icon}</span>
-                                        <div className="flex-1 font-mono text-xs text-[#7a7a90]">{item.action}</div>
-                                        <div className="font-black text-sm text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.xp}</div>
-                                    </div>
-                                ))}
-                                <div className="px-4 py-3 bg-[#ff5c5c]/05 border-t border-[#ff5c5c]/10">
-                                    <div className="font-mono text-[10px] text-[#ff5c5c]">⚠ Undoing any action deducts the XP it gave</div>
-                                </div>
-                            </div>
-
-                            <div className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden">
-                                <div className="px-4 py-3 border-b border-[#2a2a35]">
-                                    <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest">Level Unlocks</div>
-                                </div>
-                                {LEVELS.map(lvl => {
-                                    const unlockText = {
-                                        1: 'Wishlist + Liked Games — always free',
-                                        2: 'Create up to 2 Custom Lists',
-                                        3: 'Enthusiast badge on profile',
-                                        4: 'Veteran badge on profile',
-                                        5: 'Legend badge on profile',
-                                        6: 'Elite badge on profile',
-                                        7: 'Master badge on profile',
-                                        8: 'Immortal badge + special border',
-                                    }[lvl.level]
-                                    const isReached = currentLevel.level >= lvl.level
-                                    return (
-                                        <div key={lvl.level} className="flex items-center gap-3 px-4 py-3 border-b border-[#2a2a35] last:border-0">
-                                            <span className={`text-lg ${isReached ? '' : 'grayscale opacity-30'}`}>{lvl.badge}</span>
-                                            <div className="flex-1">
-                                                <div className={`font-mono text-xs ${isReached ? 'text-white' : 'text-[#7a7a90]'}`}>{unlockText}</div>
-                                                <div className="font-mono text-[9px] text-[#7a7a90]">Level {lvl.level} · {lvl.xpRequired} XP</div>
-                                            </div>
-                                            {isReached
-                                                ? <span className="font-mono text-[9px] text-[#c8ff57]">✓</span>
-                                                : <span className="font-mono text-[9px] text-[#2a2a35]">🔒</span>}
-                                        </div>
-                                    )
-                                })}
-                            </div>
                         </div>
                     )}
                 </>

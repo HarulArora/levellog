@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import useNotifications from '../hooks/useNotifications'
+import { Bell, User, Search, LogOut, ChevronDown, UserSearch, Tags } from 'lucide-react'
+import { useDeals } from '../context/DealsContext'
+import Avatar from './ui/Avatar'
 
 function Navbar() {
     const location = useLocation()
@@ -10,7 +13,7 @@ function Navbar() {
     const { unreadCount, setUnreadCount } = useNotifications()
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
-    const [dealsBadge, setDealsBadge] = useState(0)
+    const { newDealsCount, clearNewDealsCount } = useDeals()
     const dropdownRef = useRef(null)
 
     const links = [
@@ -22,16 +25,12 @@ function Navbar() {
     ]
 
     // Listen for new deals from Deals page
-    useEffect(() => {
-        const handler = (e) => setDealsBadge(prev => prev + e.detail.count)
-        window.addEventListener('levellog:new-deals', handler)
-        return () => window.removeEventListener('levellog:new-deals', handler)
-    }, [])
+    // Handle menu clicks outside
 
     // Clear badge when visiting /deals
     useEffect(() => {
-        if (location.pathname === '/deals') setDealsBadge(0)
-    }, [location.pathname])
+        if (location.pathname === '/deals') clearNewDealsCount()
+    }, [location.pathname, clearNewDealsCount])
 
     useEffect(() => {
         const handler = (e) => {
@@ -61,27 +60,9 @@ function Navbar() {
     }
 
     const handleDealsClick = () => {
-        setDealsBadge(0)
+        clearNewDealsCount()
         setMenuOpen(false)
         setDropdownOpen(false)
-    }
-
-    const Avatar = ({ size = 'md' }) => {
-        const dim = size === 'sm' ? 'w-7 h-7 text-[10px]' : 'w-9 h-9 text-xs'
-        if (user?.avatar) {
-            return (
-                <img
-                    src={user.avatar}
-                    alt={user.username}
-                    className={`${dim} rounded-full object-cover ring-2 ring-[#2a2a35] hover:ring-[#c8ff57] transition-all`}
-                />
-            )
-        }
-        return (
-            <div className={`${dim} rounded-full bg-[#c8ff57]/15 border-2 border-[#2a2a35] hover:border-[#c8ff57] transition-all flex items-center justify-center font-black text-[#c8ff57] uppercase`}>
-                {user?.username?.[0] || '?'}
-            </div>
-        )
     }
 
     return (
@@ -112,9 +93,9 @@ function Navbar() {
                                     {link.name}
                                 </Link>
                                 {/* Deals new-deals badge */}
-                                {isDeals && dealsBadge > 0 && (
+                                {isDeals && newDealsCount > 0 && (
                                     <div className="absolute -top-2 -right-3 w-4 h-4 bg-[#c8ff57] rounded-full flex items-center justify-center font-mono text-[9px] text-black font-bold pointer-events-none">
-                                        {dealsBadge > 9 ? '9+' : dealsBadge}
+                                        {newDealsCount > 9 ? '9+' : newDealsCount}
                                     </div>
                                 )}
                             </li>
@@ -127,10 +108,10 @@ function Navbar() {
                     {user ? (
                         <>
                             {/* Notifications */}
-                            <Link to="/notifications" onClick={handleNotificationClick} className="relative">
-                                <div className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors text-lg">🔔</div>
+                            <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
+                                <Bell size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
                                 {unreadCount > 0 && (
-                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ff5c5c] rounded-full flex items-center justify-center font-mono text-[9px] text-white font-bold">
+                                    <div className="absolute top-1 right-1 w-4 h-4 bg-[#ff5c5c] rounded-full flex items-center justify-center font-mono text-[9px] text-white font-bold ring-2 ring-[#0a0a0f]">
                                         {unreadCount > 9 ? '9+' : unreadCount}
                                     </div>
                                 )}
@@ -138,41 +119,48 @@ function Navbar() {
 
                             {/* Avatar dropdown */}
                             <div className="relative" ref={dropdownRef}>
-                                <button onClick={() => setDropdownOpen(o => !o)} className="flex items-center gap-2 focus:outline-none">
+                                <button onClick={() => setDropdownOpen(o => !o)} className="flex items-center gap-1.5 focus:outline-none p-1 pr-2 hover:bg-[#2a2a35]/30 rounded-full transition-all border border-transparent hover:border-[#2a2a35]">
                                     <Avatar />
+                                    <ChevronDown size={14} className={`text-[#7a7a90] transition-transform duration-300 ${dropdownOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
                                 {dropdownOpen && (
                                     <div className="absolute right-0 top-[calc(100%+10px)] w-52 bg-[#111118] border border-[#2a2a35] rounded-lg shadow-2xl overflow-hidden z-50">
 
                                         {/* User info */}
-                                        <div className="px-4 py-3 border-b border-[#2a2a35] flex items-center gap-3">
-                                            <Avatar size="sm" />
-                                            <div className="min-w-0">
-                                                <div className="text-white font-semibold text-sm truncate">{user.username}</div>
-                                                <div className="font-mono text-[10px] text-[#7a7a90]">{user.badge || '🎮'} Lv.{user.level || 1}</div>
+                                        <div className="px-4 py-4 border-b border-[#2a2a35] bg-[#1a1a25]/30">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <Avatar size="sm" />
+                                                <div className="min-w-0">
+                                                    <div className="text-white font-bold text-sm truncate tracking-tight">{user.username}</div>
+                                                    <div className="text-[10px] text-[#7a7a90] truncate opacity-60">@{user.username.toLowerCase()}</div>
+                                                </div>
                                             </div>
+                                            <Link to="/stats?tab=xp" onClick={handleLinkClick} className="flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2.5 py-1 border border-[#2a2a35] w-fit shadow-inner shadow-black/60 translate-y-[1px] hover:border-[#c8ff57]/50 transition-colors group/lv">
+                                                <span className="flex items-center justify-center text-xs leading-none relative -top-[2px] flex-shrink-0">{user.badge || '🎮'}</span>
+                                                <span className="font-mono text-[10px] text-[#c8ff57] uppercase font-black tracking-widest whitespace-nowrap leading-none pt-[1px] group-hover/lv:underline">Lv.{user.level || 1}</span>
+                                            </Link>
                                         </div>
 
                                         <div className="py-1">
                                             <Link to={`/user/${user.username}`} onClick={handleLinkClick}
-                                                className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-sm">
-                                                <span>👤</span>
-                                                <span className="font-mono text-xs uppercase tracking-wider">My Profile</span>
+                                                className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                <User size={14} className="opacity-70" />
+                                                <span>My Profile</span>
                                             </Link>
 
                                             <Link to="/search" onClick={handleLinkClick}
-                                                className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-sm">
-                                                <span>🔍</span>
-                                                <span className="font-mono text-xs uppercase tracking-wider">Find Friends</span>
+                                                className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                <Search size={14} className="opacity-70" strokeWidth={2.5} />
+                                                <span>Find Friends</span>
                                             </Link>
 
                                             <div className="border-t border-[#2a2a35] my-1" />
 
                                             <button onClick={handleLogout}
-                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-[#ff5c5c] hover:bg-[#ff5c5c]/10 transition-all text-sm">
-                                                <span>🚪</span>
-                                                <span className="font-mono text-xs uppercase tracking-wider">Logout</span>
+                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-[#ff5c5c] hover:bg-[#ff5c5c]/10 transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                <LogOut size={14} className="opacity-70" />
+                                                <span>Logout</span>
                                             </button>
                                         </div>
                                     </div>
@@ -218,9 +206,9 @@ function Navbar() {
                                            ${location.pathname === link.path ? 'text-[#c8ff57]' : 'text-[#7a7a90]'}`}
                             >
                                 {link.name}
-                                {isDeals && dealsBadge > 0 && (
+                                {isDeals && newDealsCount > 0 && (
                                     <span className="bg-[#c8ff57] text-black rounded-full px-2 text-[9px] font-bold font-mono">
-                                        {dealsBadge > 9 ? '9+' : dealsBadge}
+                                        {newDealsCount > 9 ? '9+' : newDealsCount}
                                     </span>
                                 )}
                             </Link>
@@ -229,8 +217,9 @@ function Navbar() {
 
                     {user && (
                         <Link to="/notifications" onClick={handleNotificationClick}
-                            className="text-sm font-semibold tracking-widest uppercase text-[#7a7a90] flex items-center gap-2">
-                            🔔 Notifications
+                            className="text-sm font-semibold tracking-widest uppercase text-[#7a7a90] flex items-center gap-3 py-1">
+                            <Bell size={18} />
+                            <span>Notifications</span>
                             {unreadCount > 0 && (
                                 <span className="bg-[#ff5c5c] text-white rounded-full px-2 text-[10px] font-bold">
                                     {unreadCount}
@@ -252,29 +241,34 @@ function Navbar() {
                                     </div>
                                 )}
                                 <div>
-                                    <div className="text-white font-semibold text-sm">{user.username}</div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90]">{user.badge || '🎮'} Lv.{user.level || 1}</div>
+                                    <div className="text-white font-bold text-sm tracking-tight">{user.username}</div>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <Link to="/stats?tab=xp" onClick={handleLinkClick} className="flex items-center gap-1.5 bg-[#111118] rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm shadow-black/40 hover:border-[#c8ff57]/50 transition-colors group/mlv">
+                                            <span className="flex items-center justify-center text-[10px] leading-none relative -top-[1.8px]">{user.badge || '🎮'}</span>
+                                            <span className="font-mono text-[9px] text-[#c8ff57] uppercase font-black tracking-widest leading-none group-hover/mlv:underline">Lv.{user.level || 1}</span>
+                                        </Link>
+                                    </div>
                                 </div>
                             </div>
 
                             <Link to={`/user/${user.username}`} onClick={handleLinkClick}
-                                className="flex items-center gap-3 py-2.5 text-[#a0a0b8] hover:text-white transition-colors">
-                                <span>👤</span>
-                                <span className="font-mono text-xs uppercase tracking-wider">My Profile</span>
+                                className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
+                                <User size={16} />
+                                <span>My Profile</span>
                             </Link>
 
                             <Link to="/search" onClick={handleLinkClick}
-                                className="flex items-center gap-3 py-2.5 text-[#a0a0b8] hover:text-white transition-colors">
-                                <span>🔍</span>
-                                <span className="font-mono text-xs uppercase tracking-wider">Find Friends</span>
+                                className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
+                                <Search size={16} strokeWidth={2.5} />
+                                <span>Find Friends</span>
                             </Link>
 
                             <div className="border-t border-[#2a2a35] my-1" />
 
                             <button onClick={handleLogout}
-                                className="flex items-center gap-3 py-2.5 text-[#ff5c5c] w-full transition-colors">
-                                <span>🚪</span>
-                                <span className="font-mono text-xs uppercase tracking-wider">Logout</span>
+                                className="flex items-center gap-3 py-3 text-[#ff5c5c] w-full transition-colors text-xs font-bold uppercase tracking-wider">
+                                <LogOut size={16} />
+                                <span>Logout</span>
                             </button>
                         </div>
                     ) : (

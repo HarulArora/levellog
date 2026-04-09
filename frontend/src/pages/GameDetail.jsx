@@ -3,7 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import useGames from '../hooks/useGames'
+import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play } from 'lucide-react'
 import AddGameModal from '../components/library/AddGameModal'
+import Skeleton from '../components/ui/Skeleton'
 
 // ── Single comment + replies ──
 function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) {
@@ -15,6 +17,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
     const [submittingEdit, setSubmittingEdit] = useState(false)
     const [isEdited, setIsEdited] = useState(comment.edited || false)
     const [repliesVisible, setRepliesVisible] = useState(true)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
     // ── Use likeCount/dislikeCount from new backend ──────────────────
     const [likes, setLikes] = useState(
@@ -26,7 +29,6 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
     const [liked, setLiked] = useState(false)
     const [disliked, setDisliked] = useState(false)
 
-    // ── Fetch whether current user liked this comment ─────────────────
     useEffect(() => {
         if (!currentUser) return
         const fetchLikeState = async () => {
@@ -35,20 +37,13 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
                 setLiked(res.data.liked || false)
                 setDisliked(res.data.disliked || false)
             } catch {
-                // fallback — check old array if backend doesn't have endpoint yet
                 if (comment.likes) {
                     const uid = currentUser.id || currentUser._id
-                    setLiked(comment.likes.some(id =>
-                        id === uid || id?._id === uid ||
-                        id?.toString() === uid?.toString()
-                    ))
+                    setLiked(comment.likes.some(id => id === uid || id?._id === uid || id?.toString() === uid?.toString()))
                 }
                 if (comment.dislikes) {
                     const uid = currentUser.id || currentUser._id
-                    setDisliked(comment.dislikes.some(id =>
-                        id === uid || id?._id === uid ||
-                        id?.toString() === uid?.toString()
-                    ))
+                    setDisliked(comment.dislikes.some(id => id === uid || id?._id === uid || id?.toString() === uid?.toString()))
                 }
             }
         }
@@ -60,23 +55,15 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
         comment.userId?._id === currentUser._id
     )
 
-    const indentClass = depth > 0 ? 'ml-6 mt-2' : ''
+    const indentClass = depth > 0 ? 'ml-4 md:ml-8 mt-2' : ''
     const replyCount = comment.replies?.length || 0
-
-    const handleOpenReply = () => {
-        const mentionName = comment.userId?.username
-        if (mentionName) setReplyText(`@${mentionName} `)
-        setShowReplyBox(true)
-    }
 
     const handleLike = async () => {
         if (!currentUser) return
         try {
             const res = await api.post(`/comments/${comment._id}/like`)
-            setLikes(res.data.likes)
-            setDislikes(res.data.dislikes)
-            setLiked(res.data.liked)
-            setDisliked(res.data.disliked)
+            setLikes(res.data.likes); setDislikes(res.data.dislikes)
+            setLiked(res.data.liked); setDisliked(res.data.disliked)
         } catch (err) { console.error('Like error:', err) }
     }
 
@@ -84,20 +71,18 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
         if (!currentUser) return
         try {
             const res = await api.post(`/comments/${comment._id}/dislike`)
-            setLikes(res.data.likes)
-            setDislikes(res.data.dislikes)
-            setLiked(res.data.liked)
-            setDisliked(res.data.disliked)
+            setLikes(res.data.likes); setDislikes(res.data.dislikes)
+            setLiked(res.data.liked); setDisliked(res.data.disliked)
         } catch (err) { console.error('Dislike error:', err) }
     }
 
     const handleDelete = async () => {
-        if (!window.confirm('Delete this comment?')) return
         try {
             const res = await api.delete(`/comments/${comment._id}`)
             onXpToast(res.data.message || '🗑 Comment deleted · -1 XP', 'loss')
             onRefresh()
         } catch (err) { console.error('Delete error:', err) }
+        finally { setShowDeleteConfirm(false) }
     }
 
     const handleEdit = async () => {
@@ -105,8 +90,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
         setSubmittingEdit(true)
         try {
             await api.put(`/comments/${comment._id}`, { text: editingText })
-            setIsEditing(false)
-            setIsEdited(true)
+            setIsEditing(false); setIsEdited(true)
             onRefresh()
         } catch (err) { console.error('Edit error:', err) }
         finally { setSubmittingEdit(false) }
@@ -118,16 +102,11 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
         try {
             const topParentId = comment.parentId || comment._id
             const res = await api.post(`/comments/${igdbId}`, {
-                text: replyText,
-                parentId: topParentId,
-                replyToId: comment._id,
-                replyToUserId: comment.userId?._id,
-                gameTitle,
+                text: replyText, parentId: topParentId, replyToId: comment._id,
+                replyToUserId: comment.userId?._id, gameTitle,
             })
             onXpToast(res.data.message || '💬 Reply posted · +1 XP', 'gain')
-            setReplyText('')
-            setShowReplyBox(false)
-            setRepliesVisible(true) // auto-expand when a new reply is posted
+            setReplyText(''); setShowReplyBox(false); setRepliesVisible(true)
             onRefresh()
         } catch (err) { console.error('Reply error:', err) }
         finally { setSubmittingReply(false) }
@@ -137,11 +116,11 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
         const seconds = Math.floor((new Date() - new Date(date)) / 1000)
         if (seconds < 60) return 'just now'
         const minutes = Math.floor(seconds / 60)
-        if (minutes < 60) return `${minutes}m ago`
+        if (minutes < 60) return `${minutes}m`
         const hours = Math.floor(minutes / 60)
-        if (hours < 24) return `${hours}h ago`
+        if (hours < 24) return `${hours}h`
         const days = Math.floor(hours / 24)
-        if (days < 7) return `${days}d ago`
+        if (days < 7) return `${days}d`
         return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     }
 
@@ -160,55 +139,31 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
 
     return (
         <div className={indentClass}>
-            <div className={depth > 0 ? 'border-l-2 border-[#2a2a35] pl-3' : ''}>
-                <div className={`bg-[#111118] border rounded-lg p-4 ${isOwn ? 'border-[#c8ff57]/20' : 'border-[#2a2a35]'}`}>
-
+            <div className={depth > 0 ? 'border-l-2 border-[#2a2a35] pl-3 md:pl-4' : ''}>
+                <div className={`bg-[#111118] border rounded-lg p-3 md:p-4 transition-all ${isOwn ? 'border-[#c8ff57]/20 shadow-[0_0_15px_rgba(200,255,87,0.03)]' : 'border-[#2a2a35]'}`}>
+                    
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-2">
-                        {profilePath ? (
-                            <Link to={profilePath} className="flex-shrink-0 hover:opacity-80 transition-opacity">
-                                {comment.userId?.avatar ? (
-                                    <img src={comment.userId.avatar} alt={username}
-                                        className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a35]" />
-                                ) : (
-                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black
-                                                    ${isOwn ? 'bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] text-black' : 'bg-[#2a2a35] text-white'}`}
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                        {username?.charAt(0).toUpperCase() || '?'}
-                                    </div>
-                                )}
-                            </Link>
-                        ) : (
-                            comment.userId?.avatar ? (
-                                <img src={comment.userId.avatar} alt={username}
-                                    className="w-7 h-7 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35]" />
+                        <Link to={profilePath || '#'} className={`flex-shrink-0 ${!profilePath && 'pointer-events-none'}`}>
+                            {comment.userId?.avatar ? (
+                                <img src={comment.userId.avatar} alt={username} className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a35]" />
                             ) : (
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black
                                                 ${isOwn ? 'bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] text-black' : 'bg-[#2a2a35] text-white'}`}
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                     {username?.charAt(0).toUpperCase() || '?'}
                                 </div>
-                            )
-                        )}
-
-                        {profilePath ? (
-                            <Link to={profilePath}
-                                className={`font-bold text-xs hover:underline ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
-                                {username || 'User'}
-                                {isOwn && <span className="ml-1 font-mono text-[9px] text-[#7a7a90] normal-case font-normal">· you</span>}
-                            </Link>
-                        ) : (
-                            <span className={`font-bold text-xs ${isOwn ? 'text-[#c8ff57]' : 'text-white'}`}>
-                                {username || 'User'}
-                                {isOwn && <span className="ml-1 font-mono text-[9px] text-[#7a7a90] normal-case font-normal">· you</span>}
-                            </span>
-                        )}
-
-                        <span className="font-mono text-[9px] text-[#7a7a90] border border-[#2a2a35] rounded px-1 py-0.5">
-                            Lv.{comment.userId?.level || 1}
-                        </span>
+                            )}
+                        </Link>
+                        <Link to={profilePath || '#'} className={`font-bold text-xs hover:underline ${isOwn ? 'text-[#c8ff57]' : 'text-white'} ${!profilePath && 'pointer-events-none'}`}>
+                            {username || 'User'}
+                        </Link>
+                        <div className="flex items-center gap-1.5 bg-[#18181f] rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm">
+                            <span className="flex items-center justify-center text-[10px] leading-none relative -top-[1.8px]">{comment.userId?.badge || '🎮'}</span>
+                            <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-black tracking-widest leading-none">Lv.{comment.userId?.level || 1}</span>
+                        </div>
                         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                            {isEdited && <span className="font-mono text-[9px] text-[#7a7a90] italic">edited</span>}
+                            {isEdited && <span className="font-mono text-[8px] text-[#505060] italic">edited</span>}
                             <span className="font-mono text-[9px] text-[#7a7a90]">{timeAgo(comment.createdAt)}</span>
                         </div>
                     </div>
@@ -217,76 +172,59 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
                     {isEditing ? (
                         <div className="mt-2">
                             <textarea value={editingText} onChange={e => setEditingText(e.target.value)} rows={2}
-                                className="w-full bg-[#18181f] border border-[#c8ff57]/30 rounded px-3 py-2
-                                           text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] transition-colors" />
+                                className="w-full bg-[#18181f] border border-[#c8ff57]/30 rounded px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] transition-colors" />
                             <div className="flex gap-2 mt-2">
-                                <button onClick={handleEdit} disabled={submittingEdit || !editingText.trim()}
-                                    className="px-3 py-1 bg-[#c8ff57] text-black font-bold text-[10px] rounded
-                                               hover:bg-[#d4ff6e] transition-all disabled:opacity-50">
-                                    {submittingEdit ? 'Saving...' : 'Save'}
-                                </button>
-                                <button onClick={() => setIsEditing(false)}
-                                    className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded
-                                               hover:border-white hover:text-white transition-all">
-                                    Cancel
-                                </button>
+                                <button onClick={handleEdit} disabled={submittingEdit || !editingText.trim()} className="px-3 py-1 bg-[#c8ff57] text-black font-bold text-[10px] rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-50">Save</button>
+                                <button onClick={() => setIsEditing(false)} className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:border-white hover:text-white transition-all">Cancel</button>
                             </div>
                         </div>
                     ) : (
-                        <p className="text-[#c8c8d8] text-sm leading-relaxed">{renderText(comment.text)}</p>
+                        <p className="text-[#c8c8d8] text-sm leading-relaxed break-words">{renderText(comment.text)}</p>
                     )}
 
                     {/* Actions */}
                     {!isEditing && (
-                        <div className="flex items-center gap-3 mt-3">
-                            <button onClick={handleLike}
-                                className={`flex items-center gap-1 font-mono text-[10px] transition-colors
-                                           ${liked ? 'text-[#c8ff57]' : 'text-[#7a7a90] hover:text-[#c8ff57]'}
-                                           ${!currentUser ? 'cursor-default' : 'cursor-pointer'}`}>
-                                👍 {likes > 0 && <span>{likes}</span>}
-                            </button>
-                            <button onClick={handleDislike}
-                                className={`flex items-center gap-1 font-mono text-[10px] transition-colors
-                                           ${disliked ? 'text-[#ff5c5c]' : 'text-[#7a7a90] hover:text-[#ff5c5c]'}
-                                           ${!currentUser ? 'cursor-default' : 'cursor-pointer'}`}>
-                                👎 {dislikes > 0 && <span>{dislikes}</span>}
-                            </button>
+                        <div className="flex items-center gap-2 mt-3">
+                            <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm">
+                                <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg transition-all active:scale-95
+                                    ${liked ? 'bg-[#c8ff57]/20 text-[#c8ff57]' : 'text-[#7a7a90] hover:bg-white/10 hover:text-white'}`}>
+                                    <ThumbsUp size={12} strokeWidth={2.5} className={liked ? 'fill-current' : ''} /> {likes > 0 && <span>{likes}</span>}
+                                </button>
+                                <div className="w-[1px] bg-[#2a2a35] my-1 mx-0.5" />
+                                <button onClick={handleDislike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg transition-all active:scale-95
+                                    ${disliked ? 'bg-[#ff5c5c]/20 text-[#ff5c5c]' : 'text-[#7a7a90] hover:bg-white/10 hover:text-white'}`}>
+                                    <ThumbsDown size={12} strokeWidth={2.5} className={disliked ? 'fill-current' : ''} /> {dislikes > 0 && <span>{dislikes}</span>}
+                                </button>
+                            </div>
 
                             {currentUser && (
-                                <button onClick={handleOpenReply}
-                                    className="font-mono text-[10px] text-[#7a7a90] hover:text-white transition-colors">
-                                    ↩ Reply
+                                <button onClick={() => { const mention = comment.userId?.username; if (mention) setReplyText(`@${mention} `); setShowReplyBox(true) }}
+                                    className="px-2 py-1 flex items-center gap-1 font-bold text-[10px] text-[#7a7a90] hover:text-white transition-colors bg-[#18181f]/50 rounded-lg border border-transparent hover:border-[#2a2a35] active:scale-95 shadow-sm">
+                                    <MessageSquare size={12} /> Reply
                                 </button>
                             )}
 
-                            {/* Hide/Show replies toggle — only on top-level comments with replies */}
                             {depth === 0 && replyCount > 0 && (
-                                <button
-                                    onClick={() => setRepliesVisible(v => !v)}
-                                    className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57] transition-colors flex items-center gap-1"
-                                >
-                                    <span
-                                        className="inline-block transition-transform duration-200"
-                                        style={{ transform: repliesVisible ? 'rotate(90deg)' : 'rotate(0deg)' }}
-                                    >▶</span>
-                                    {repliesVisible
-                                        ? `Hide ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
-                                        : `Show ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
-                                    }
+                                <button onClick={() => setRepliesVisible(v => !v)}
+                                    className="font-bold text-[10px] text-[#7a7a90] hover:text-[#c8ff57] transition-all bg-[#18181f]/30 px-2 py-1 rounded-lg ml-1 active:scale-95">
+                                    {repliesVisible ? `Hide Replies` : `Show ${replyCount} ${replyCount === 1 ? 'Reply' : 'Replies'}`}
                                 </button>
                             )}
 
-                            {isOwn && (
-                                <>
-                                    <button onClick={() => { setIsEditing(true); setEditingText(comment.text) }}
-                                        className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57] transition-colors ml-auto">
-                                        ✏ Edit
-                                    </button>
-                                    <button onClick={handleDelete}
-                                        className="font-mono text-[10px] text-[#7a7a90] hover:text-[#ff5c5c] transition-colors">
-                                        🗑 Delete
-                                    </button>
-                                </>
+                            {isOwn && !showDeleteConfirm && (
+                                <div className="ml-auto flex gap-1.5">
+                                    <button onClick={() => { setIsEditing(true); setEditingText(comment.text) }} className="px-2.5 py-1 text-[#7a7a90] hover:text-black hover:bg-[#c8ff57] transition-all rounded-lg font-bold text-[10px] active:scale-95 shadow-sm">Edit</button>
+                                    <button onClick={() => setShowDeleteConfirm(true)} className="px-2.5 py-1 text-[#7a7a90] hover:text-white hover:bg-[#ff5c5c] transition-all rounded-lg font-bold text-[10px] active:scale-95 shadow-sm">Delete</button>
+                                </div>
+                            )}
+
+                            {/* Inline Delete Confirmation */}
+                            {showDeleteConfirm && (
+                                <div className="ml-auto flex items-center gap-2 bg-[#ff5c5c]/10 border border-[#ff5c5c]/30 rounded-md px-2 py-1 animate-in fade-in slide-in-from-right-2 duration-200">
+                                    <span className="font-mono text-[9px] text-[#ff5c5c] font-bold uppercase tracking-tighter">DELETE?</span>
+                                    <button onClick={handleDelete} className="px-2 py-0.5 bg-[#ff5c5c] text-white font-bold text-[9px] rounded uppercase">YES</button>
+                                    <button onClick={() => setShowDeleteConfirm(false)} className="px-2 py-0.5 border border-[#ff5c5c]/30 text-[#ff5c5c] font-mono text-[9px] rounded">NO</button>
+                                </div>
                             )}
                         </div>
                     )}
@@ -294,57 +232,25 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
 
                 {/* Reply box */}
                 {showReplyBox && (
-                    <div className="mt-2 ml-2">
+                    <div className="mt-2 ml-2 animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="flex gap-2">
-                            <textarea
-                                value={replyText}
-                                onChange={e => setReplyText(e.target.value)}
-                                placeholder={`Reply to @${comment.userId?.username}...`}
-                                rows={2}
-                                autoFocus
+                            <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder={`Reply to @${comment.userId?.username}...`} rows={2} autoFocus
                                 onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleReply() }}
-                                className="flex-1 bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2
-                                           text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57]
-                                           placeholder:text-[#7a7a90] transition-colors"
-                            />
+                                className="flex-1 bg-[#18181f] border border-[#2a2a35] rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors shadow-inner" />
                             <div className="flex flex-col gap-1">
-                                <button onClick={handleReply} disabled={!replyText.trim() || submittingReply}
-                                    className="px-3 py-1.5 bg-[#c8ff57] text-black font-bold text-[10px] rounded
-                                               hover:bg-[#d4ff6e] transition-all disabled:opacity-50">
-                                    {submittingReply ? '...' : 'Reply'}
-                                </button>
-                                <button onClick={() => { setShowReplyBox(false); setReplyText('') }}
-                                    className="px-3 py-1.5 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded
-                                               hover:border-white transition-all">
-                                    Cancel
-                                </button>
+                                <button onClick={handleReply} disabled={!replyText.trim() || submittingReply} className="px-3 py-1.5 bg-[#c8ff57] text-black font-bold text-[10px] rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-50 h-full">Post</button>
+                                <button onClick={() => { setShowReplyBox(false); setReplyText('') }} className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:bg-white/5 transition-all">✕</button>
                             </div>
                         </div>
-                        <p className="font-mono text-[9px] text-[#7a7a90] mt-1">Ctrl+Enter to post</p>
                     </div>
                 )}
 
                 {/* Replies — collapsible */}
                 {replyCount > 0 && (
-                    <div
-                        className="overflow-hidden transition-all duration-300"
-                        style={{
-                            maxHeight: repliesVisible ? '9999px' : '0px',
-                            opacity: repliesVisible ? 1 : 0,
-                        }}
-                    >
+                    <div className={`overflow-hidden transition-all duration-300 ${repliesVisible ? 'opacity-100 max-h-[9999px]' : 'opacity-0 max-h-0'}`}>
                         <div className="mt-2 flex flex-col gap-2">
                             {comment.replies.map(reply => (
-                                <CommentItem
-                                    key={reply._id}
-                                    comment={reply}
-                                    currentUser={currentUser}
-                                    igdbId={igdbId}
-                                    onRefresh={onRefresh}
-                                    onXpToast={onXpToast}
-                                    depth={Math.min(depth + 1, 2)}
-                                    gameTitle={gameTitle}
-                                />
+                                <CommentItem key={reply._id} comment={reply} currentUser={currentUser} igdbId={igdbId} onRefresh={onRefresh} onXpToast={onXpToast} depth={Math.min(depth + 1, 2)} gameTitle={gameTitle} />
                             ))}
                         </div>
                     </div>
@@ -536,8 +442,35 @@ function GameDetail() {
     }
 
     if (loading) return (
-        <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-[#7a7a90] font-mono text-sm">Loading...</div>
+        <div className="min-h-screen bg-[#0a0a0f] text-[#7a7a90]">
+            <div className="relative overflow-hidden min-h-[420px] bg-[#111118]">
+                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 py-10">
+                    <div className="flex flex-col md:flex-row gap-8 items-start">
+                        <Skeleton variant="block" width="192px" height="280px" style={{ borderRadius: 12 }} />
+                        <div className="flex-1 min-w-0 w-full">
+                            <Skeleton variant="line" width="60%" height="48px" style={{ marginBottom: 16 }} />
+                            <Skeleton variant="line" width="40%" height="16px" style={{ marginBottom: 24 }} />
+                            <div className="flex gap-2">
+                                <Skeleton variant="block" width="80px" height="24px" />
+                                <Skeleton variant="block" width="60px" height="24px" />
+                                <Skeleton variant="block" width="100px" height="24px" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-12">
+                <Skeleton variant="line" width="200px" height="24px" style={{ marginBottom: 24 }} />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                    <div className="lg:col-span-2 space-y-8">
+                        <Skeleton variant="block" width="100%" height="200px" />
+                        <Skeleton variant="block" width="100%" height="300px" />
+                    </div>
+                    <div className="space-y-6">
+                        <Skeleton variant="block" width="100%" height="400px" />
+                    </div>
+                </div>
+            </div>
         </div>
     )
 
@@ -710,21 +643,20 @@ function GameDetail() {
                                 {user ? (
                                     myGame ? (
                                         <button onClick={() => setShowAddModal(true)}
-                                            className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-xs border transition-all
-                                                       ${statusConfig[myGame.status]?.bg || 'bg-[#c8ff57]/15'}
+                                            className={`btn-apple px-5 py-2.5 flex items-center gap-2 border 
+                                                       ${statusConfig[myGame.status]?.bg || 'bg-[#c8ff57]/10'}
                                                        ${statusConfig[myGame.status]?.color || 'text-[#c8ff57]'}
-                                                       border-current hover:opacity-80`}>
-                                            {statusConfig[myGame.status]?.label || 'In Library'} · Update Log
+                                                       border-current hover:brightness-125`}>
+                                            <Check size={16} strokeWidth={2.5} /> {statusConfig[myGame.status]?.label || 'In Library'} · Update Data
                                         </button>
                                     ) : (
-                                        <button onClick={() => setShowAddModal(true)}
-                                            className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-xs rounded hover:bg-[#d4ff6e] transition-all">
-                                            + Log This Game
+                                        <button onClick={() => setShowAddModal(true)} className="btn-apple btn-apple-primary px-5 py-2.5 gap-1.5">
+                                            <Plus size={16} strokeWidth={3} /> Log This Game
                                         </button>
                                     )
                                 ) : (
                                     <Link to="/login">
-                                        <button className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-xs rounded hover:bg-[#d4ff6e] transition-all">
+                                        <button className="btn-apple btn-apple-primary px-5 py-2.5">
                                             Login to Track
                                         </button>
                                     </Link>
@@ -732,32 +664,30 @@ function GameDetail() {
 
                                 {user && (
                                     <button onClick={handleLike} disabled={liking}
-                                        className={`px-4 py-2 border font-mono text-xs rounded transition-all flex items-center gap-1.5
-                                                   ${liked ? 'border-[#ff5c5c] text-[#ff5c5c] bg-[#ff5c5c]/10' : 'border-white/15 text-[#a0a0b8] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'}`}>
-                                        {liked ? '❤️' : '🤍'} {liked ? 'Liked' : 'Like'}
+                                        className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 backdrop-blur-md border 
+                                                   ${liked ? 'border-[#ff5c5c] text-[#ff5c5c] bg-[#ff5c5c]/10' : 'border-white/10 bg-black/40 text-[#c8c8d8] hover:border-[#ff5c5c] hover:bg-[#ff5c5c]/10 hover:text-[#ff5c5c]'}`}>
+                                        <Heart size={16} className={liked ? 'fill-[#ff5c5c]' : ''} /> {liked ? 'Liked' : 'Like'}
                                     </button>
                                 )}
 
                                 {user && (
                                     <button onClick={handleWishlist} disabled={wishing}
-                                        className={`px-4 py-2 border font-mono text-xs rounded transition-all flex items-center gap-1.5
-                                                   ${wishlisted ? 'border-[#5c9fff] text-[#5c9fff] bg-[#5c9fff]/10' : 'border-white/15 text-[#a0a0b8] hover:border-[#5c9fff] hover:text-[#5c9fff]'}`}>
-                                        {wishlisted ? '🎯' : '＋'} {wishlisted ? 'Wishlisted' : 'Wishlist'}
+                                        className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 backdrop-blur-md border 
+                                                   ${wishlisted ? 'border-[#5c9fff] text-[#5c9fff] bg-[#5c9fff]/10' : 'border-white/10 bg-black/40 text-[#c8c8d8] hover:border-[#5c9fff] hover:bg-[#5c9fff]/10 hover:text-[#5c9fff]'}`}>
+                                        {wishlisted ? <Check size={16} strokeWidth={3} /> : <Plus size={16} />} {wishlisted ? 'Wishlisted' : 'Wishlist'}
                                     </button>
                                 )}
 
                                 {user && (
-                                    <button onClick={handleOpenListModal}
-                                        className="px-4 py-2 border border-white/15 text-[#a0a0b8] font-mono text-xs rounded
-                                                   hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all flex items-center gap-1.5">
-                                        📋 Add to List
+                                    <button onClick={handleOpenListModal} className="btn-apple btn-apple-secondary px-4 py-2.5 gap-1.5">
+                                        <ListChecks size={16} /> Add to List
                                     </button>
                                 )}
 
                                 <button onClick={handleShare}
-                                    className={`px-4 py-2 border font-mono text-xs rounded transition-all
-                                               ${shareCopied ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/10' : 'border-white/15 text-[#a0a0b8] hover:border-[#c8ff57] hover:text-[#c8ff57]'}`}>
-                                    {shareCopied ? '✓ Copied!' : '↗ Share'}
+                                    className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 backdrop-blur-md border 
+                                               ${shareCopied ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/10' : 'border-white/10 bg-black/40 text-[#c8c8d8] hover:border-[#c8ff57] hover:bg-[#c8ff57]/10 hover:text-[#c8ff57]'}`}>
+                                    {shareCopied ? <Check size={16} strokeWidth={3} /> : <Share size={16} />} {shareCopied ? 'Copied!' : 'Share'}
                                 </button>
                             </div>
                         </div>

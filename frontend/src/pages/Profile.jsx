@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import FollowListModal from '../components/profile/FollowListModal'
+import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List } from 'lucide-react'
 
 function Profile() {
     const { username } = useParams()
@@ -71,8 +72,9 @@ function Profile() {
             const fetchedUser = userRes.data.user
             setUser(fetchedUser)
 
-            // use isFollowedByMe from backend — no more array scanning
+            // use state from backend — no more array scanning
             const following = fetchedUser.isFollowedByMe || false
+            setRequestSent(fetchedUser.isRequestedByMe || false)
 
             const canSee = !fetchedUser.isPrivate ||
                 currentUser?.username === username ||
@@ -139,6 +141,11 @@ function Profile() {
                 setRequestSent(false)
                 showXpToast(res.data.message || 'Unfollowed · -1 XP', 'loss')
                 await fetchProfile()
+            } else if (requestSent) {
+                const res = await api.delete(`/auth/follow-request/cancel/${user._id}`)
+                setRequestSent(false)
+                showXpToast(res.data.message || 'Follow request cancelled', 'loss')
+                await fetchProfile()
             } else {
                 const res = await api.post(`/auth/follow/${user._id}`)
                 if (res.data.type === 'request_sent') {
@@ -180,7 +187,7 @@ function Profile() {
     if (error) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="text-5xl">😕</div>
+                <Frown size={56} className="text-[#ff5c5c] mb-2" strokeWidth={1.5} />
                 <div className="text-white font-black text-2xl tracking-widest uppercase"
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                     User Not Found
@@ -189,7 +196,7 @@ function Profile() {
                     No user with username "{username}" exists
                 </div>
                 <Link to="/">
-                    <button className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all">
+                    <button className="btn-apple btn-apple-primary px-6 py-2.5 mt-2">
                         Go Home
                     </button>
                 </Link>
@@ -241,8 +248,14 @@ function Profile() {
                     {/* Info */}
                     <div className="flex-1 text-center sm:text-left">
                         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-2">
-                            <h1 className="font-black text-3xl md:text-4xl tracking-widest text-white">
+                            <h1 className="font-black text-3xl md:text-4xl tracking-widest text-white flex items-center gap-2">
                                 {user.username}
+                                {user.followsMe && (
+                                    <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-sm
+                                                     bg-[#7a7a90]/15 text-[#7a7a90] border border-[#7a7a90]/30 select-none">
+                                        Follows you
+                                    </span>
+                                )}
                             </h1>
                             {user.isPrivate && (
                                 <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm
@@ -254,12 +267,24 @@ function Profile() {
 
                         {/* XP + Level */}
                         <div className="flex items-center gap-2 mb-1">
-                            <span className="text-base">{user.badge || '🎮'}</span>
-                            <span className="font-mono text-xs text-[#c8ff57] uppercase tracking-wider">
-                                Level {user.level || 1}
-                            </span>
-                            <span className="font-mono text-xs text-[#7a7a90]">·</span>
-                            <span className="font-mono text-xs text-[#7a7a90]">{user.xp || 0} XP</span>
+                            <span className="text-base flex items-center justify-center relative -top-[1px]">{user.badge || <Gamepad2 size={16} strokeWidth={2.5} className="text-[#c8ff57]" />}</span>
+                            {isOwnProfile ? (
+                                <Link to="/stats?tab=xp" className="flex items-center gap-2 leading-none hover:opacity-80 transition-opacity cursor-pointer group">
+                                    <span className="font-mono text-xs text-[#c8ff57] font-black uppercase tracking-widest group-hover:underline">
+                                        Level {user.level || 1}
+                                    </span>
+                                    <span className="font-mono text-xs text-[#7a7a90] opacity-50">·</span>
+                                    <span className="font-mono text-xs text-[#7a7a90] font-bold group-hover:text-white transition-colors">{user.xp || 0} XP</span>
+                                </Link>
+                            ) : (
+                                <div className="flex items-center gap-2 leading-none">
+                                    <span className="font-mono text-xs text-[#c8ff57] font-black uppercase tracking-widest">
+                                        Level {user.level || 1}
+                                    </span>
+                                    <span className="font-mono text-xs text-[#7a7a90] opacity-50">·</span>
+                                    <span className="font-mono text-xs text-[#7a7a90] font-bold">{user.xp || 0} XP</span>
+                                </div>
+                            )}
                         </div>
 
                         {user.bio && (
@@ -308,19 +333,20 @@ function Profile() {
                                 <button
                                     onClick={handlePrivacyToggle}
                                     disabled={privacyLoading}
-                                    className={`px-4 py-2 text-sm font-semibold rounded border transition-all disabled:opacity-50
+                                    className={`btn-apple px-4 py-2 text-sm font-semibold border transition-all disabled:opacity-50
                                                ${user.isPrivate
-                                            ? 'border-[#c8ff57]/50 text-[#c8ff57] hover:bg-[#c8ff57]/10'
+                                            ? 'border-[#c8ff57]/50 text-[#c8ff57] bg-[#c8ff57]/10 hover:bg-[#c8ff57]/20'
                                             : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-[#c8ff57]'}`}
                                 >
-                                    {privacyLoading ? 'Updating...' : user.isPrivate ? '🔒 Private' : '🌐 Public'}
+                                    <div className="flex items-center justify-center gap-1.5">
+                                        {privacyLoading ? 'Updating...' : user.isPrivate ? <><Lock size={14} /> Private</> : <><Globe size={14} /> Public</>}
+                                    </div>
                                 </button>
                                 <button
                                     onClick={() => navigate('/edit-profile')}
-                                    className="px-4 py-2 text-sm font-semibold rounded border border-[#2a2a35]
-                                               text-[#7a7a90] hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all"
+                                    className="btn-apple btn-apple-secondary px-4 py-2 flex items-center justify-center gap-1.5"
                                 >
-                                    ✏️ Edit Profile
+                                    <Pencil size={14} /> Edit Profile
                                 </button>
                             </>
                         )}
@@ -328,27 +354,27 @@ function Profile() {
                         {!isOwnProfile && currentUser && (
                             <button
                                 onClick={handleFollow}
-                                disabled={followLoading || requestSent}
-                                className={`px-6 py-2 text-sm font-bold rounded transition-all disabled:opacity-70
+                                disabled={followLoading}
+                                className={`btn-apple px-6 py-2 text-sm font-bold transition-all disabled:opacity-70
                                            ${isFollowing
-                                        ? 'border border-[#2a2a35] text-[#7a7a90] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'
+                                        ? 'btn-apple-secondary hover:border-[#ff5c5c] hover:text-[#ff5c5c] hover:bg-[#ff5c5c]/10'
                                         : requestSent
-                                            ? 'border border-[#ff9f5c]/50 text-[#ff9f5c] cursor-not-allowed'
-                                            : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e]'}`}
+                                            ? 'btn-apple-secondary border-[#ff9f5c]/50 text-[#ff9f5c] hover:border-[#ff9f5c] hover:bg-[#ff9f5c]/10'
+                                            : 'btn-apple-primary'}`}
                             >
                                 {followLoading
                                     ? '...'
                                     : isFollowing
                                         ? 'Unfollow'
                                         : requestSent
-                                            ? '⏳ Requested'
+                                            ? 'Cancel Request'
                                             : 'Follow'}
                             </button>
                         )}
 
                         {!isOwnProfile && !currentUser && (
                             <Link to="/login">
-                                <button className="px-6 py-2 text-sm font-bold rounded bg-[#c8ff57] text-black hover:bg-[#d4ff6e] transition-all">
+                                <button className="btn-apple btn-apple-primary px-6 py-2 w-full">
                                     Login to Follow
                                 </button>
                             </Link>
@@ -381,11 +407,11 @@ function Profile() {
 
             {/* ── Tab Bar ── */}
             {canSeeGames && (
-                <div className="flex gap-1 mb-4">
+                <div className="flex gap-1 mb-4 flex-wrap">
                     {[
-                        { id: 'games', label: '🎮 Recent Games' },
-                        { id: 'stats', label: '📊 Stats' },
-                        ...(canSeeLists ? [{ id: 'lists', label: '📋 Lists' }] : []),
+                        { id: 'games', label: <><Gamepad2 size={14} className="mr-1" /> Recent Games</> },
+                        { id: 'stats', label: <><BarChart2 size={14} className="mr-1" /> Stats</> },
+                        ...(canSeeLists ? [{ id: 'lists', label: <><List size={14} className="mr-1" /> Lists</> }] : []),
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -415,19 +441,19 @@ function Profile() {
 
                     {!canSeeGames ? (
                         <div className="flex flex-col items-center justify-center py-16 gap-4">
-                            <div className="text-5xl">🔒</div>
+                            <Lock size={48} strokeWidth={1.5} className="text-[#2a2a35]" />
                             <div className="text-white font-black text-xl tracking-widest uppercase"
                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                 Private Profile
                             </div>
-                            <div className="text-[#7a7a90] font-mono text-sm text-center max-w-xs">
+                            <div className="text-[#7a7a90] font-mono text-sm text-center max-w-xs mb-2">
                                 {requestSent
                                     ? `Your follow request is pending. Wait for ${user.username} to accept.`
                                     : `Follow ${user.username} to see their games`}
                             </div>
                             {!currentUser && (
                                 <Link to="/login">
-                                    <button className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-sm rounded mt-2 hover:bg-[#d4ff6e] transition-all">
+                                    <button className="btn-apple btn-apple-primary px-6 py-2.5">
                                         Login to Follow
                                     </button>
                                 </Link>
@@ -449,10 +475,10 @@ function Profile() {
                                         className="bg-[#18181f] border border-[#2a2a35] rounded-lg overflow-hidden
                                                    hover:border-[#c8ff57]/50 transition-all group"
                                     >
-                                        <div className="h-[120px] bg-cover bg-center bg-[#2a2a35] relative"
+                                        <div className="h-[120px] bg-cover bg-center bg-[#2a2a35] relative flex items-center justify-center"
                                             style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}>
                                             {!imageUrl && (
-                                                <div className="w-full h-full flex items-center justify-center text-2xl">🎮</div>
+                                                <Gamepad2 size={32} className="text-[#3a3a4a]" />
                                             )}
                                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all" />
                                         </div>
@@ -554,7 +580,9 @@ function Profile() {
                         <div className="flex flex-col gap-4">
                             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                 <div className="flex items-start gap-4">
-                                    <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center text-2xl flex-shrink-0">📋</div>
+                                    <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center flex-shrink-0">
+                                        <List size={24} className="text-[#c8ff57]" />
+                                    </div>
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <h2 className="font-black text-xl text-white tracking-widest uppercase"
@@ -584,7 +612,9 @@ function Profile() {
                                                 <img src={game.gameCover} alt={game.gameTitle}
                                                     className="w-full h-[140px] object-cover group-hover:opacity-90 transition-opacity" />
                                             ) : (
-                                                <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center text-3xl">🎮</div>
+                                                <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center">
+                                                    <Gamepad2 size={40} className="text-[#3a3a4a]" />
+                                                </div>
                                             )}
                                             <div className="p-2">
                                                 <div className="text-white font-semibold text-xs truncate group-hover:text-[#c8ff57] transition-colors">
@@ -596,7 +626,7 @@ function Profile() {
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-16 gap-3 bg-[#111118] border border-[#2a2a35] rounded-lg">
-                                    <div className="text-4xl">📋</div>
+                                    <List size={40} className="text-[#2a2a35] mb-2" strokeWidth={1.5} />
                                     <div className="text-[#7a7a90] font-mono text-sm">No games in this list yet</div>
                                 </div>
                             )}
@@ -607,7 +637,9 @@ function Profile() {
                                 <div key={list._id} onClick={() => setSelectedList(list)}
                                     className="bg-[#111118] border border-[#2a2a35] rounded-lg hover:border-[#c8ff57]/30 transition-all overflow-hidden cursor-pointer">
                                     <div className="flex items-center gap-4 p-4">
-                                        <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center text-2xl flex-shrink-0">📋</div>
+                                        <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center flex-shrink-0">
+                                            <List size={20} className="text-[#c8ff57]" />
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <div className="text-white font-semibold text-sm truncate">{list.name}</div>
@@ -632,7 +664,9 @@ function Profile() {
                                                     <img key={game.igdbId} src={game.gameCover} alt={game.gameTitle}
                                                         className="w-10 h-14 object-cover rounded hover:opacity-80 transition-all" />
                                                 ) : (
-                                                    <div key={game.igdbId} className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center text-sm">🎮</div>
+                                                    <div key={game.igdbId} className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center">
+                                                        <Gamepad2 size={16} className="text-[#7a7a90]" />
+                                                    </div>
                                                 )
                                             ))}
                                             {list.games.length > 6 && (
@@ -646,7 +680,7 @@ function Profile() {
                             ))
                         ) : (
                             <div className="flex flex-col items-center justify-center py-16 gap-3 bg-[#111118] border border-[#2a2a35] rounded-lg">
-                                <div className="text-4xl">📋</div>
+                                <List size={40} className="text-[#2a2a35] mb-2" strokeWidth={1.5} />
                                 <div className="text-white font-semibold text-sm">No public lists</div>
                                 <div className="text-[#7a7a90] font-mono text-[10px] text-center">
                                     {user.username} hasn't made any public lists yet

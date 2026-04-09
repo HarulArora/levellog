@@ -1,5 +1,6 @@
 import express from 'express'
 import Game from '../models/Game.js'
+import GameLike from '../models/GameLike.js'
 import { protect } from '../middleware/auth.js'
 import { awardXP, deductXP } from '../utils/xp.js'
 
@@ -68,7 +69,7 @@ router.get('/stats/:igdbId', async (req, res) => {
                 { $match: { igdbId, rating: { $gt: 0 } } },
                 { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } }
             ]),
-            (await import('../models/GameLike.js')).default.countDocuments({ igdbId })
+            GameLike.countDocuments({ igdbId })
         ])
         const avgRating = ratingData[0] ? parseFloat(ratingData[0].avg.toFixed(1)) : null
         const ratingCount = ratingData[0]?.count || 0
@@ -89,7 +90,7 @@ router.post('/stats/batch', async (req, res) => {
                 { $match: { igdbId: { $in: ids }, rating: { $gt: 0 } } },
                 { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
             ]),
-            (await import('../models/GameLike.js')).default.aggregate([
+            GameLike.aggregate([
                 { $match: { igdbId: { $in: ids } } },
                 { $group: { _id: '$igdbId', count: { $sum: 1 } } }
             ]),

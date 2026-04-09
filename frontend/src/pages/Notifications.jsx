@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
+import { Bell, UserPlus, Check, MessageSquare, Trash2, X, Plus, Users } from 'lucide-react'
 
 function Notifications() {
 
@@ -125,42 +126,42 @@ function Notifications() {
     // ── Notification config ──
     const notifConfig = {
         follow: {
-            icon: '👤',
-            bg: 'bg-[#c8ff57]/15',
+            icon: <UserPlus size={16} strokeWidth={2.5} />,
+            bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
             getText: (n) => (
                 <>
-                    <span className="text-[#c8ff57] font-bold">{n.sender?.username}</span>
+                    <span className="text-[#c8ff57] font-bold hover:underline">{n.sender?.username}</span>
                     {' started following you'}
                 </>
             ),
-            getLink: () => null,
+            getLink: (n) => n.sender?.username ? `/user/${n.sender.username}` : null,
         },
         follow_request: {
-            icon: '🔔',
-            bg: 'bg-[#5c9fff]/15',
+            icon: <Bell size={16} strokeWidth={2.5} />,
+            bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
             getText: (n) => (
                 <>
-                    <span className="text-[#c8ff57] font-bold">{n.sender?.username}</span>
+                    <span className="text-[#c8ff57] font-bold hover:underline">{n.sender?.username}</span>
                     {' sent you a follow request'}
                 </>
             ),
-            getLink: () => null,
+            getLink: (n) => n.sender?.username ? `/user/${n.sender.username}` : null,
         },
         request_accepted: {
-            icon: '✅',
-            bg: 'bg-[#c8ff57]/15',
+            icon: <Check size={16} strokeWidth={3} />,
+            bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
             getText: (n) => (
                 <>
-                    <span className="text-[#c8ff57] font-bold">{n.sender?.username}</span>
+                    <span className="text-[#c8ff57] font-bold hover:underline">{n.sender?.username}</span>
                     {' accepted your follow request'}
                 </>
             ),
-            getLink: () => null,
+            getLink: (n) => n.sender?.username ? `/user/${n.sender.username}` : null,
         },
         // ✅ NEW — reply notification
         comment_reply: {
-            icon: '💬',
-            bg: 'bg-[#ff9f5c]/15',
+            icon: <MessageSquare size={16} />,
+            bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
             getText: (n) => (
                 <>
                     <span className="text-[#c8ff57] font-bold">{n.sender?.username}</span>
@@ -188,13 +189,13 @@ function Notifications() {
     if (!user) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="text-5xl">🔔</div>
+                <Bell size={56} className="text-[#c8ff57] mb-2" strokeWidth={1.5} />
                 <div className="text-white font-black text-2xl tracking-widest uppercase"
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                     Login to see notifications
                 </div>
                 <Link to="/login">
-                    <button className="px-6 py-3 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all">
+                    <button className="btn-apple btn-apple-primary px-8 py-3">
                         Login
                     </button>
                 </Link>
@@ -267,36 +268,36 @@ function Notifications() {
                         <div className="flex flex-wrap items-center gap-2 mb-4">
                             <button
                                 onClick={() => { setSelectMode(!selectMode); setSelected(new Set()) }}
-                                className={`px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border rounded transition-all
-                           ${selectMode ? 'border-[#c8ff57] text-[#c8ff57]' : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'}`}
+                                className={`btn-apple px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider border rounded transition-all
+                           ${selectMode ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/10' : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'}`}
                             >
-                                {selectMode ? '✕ Cancel' : '☑ Select'}
+                                {selectMode ? <><X size={12} className="mr-1" /> Cancel</> : <><Check size={12} className="mr-1" /> Select</>}
                             </button>
 
                             {selectMode && (
                                 <button onClick={handleSelectAll}
-                                    className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border border-[#2a2a35] text-[#7a7a90] rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
+                                    className="btn-apple px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider border border-[#2a2a35] text-[#7a7a90] bg-[#18181f]/80 rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
                                     {selected.size === notifications.length ? 'Deselect All' : 'Select All'}
                                 </button>
                             )}
 
                             {selectMode && selected.size > 0 && (
                                 <button onClick={handleDeleteSelected}
-                                    className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border border-[#ff5c5c]/40 text-[#ff5c5c] rounded hover:border-[#ff5c5c] transition-all">
-                                    🗑 Delete ({selected.size})
+                                    className="btn-apple px-3 py-1.5 flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider border border-[#ff5c5c]/40 text-[#ff5c5c] hover:bg-[#ff5c5c] hover:text-white transition-all">
+                                    <Trash2 size={12} /> Delete ({selected.size})
                                 </button>
                             )}
 
                             {unreadCount > 0 && (
                                 <button onClick={handleMarkAllRead}
-                                    className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border border-[#2a2a35] text-[#7a7a90] rounded hover:border-[#5c9fff] hover:text-[#5c9fff] transition-all">
-                                    ✓ Mark All Read
+                                    className="btn-apple px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider border border-[#2a2a35] text-[#7a7a90] hover:border-[#5c9fff] hover:text-[#5c9fff] transition-all">
+                                    <Check size={12} className="mr-1" /> Mark All Read
                                 </button>
                             )}
 
                             <button onClick={handleDeleteAll}
-                                className="px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider border border-[#ff5c5c]/30 text-[#ff5c5c]/70 rounded hover:border-[#ff5c5c] hover:text-[#ff5c5c] transition-all ml-auto">
-                                🗑 Delete All
+                                className="btn-apple px-3 py-1.5 flex items-center gap-1 font-bold text-[10px] uppercase tracking-wider border border-[#ff5c5c]/30 text-[#ff5c5c]/70 hover:bg-[#ff5c5c] hover:text-white transition-all ml-auto">
+                                <Trash2 size={12} /> Delete All
                             </button>
                         </div>
                     )}
@@ -317,8 +318,9 @@ function Notifications() {
                                     <WrapperEl
                                         key={notif._id}
                                         {...wrapperProps}
-                                        onClick={() => {
+                                        onClick={(e) => {
                                             if (selectMode) {
+                                                if (link) e.preventDefault()
                                                 toggleSelect(notif._id)
                                             } else if (isUnread) {
                                                 handleMarkOneRead(notif._id)
@@ -375,7 +377,7 @@ function Notifications() {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 gap-3">
-                            <div className="text-5xl">🔔</div>
+                            <Bell size={56} className="text-[#2a2a35] mb-2" strokeWidth={1.5} />
                             <div className="text-white font-black text-xl tracking-widest uppercase"
                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                 All Clear
@@ -403,20 +405,26 @@ function Notifications() {
                                             {req.sender?.username?.charAt(0).toUpperCase()}
                                         </div>
                                     )}
-                                    <div className="flex-1 text-sm text-[#7a7a90]">
-                                        <Link to={`/user/${req.sender?.username}`}
-                                            className="text-[#c8ff57] font-bold hover:underline">
-                                            {req.sender?.username}
-                                        </Link>
-                                        {' wants to follow you'}
+                                    <div className="flex-1 text-sm text-[#7a7a90] min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                            <Link to={`/user/${req.sender?.username}`}
+                                                className="text-[#c8ff57] font-bold hover:underline truncate">
+                                                {req.sender?.username}
+                                            </Link>
+                                            <div className="flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm shadow-black/40">
+                                                <span className="flex items-center justify-center text-[10px] leading-none relative -top-[1.8px]">{req.sender?.badge || '🎮'}</span>
+                                                <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-black tracking-widest leading-none">Lv.{req.sender?.level || 1}</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-[11px] opacity-70">wants to follow you</div>
                                     </div>
                                     <div className="flex gap-2 flex-shrink-0">
                                         <button onClick={() => handleAccept(req._id)}
-                                            className="px-3 py-1 bg-[#c8ff57] text-black font-bold text-xs rounded hover:bg-[#d4ff6e] transition-all">
+                                            className="btn-apple btn-apple-primary px-4 py-2">
                                             Accept
                                         </button>
                                         <button onClick={() => handleDecline(req._id)}
-                                            className="px-3 py-1 border border-[#ff5c5c]/40 text-[#ff5c5c] text-xs font-semibold rounded hover:border-[#ff5c5c] transition-all">
+                                            className="btn-apple btn-apple-secondary px-4 py-2 hover:bg-[#ff5c5c]/20 hover:text-[#ff5c5c] hover:border-[#ff5c5c]/50">
                                             Decline
                                         </button>
                                     </div>
@@ -425,7 +433,7 @@ function Notifications() {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 gap-3">
-                            <div className="text-5xl">👤</div>
+                            <Users size={56} className="text-[#2a2a35] mb-2" strokeWidth={1.5} />
                             <div className="text-white font-black text-xl tracking-widest uppercase"
                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                 No Requests
