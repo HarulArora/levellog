@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import useGames from '../hooks/useGames'
+import { Trophy, Play, Star, ListChecks, X, Pause, Gamepad2, Users } from 'lucide-react'
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000)
@@ -20,8 +21,8 @@ const timeAgo = (date) => {
 
 const makeActivityConfig = (navigate) => ({
     completed: {
-        icon: '🏆',
-        bg: 'bg-[#5c9fff]/15',
+        icon: <Trophy size={16} />,
+        bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
         getText: (a) => (
             <>
                 Completed{' '}
@@ -36,8 +37,8 @@ const makeActivityConfig = (navigate) => ({
         )
     },
     playing: {
-        icon: '▶',
-        bg: 'bg-[#c8ff57]/15',
+        icon: <Play size={16} fill="currentColor" />,
+        bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
         getText: (a) => (
             <>
                 Started playing{' '}
@@ -51,8 +52,8 @@ const makeActivityConfig = (navigate) => ({
         )
     },
     rated: {
-        icon: '⭐',
-        bg: 'bg-[#ff9f5c]/15',
+        icon: <Star size={16} fill="currentColor" />,
+        bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
         getText: (a) => (
             <>
                 Rated{' '}
@@ -67,8 +68,8 @@ const makeActivityConfig = (navigate) => ({
         )
     },
     planned: {
-        icon: '📋',
-        bg: 'bg-[#2a2a35]',
+        icon: <ListChecks size={16} />,
+        bg: 'bg-[#2a2a35] text-[#e8e8f0]',
         getText: (a) => (
             <>
                 Added{' '}
@@ -83,8 +84,8 @@ const makeActivityConfig = (navigate) => ({
         )
     },
     dropped: {
-        icon: '✕',
-        bg: 'bg-[#ff5c5c]/15',
+        icon: <X size={16} strokeWidth={3} />,
+        bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
         getText: (a) => (
             <>
                 Dropped{' '}
@@ -99,8 +100,8 @@ const makeActivityConfig = (navigate) => ({
         )
     },
     paused: {
-        icon: '⏸',
-        bg: 'bg-[#c45cff]/15',
+        icon: <Pause size={16} fill="currentColor" />,
+        bg: 'bg-[#c45cff]/15 text-[#c45cff]',
         getText: (a) => (
             <>
                 Paused{' '}
@@ -170,7 +171,7 @@ function Activity() {
     if (!user) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="text-5xl">🎮</div>
+                <div className="text-[#c8ff57] mb-2"><Gamepad2 size={56} strokeWidth={1.5} /></div>
                 <div
                     className="text-white font-black text-2xl tracking-widest uppercase"
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
@@ -178,8 +179,7 @@ function Activity() {
                     Login to see activity
                 </div>
                 <Link to="/login">
-                    <button className="px-6 py-3 bg-[#c8ff57] text-black font-bold
-                             text-sm rounded hover:bg-[#d4ff6e] transition-all">
+                    <button className="btn-apple btn-apple-primary px-8 py-3">
                         Login
                     </button>
                 </Link>
@@ -264,15 +264,13 @@ function Activity() {
                             })}
                         </div>
                     ) : (
-                        <div className="text-center py-16">
-                            <div className="text-4xl mb-3">🎮</div>
-                            <div className="text-[#7a7a90] font-mono text-sm">
+                        <div className="text-center py-16 flex flex-col items-center">
+                            <Gamepad2 size={48} className="text-[#2a2a35] mb-4" />
+                            <div className="text-[#7a7a90] font-mono text-sm mb-4">
                                 No activity yet. Start logging games!
                             </div>
                             <Link to="/library">
-                                <button className="mt-4 px-5 py-2 bg-[#c8ff57] text-black
-                                   font-bold text-sm rounded
-                                   hover:bg-[#d4ff6e] transition-all">
+                                <button className="btn-apple btn-apple-primary px-6 py-2.5">
                                     + Log a Game
                                 </button>
                             </Link>
@@ -452,19 +450,18 @@ function Activity() {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 gap-4">
-                            <div className="text-5xl">👾</div>
+                            <Users size={56} className="text-[#2a2a35] mb-2" strokeWidth={1.5} />
                             <div
                                 className="text-white font-black text-xl tracking-widest uppercase"
                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                             >
                                 No Activity Yet
                             </div>
-                            <div className="text-[#7a7a90] font-mono text-sm text-center max-w-sm">
+                            <div className="text-[#7a7a90] font-mono text-sm text-center max-w-sm mb-2">
                                 Follow other gamers to see their games here
                             </div>
                             <Link to="/search">
-                                <button className="px-6 py-3 bg-[#c8ff57] text-black font-bold
-                                   text-sm rounded hover:bg-[#d4ff6e] transition-all">
+                                <button className="btn-apple btn-apple-primary px-6 py-2.5">
                                     Find Friends
                                 </button>
                             </Link>

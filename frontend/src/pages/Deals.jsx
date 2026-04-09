@@ -1,4 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { Search, X } from 'lucide-react'
+import { useDeals } from '../context/DealsContext'
+import { DealSkeleton } from '../components/ui/Skeleton'
 
 const AFF = {
     gog: '',
@@ -75,80 +78,13 @@ const FILTER_STORES = [
 const DEALS_PER_PAGE = 30
 const ALL_STORE_IDS = ['1', '7', '11', '15', '3', '25', '35', '21', '6', '8', '13']
 
-const PROXY_LIST = [
-    (url) => fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) }),
-    async (url) => {
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) })
-        if (!res.ok) throw new Error(`allorigins ${res.status}`)
-        const { contents } = await res.json()
-        return new Response(contents, { headers: { 'Content-Type': 'application/json' } })
-    },
-    (url) => fetch(`https://thingproxy.freeboard.io/fetch/${url}`, { signal: AbortSignal.timeout(7000) }),
-    (url) => fetch(`https://cors-proxy.htmldriven.com/?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(7000) }),
-    (url) => fetch(url, { signal: AbortSignal.timeout(8000) }),
-]
-
-async function fetchWithProxies(targetUrl) {
-    let lastErr
-    for (const proxyFn of PROXY_LIST) {
-        try {
-            const res = await proxyFn(targetUrl)
-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            const json = await res.json()
-            return json
-        } catch (e) {
-            lastErr = e
-        }
-    }
-    throw lastErr || new Error('All proxies failed')
-}
-
-async function fetchWithDelay(urls, delayMs = 300) {
-    const results = []
-    for (const url of urls) {
-        try {
-            let json
-            try {
-                const res = await fetch(url.replace(/^https:\/\/corsproxy\.io\/\?url=/, '').replace(/^[^?]*\?url=/, ''), { signal: AbortSignal.timeout(6000) })
-                if (!res.ok) throw new Error(`direct ${res.status}`)
-                json = await res.json()
-            } catch {
-                const target = (() => {
-                    try { return decodeURIComponent(url.split('?url=')[1] || url) } catch { return url }
-                })()
-                json = await fetchWithProxies(target)
-            }
-            results.push(json)
-        } catch {
-            results.push(null)
-        }
-        if (delayMs) await new Promise(r => setTimeout(r, delayMs))
-    }
-    return results
-}
-
 function mcColor(n) {
     if (n >= 75) return '#c8ff57'
     if (n >= 50) return '#5c9fff'
     return '#ff5c5c'
 }
 
-function DealSkeleton() {
-    return (
-        <div style={{
-            display: 'flex', background: '#111118',
-            border: '1px solid #2a2a35', borderRadius: 8,
-            overflow: 'hidden', height: 92, animation: 'pulse 1.5s ease-in-out infinite',
-        }}>
-            <div style={{ width: 100, background: '#18181f', flexShrink: 0 }} />
-            <div style={{ flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ height: 9, background: '#18181f', borderRadius: 3, width: '35%' }} />
-                <div style={{ height: 12, background: '#18181f', borderRadius: 3, width: '65%' }} />
-                <div style={{ height: 18, background: '#18181f', borderRadius: 3, width: '22%' }} />
-            </div>
-        </div>
-    )
-}
+
 
 function DealCard({ deal }) {
     const store = STORE_META[deal.storeID] || { name: 'Store', color: '#888', icon: '🛒' }
@@ -250,106 +186,25 @@ function Pagination({ page, totalPages, onPage }) {
 }
 
 export default function Deals() {
-    const [deals, setDeals] = useState([])
-    const [dealsLoading, setDealsLoading] = useState(true)
+    const { deals, loading: dealsLoading, lastUpdated, fetchDeals } = useDeals()
     const [storeFilter, setStoreFilter] = useState('all')
     const [freeOnly, setFreeOnly] = useState(false)
     const [search, setSearch] = useState('')
     const [page, setPage] = useState(1)
-    const [lastUpdated, setLastUpdated] = useState(null)
-    const [newDeals, setNewDeals] = useState([])
+    
+    // Explicit list to show 'scanning' or similar if necessary
     const [fetchStatus, setFetchStatus] = useState('')
-    const prevIds = useRef(new Set())
 
-    const fetchDeals = useCallback(async () => {
-        try {
-            setDealsLoading(true)
-            setFetchStatus('Fetching deals...')
-            let data = []
-
-            if (storeFilter === 'all') {
-                const urls = ALL_STORE_IDS.map(id => {
-                    const p = new URLSearchParams({ pageSize: 60, sortBy: 'Savings', desc: 1, onSale: 1, storeID: id, pageNumber: 0 })
-                    if (freeOnly) p.append('upperPrice', '0')
-                    return `https://www.cheapshark.com/api/1.0/deals?${p}`
-                })
-
-                setFetchStatus('Loading deals from all stores...')
-                const results = await fetchWithDelay(urls, 150)
-                for (const r of results) {
-                    if (Array.isArray(r)) data = data.concat(r)
-                }
-            } else {
-                const urls = [0, 1].map(pageNum => {
-                    const p = new URLSearchParams({ pageSize: 60, sortBy: 'Savings', desc: 1, onSale: 1, storeID: storeFilter, pageNumber: pageNum })
-                    if (freeOnly) p.append('upperPrice', '0')
-                    return `https://www.cheapshark.com/api/1.0/deals?${p}`
-                })
-
-                setFetchStatus('Loading deals...')
-                const results = await fetchWithDelay(urls, 200)
-                for (const r of results) {
-                    if (Array.isArray(r)) data = data.concat(r)
-                }
-            }
-
-            const seen = new Set()
-            data = data.filter(d => {
-                if (!d?.dealID || seen.has(d.dealID)) return false
-                seen.add(d.dealID)
-                return true
-            })
-
-            data.sort((a, b) => parseFloat(b.savings) - parseFloat(a.savings))
-
-            const cleaned = data.filter(d => {
-                const sale = parseFloat(d.salePrice)
-                const normal = parseFloat(d.normalPrice)
-                const pct = Math.trunc(parseFloat(d.savings))
-                return sale === 0 || (pct > 0 && normal > sale)
-            })
-
-            const fresh = cleaned.filter(d => prevIds.current.size > 0 && !prevIds.current.has(d.dealID))
-            prevIds.current = new Set(cleaned.map(d => d.dealID))
-
-            if (fresh.length > 0) {
-                setNewDeals(fresh.slice(0, 10))
-                window.dispatchEvent(new CustomEvent('levellog:new-deals', { detail: { count: fresh.length } }))
-                if (Notification?.permission === 'granted') {
-                    new Notification('🎮 New LevelLog Deals!', {
-                        body: `${fresh.length} new deal${fresh.length > 1 ? 's' : ''}: ${fresh.slice(0, 2).map(d => d.title).join(', ')}`,
-                        icon: '/favicon.ico',
-                    })
-                }
-            }
-
-            setDeals(cleaned)
-            setLastUpdated(new Date())
-            setFetchStatus('')
-        } catch (err) {
-            setFetchStatus('Failed to load deals')
-            console.error(err)
-        } finally {
-            setDealsLoading(false)
-        }
-    }, [storeFilter, freeOnly])
-
+    // When storeFilter or freeOnly changes, refresh global context
     useEffect(() => {
         setPage(1)
-        fetchDeals()
-    }, [fetchDeals])
+        fetchDeals(storeFilter, freeOnly)
+    }, [storeFilter, freeOnly, fetchDeals])
 
-    useEffect(() => {
-        const t = setInterval(() => { fetchDeals() }, 5 * 60 * 1000)
-        return () => clearInterval(t)
-    }, [fetchDeals])
-
-    useEffect(() => {
-        if ('Notification' in window && Notification.permission === 'default')
-            Notification.requestPermission()
-    }, [])
-
-    const filtered = deals.filter(d => !search || d.title.toLowerCase().includes(search.toLowerCase()))
+    const filtered = useMemo(() => 
+        deals.filter(d => !search || d.title.toLowerCase().includes(search.toLowerCase())),
+        [deals, search]
+    )
     const totalPages = Math.ceil(filtered.length / DEALS_PER_PAGE)
     const paginated = filtered.slice((page - 1) * DEALS_PER_PAGE, page * DEALS_PER_PAGE)
 
@@ -376,8 +231,12 @@ export default function Deals() {
 
                 <div className="sec-head" style={{ marginBottom: 24 }}>
                     <h1 className="sec-title">🔥 GAME DEALS</h1>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#7a7a90' }}>
-                        {dealsLoading ? (fetchStatus || 'Loading...') : `${filtered.length} deals found`}
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#c8ff57', fontWeight: 600 }}>
+                        {dealsLoading ? (fetchStatus || 'Scanning...') : (
+                            storeFilter === 'all' 
+                                ? `${filtered.length.toLocaleString()}+ BEST DEALS DISCOVERED` 
+                                : `${filtered.length.toLocaleString()} deals found in this store`
+                        )}
                     </span>
                     <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
                         {lastUpdated && (
@@ -395,7 +254,7 @@ export default function Deals() {
                     </div>
                 </div>
 
-                <NewDealsBanner deals={newDeals} onDismiss={() => setNewDeals([])} />
+                {/* No local new deals banner here as it's handled by global context / badge */}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
                     <div className="filter-row">
@@ -412,10 +271,12 @@ export default function Deals() {
                             🎁 Free Only
                         </button>
                         <div style={{ marginLeft: 'auto', position: 'relative' }}>
-                            <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#7a7a90' }}>🔍</span>
+                            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#7a7a90', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                                <Search size={16} strokeWidth={2.5} />
+                            </span>
                             <input type="text" placeholder="Search deals..." value={search}
                                 onChange={e => { setSearch(e.target.value); setPage(1) }}
-                                style={{ background: '#111118', border: '1px solid #2a2a35', borderRadius: 4, padding: '6px 10px 6px 28px', color: '#e8e8f0', fontFamily: "'DM Sans', sans-serif", fontSize: 13, width: 180, outline: 'none', transition: 'border-color 0.15s' }}
+                                style={{ background: '#111118', border: '1px solid #2a2a35', borderRadius: 6, padding: '8px 12px 8px 36px', color: '#e8e8f0', fontFamily: "'DM Sans', sans-serif", fontSize: 13, width: 220, outline: 'none', transition: 'all 0.15s shadow-sm focus:shadow-[#c8ff57]/5' }}
                                 onFocus={e => e.target.style.borderColor = '#c8ff57'}
                                 onBlur={e => e.target.style.borderColor = '#2a2a35'}
                             />
@@ -424,16 +285,9 @@ export default function Deals() {
                 </div>
 
                 {dealsLoading ? (
-                    <>
-                        {fetchStatus && (
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: '#7a7a90', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ animation: 'pulse 1s infinite' }}>⏳</span> {fetchStatus}
-                            </div>
-                        )}
-                        <div className="deals-grid">
-                            {Array.from({ length: 12 }).map((_, i) => <DealSkeleton key={i} />)}
-                        </div>
-                    </>
+                    <div className="deals-grid">
+                        {Array.from({ length: 12 }).map((_, i) => <DealSkeleton key={i} />)}
+                    </div>
                 ) : paginated.length > 0 ? (
                     <>
                         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#5a5a6a', marginBottom: 14 }}>

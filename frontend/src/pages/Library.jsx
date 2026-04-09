@@ -3,6 +3,7 @@ import useGames from '../hooks/useGames'
 import GameCard from '../components/library/GameCard'
 import FilterBar from '../components/library/FilterBar'
 import Toast from '../components/ui/Toast'
+import { Search } from 'lucide-react'
 
 // Heavy modals are lazy-loaded — not bundled until first open
 const AddGameModal = lazy(() => import('../components/library/AddGameModal'))
@@ -128,7 +129,9 @@ function Library() {
                 </div>
 
                 <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#7a7a90] text-sm">🔍</span>
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#7a7a90] flex items-center">
+                        <Search size={14} strokeWidth={2.5} />
+                    </span>
                     <input
                         type="text"
                         placeholder="Search games in your library..."

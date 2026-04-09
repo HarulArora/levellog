@@ -1,8 +1,35 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import useGames from '../hooks/useGames'
+import { Trophy, Play, Star, ListChecks, X, Pause, Search, Gamepad2, Flame, Plus } from 'lucide-react'
+import Skeleton, { GameCardSkeleton } from '../components/ui/Skeleton'
+
+const RatingDisplay = ({ myRating, platformAvg, hasUser }) => {
+    return (
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+            {myRating ? (
+                <div className="flex items-center gap-1">
+                    <span className="font-mono text-[8px] text-[#7a7a90] uppercase tracking-wider">me</span>
+                    <div className="font-black text-lg text-[#c8ff57] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        {myRating}<small className="font-mono text-[8px] text-[#7a7a90] font-normal">/10</small>
+                    </div>
+                </div>
+            ) : hasUser ? (
+                <div className="font-mono text-[8px] text-[#2a2a35] uppercase tracking-wider">not rated</div>
+            ) : null}
+            {platformAvg ? (
+                <div className="flex items-center gap-1">
+                    <span className="font-mono text-[8px] text-[#7a7a90] uppercase tracking-wider">avg</span>
+                    <div className="font-black text-lg text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        {platformAvg}<small className="font-mono text-[8px] text-[#7a7a90] font-normal">/10</small>
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    )
+}
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000)
@@ -18,49 +45,67 @@ const timeAgo = (date) => {
 
 const makeActivityConfig = (navigate) => ({
     completed: {
-        icon: '🏆', bg: 'bg-[#5c9fff]/15',
+        icon: <Trophy size={16} />, bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
         getText: (a) => (<>Completed{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{a.rating ? ` — rated it ${a.rating}/10` : ''}</>)
     },
     playing: {
-        icon: '▶', bg: 'bg-[#c8ff57]/15',
+        icon: <Play size={16} fill="currentColor" />, bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
         getText: (a) => (<>Started playing{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span></>)
     },
     rated: {
-        icon: '⭐', bg: 'bg-[#ff9f5c]/15',
+        icon: <Star size={16} fill="currentColor" />, bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
         getText: (a) => (<>Rated{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{` ${a.rating}/10`}</>)
     },
     planned: {
-        icon: '📋', bg: 'bg-[#2a2a35]',
+        icon: <ListChecks size={16} />, bg: 'bg-[#2a2a35] text-[#e8e8f0]',
         getText: (a) => (<>Added{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{' to planned list'}</>)
     },
     dropped: {
-        icon: '✕', bg: 'bg-[#ff5c5c]/15',
+        icon: <X size={16} strokeWidth={3} />, bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
         getText: (a) => (<>Dropped{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{a.hours ? ` after ${a.hours}h` : ''}</>)
     },
     paused: {
-        icon: '⏸', bg: 'bg-[#c45cff]/15',
+        icon: <Pause size={16} fill="currentColor" />, bg: 'bg-[#c45cff]/15 text-[#c45cff]',
         getText: (a) => (<>Paused{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span></>)
     },
 })
 
 // ── Mosaic banner ──
 function HeroBanner({ games }) {
-    const covers = games.filter(g => g.cover).map(g => g.cover).filter((v, i, a) => a.indexOf(v) === i)
-    if (covers.length === 0) return null
-    const sizePatterns = [
+    const covers = useMemo(() => 
+        games.filter(g => g.cover).map(g => g.cover).filter((v, i, a) => a.indexOf(v) === i),
+        [games]
+    )
+    
+    const sizePatterns = useMemo(() => [
         { w: 'w-[180px]', h: 'h-[240px]' }, { w: 'w-[130px]', h: 'h-[170px]' },
         { w: 'w-[160px]', h: 'h-[210px]' }, { w: 'w-[140px]', h: 'h-[185px]' },
         { w: 'w-[175px]', h: 'h-[230px]' }, { w: 'w-[120px]', h: 'h-[160px]' },
         { w: 'w-[155px]', h: 'h-[205px]' }, { w: 'w-[145px]', h: 'h-[195px]' },
         { w: 'w-[165px]', h: 'h-[220px]' }, { w: 'w-[135px]', h: 'h-[180px]' },
-    ]
-    const shuffled = [...covers].sort(() => Math.random() - 0.5)
-    const getRow = (startIndex, count) => Array.from({ length: count }, (_, i) => ({
-        img: shuffled[(startIndex + i) % shuffled.length],
-        ...sizePatterns[i % sizePatterns.length]
-    }))
-    const row1Tiles = getRow(0, 15)
-    const row2Tiles = getRow(Math.ceil(shuffled.length / 2), 15)
+    ], [])
+
+    const shuffled = useMemo(() => (covers.length > 0 ? [...covers].sort(() => 0.5 - Math.random()) : []), [covers])
+
+    const row1Tiles = useMemo(() => {
+        if (!shuffled.length) return []
+        return Array.from({ length: 15 }, (_, i) => ({
+            img: shuffled[i % shuffled.length],
+            ...sizePatterns[i % sizePatterns.length]
+        }))
+    }, [shuffled, sizePatterns])
+
+    const row2Tiles = useMemo(() => {
+        if (!shuffled.length) return []
+        const offset = Math.ceil(shuffled.length / 2)
+        return Array.from({ length: 15 }, (_, i) => ({
+            img: shuffled[(offset + i) % shuffled.length],
+            ...sizePatterns[(i + 5) % sizePatterns.length]
+        }))
+    }, [shuffled, sizePatterns])
+
+    if (covers.length === 0) return null
+
     return (
         <div className="absolute inset-0 z-0 overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-[55%] flex items-end gap-3 pb-2">
@@ -154,7 +199,7 @@ function GameSearchBar() {
         <div ref={wrapperRef} className="relative w-full">
             {/* Input */}
             <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none text-base">🔍</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none text-base"><Search size={16} /></span>
                 <input
                     type="text"
                     placeholder="Search any game..."
@@ -242,84 +287,68 @@ function Home() {
     const { user } = useAuth()
     const navigate = useNavigate()
     const { games } = useGames()
-    const activityConfig = makeActivityConfig(navigate)
+    const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
 
     const [trending, setTrending] = useState([])
     const [topRated, setTopRated] = useState([])
     const [comingSoon, setComingSoon] = useState([])
     const [activity, setActivity] = useState([])
-    const [loadingTrending, setLoadingTrending] = useState(true)
-    const [loadingComing, setLoadingComing] = useState(true)
-    const [loadingActivity, setLoadingActivity] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [gameStats, setGameStats] = useState({})
 
+    // Consolidated Home Fetcher (Optimized with backend bundle)
     useEffect(() => {
-        const fetch_ = async () => {
+        const fetchGlobalData = async () => {
             try {
-                setLoadingTrending(true)
-                const [trendRes, topRes] = await Promise.all([
-                    api.get('/igdb/trending'),
-                    api.get('/igdb/top-rated')
-                ])
-                const trendGames = trendRes.data.games.slice(0, 10)
-                const topGames = topRes.data.games.slice(0, 10)
-                setTrending(trendGames)
-                setTopRated(topGames)
-                const allIds = [...trendGames, ...topGames].map(g => g.id).filter(Boolean)
-                if (allIds.length > 0) {
-                    try {
-                        const statsRes = await api.post('/games/stats/batch', { igdbIds: allIds })
-                        setGameStats(statsRes.data.stats || {})
-                    } catch { }
-                }
+                setLoading(true)
+                const res = await api.get('/igdb/home')
+                const { trending, topRated, comingSoon, gameStats } = res.data
+                setTrending(trending || [])
+                setTopRated(topRated || [])
+                setComingSoon(comingSoon || [])
+                setGameStats(gameStats || {})
             } catch (err) {
-                console.error('Trending error:', err)
+                console.error('Home data error:', err)
             } finally {
-                setLoadingTrending(false)
+                setLoading(false)
             }
         }
-        fetch_()
-    }, [])
-
-    useEffect(() => {
-        const fetch_ = async () => {
-            try {
-                setLoadingComing(true)
-                const res = await api.get('/igdb/coming-soon')
-                setComingSoon(res.data.games)
-            } catch { } finally { setLoadingComing(false) }
-        }
-        fetch_()
+        fetchGlobalData()
     }, [])
 
     useEffect(() => {
         if (!user) return
-        const fetch_ = async () => {
+        const fetchActivity = async () => {
             try {
-                setLoadingActivity(true)
                 const res = await api.get(`/games/activity/${user.id || user._id}`)
                 setActivity(res.data.activity)
-            } catch { } finally { setLoadingActivity(false) }
+            } catch (err) {
+                console.error('Activity fetch error:', err)
+            }
         }
-        fetch_()
+        fetchActivity()
     }, [user])
 
-    const userStats = {
+    const userStats = useMemo(() => ({
         total: games.length,
         playing: games.filter(g => g.status === 'playing').length,
         completed: games.filter(g => g.status === 'completed').length,
         planned: games.filter(g => g.status === 'planned').length,
-    }
+        totalHours: games.reduce((s, g) => s + (g.hours || 0), 0),
+        avgRating: games.filter(g => g.rating > 0).length > 0
+            ? (games.filter(g => g.rating > 0).reduce((s, g) => s + g.rating, 0) / games.filter(g => g.rating > 0).length).toFixed(1)
+            : '—'
+    }), [games])
 
-    const recentGames = games.slice(0, 4)
+    const recentGames = useMemo(() => games.slice(0, 4), [games])
 
-    const statusConfig = {
+    const statusConfig = useMemo(() => ({
         playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
         completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
         planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
         dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
-    }
+    }), [])
 
     const getMyRating = (igdbId) => {
         if (!igdbId || !user) return null
@@ -327,32 +356,6 @@ function Home() {
         return match?.rating > 0 ? match.rating : null
     }
 
-    const RatingDisplay = ({ game }) => {
-        const myRating = getMyRating(game.id)
-        const platformAvg = gameStats[game.id]?.avgRating
-        return (
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                {myRating ? (
-                    <div className="flex items-center gap-1">
-                        <span className="font-mono text-[8px] text-[#7a7a90] uppercase tracking-wider">me</span>
-                        <div className="font-black text-lg text-[#c8ff57] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            {myRating}<small className="font-mono text-[8px] text-[#7a7a90] font-normal">/10</small>
-                        </div>
-                    </div>
-                ) : user ? (
-                    <div className="font-mono text-[8px] text-[#2a2a35] uppercase tracking-wider">not rated</div>
-                ) : null}
-                {platformAvg ? (
-                    <div className="flex items-center gap-1">
-                        <span className="font-mono text-[8px] text-[#7a7a90] uppercase tracking-wider">avg</span>
-                        <div className="font-black text-lg text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            {platformAvg}<small className="font-mono text-[8px] text-[#7a7a90] font-normal">/10</small>
-                        </div>
-                    </div>
-                ) : null}
-            </div>
-        )
-    }
 
     return (
         <div className="min-h-screen">
@@ -368,8 +371,8 @@ function Home() {
                 HERO
             ══════════════════════════ */}
             <section className="relative py-12 md:py-20 overflow-hidden">
-                {!loadingTrending && trending.length > 0 && (
-                    <HeroBanner games={[...trending, ...topRated, ...(loadingComing ? [] : comingSoon)]} />
+                {!loading && trending.length > 0 && (
+                    <HeroBanner games={[...trending, ...topRated, ...comingSoon]} />
                 )}
 
                 <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10">
@@ -402,23 +405,23 @@ function Home() {
                                 {user ? (
                                     <>
                                         <button onClick={() => navigate('/library')}
-                                            className="px-5 py-3 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all">
-                                            + Log a Game
+                                            className="btn-apple btn-apple-primary px-6 py-3 gap-1.5">
+                                            <Plus size={16} strokeWidth={2.5} /> Log a Game
                                         </button>
                                         <button onClick={() => navigate('/library')}
-                                            className="px-5 py-3 border border-[#2a2a35] text-white font-semibold text-sm rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
+                                            className="btn-apple btn-apple-secondary px-6 py-3 gap-1.5">
                                             My Library →
                                         </button>
                                     </>
                                 ) : (
                                     <>
                                         <Link to="/signup">
-                                            <button className="px-5 py-3 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all">
+                                            <button className="btn-apple btn-apple-primary px-6 py-3">
                                                 Get Started Free
                                             </button>
                                         </Link>
                                         <Link to="/login">
-                                            <button className="px-5 py-3 border border-[#2a2a35] text-white font-semibold text-sm rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
+                                            <button className="btn-apple btn-apple-secondary px-6 py-3">
                                                 Login →
                                             </button>
                                         </Link>
@@ -430,13 +433,8 @@ function Home() {
                                 <div className="flex gap-8">
                                     {[
                                         { value: userStats.total, label: 'Games Logged' },
-                                        { value: games.reduce((s, g) => s + (g.hours || 0), 0), label: 'Hours Played' },
-                                        {
-                                            value: games.filter(g => g.rating > 0).length > 0
-                                                ? (games.filter(g => g.rating > 0).reduce((s, g) => s + g.rating, 0) / games.filter(g => g.rating > 0).length).toFixed(1)
-                                                : '—',
-                                            label: 'Avg Rating'
-                                        }
+                                        { value: userStats.totalHours, label: 'Hours Played' },
+                                        { value: userStats.avgRating, label: 'Avg Rating' }
                                     ].map(stat => (
                                         <div key={stat.label}>
                                             <div className="font-black text-3xl text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stat.value}</div>
@@ -567,14 +565,18 @@ function Home() {
                                 <div className="flex flex-col gap-1 min-w-0">
                                     <div className="text-white font-bold text-sm truncate">{user.username}</div>
                                     <div className="font-mono text-[10px] text-[#7a7a90]">@{user.username} · All platforms</div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-sm flex-shrink-0">{user.badge || '🎮'}</span>
-                                        <span className="font-mono text-[10px] text-[#c8ff57] uppercase tracking-wider flex-shrink-0">Lv.{user.level || 1}</span>
-                                        <div className="w-20 h-1.5 bg-[#2a2a35] rounded-full flex-shrink-0 overflow-hidden">
-                                            <div className="h-full rounded-full bg-gradient-to-r from-[#c8ff57] to-[#5c9fff]"
-                                                style={{ width: `${Math.min(((user.xp || 0) / [5, 15, 30, 50][[5, 15, 30, 50].findIndex(x => (user.xp || 0) < x)] || 1) * 100, 100)}%` }} />
+                                    <div className="flex items-center gap-2.5 mt-2" onClick={(e) => { e.stopPropagation(); navigate('/stats?tab=xp') }}>
+                                        <div className="flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2.5 py-1 border border-[#2a2a35] w-fit shadow-inner shadow-black/60 shadow-[0_1px_4px_rgba(0,0,0,0.5)] hover:border-[#c8ff57]/50 transition-colors">
+                                            <span className="flex items-center justify-center text-xs leading-none relative -top-[1.8px] flex-shrink-0">{user.badge || '🎮'}</span>
+                                            <span className="font-mono text-[10px] text-[#c8ff57] uppercase font-black tracking-widest flex-shrink-0 leading-none">Lv.{user.level || 1}</span>
                                         </div>
-                                        <span className="font-mono text-[10px] text-[#7a7a90] flex-shrink-0 tabular-nums">{user.xp || 0} XP</span>
+                                        <div className="flex items-center gap-2 group/xp cursor-pointer">
+                                            <div className="w-16 h-1 bg-[#2a2a35] rounded-full flex-shrink-0 overflow-hidden">
+                                                <div className="h-full rounded-full bg-gradient-to-r from-[#c8ff57] to-[#5c9fff] transition-all group-hover/xp:shadow-[0_0_8px_rgba(200,255,87,0.5)]"
+                                                    style={{ width: `${Math.min(((user.xp || 0) / 100) * 100, 100)}%` }} />
+                                            </div>
+                                            <span className="font-mono text-[10px] text-[#7a7a90] group-hover/xp:text-[#c8ff57] flex-shrink-0 tabular-nums font-bold tracking-tight whitespace-nowrap leading-none transition-colors">{user.xp || 0} XP</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -607,12 +609,39 @@ function Home() {
             ══════════════════════════ */}
             <section className="max-w-[1200px] mx-auto px-5 md:px-10 py-12">
                 <div className="flex items-center gap-3 mb-6">
-                    <span className="text-2xl">🔥</span>
+                    <span className="text-2xl"><Flame className="text-[#ff5c5c] fill-current" size={24} /></span>
                     <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Trending Now</h2>
                     <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Most logged this week</span>
                 </div>
-                {loadingTrending ? (
-                    <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">Loading...</div>
+                {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="flex flex-col gap-2">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <div key={i} className="flex items-center gap-4 p-3 rounded-lg border border-[#2a2a35] bg-[#111118]">
+                                    <Skeleton variant="block" width="24px" height="24px" />
+                                    <Skeleton variant="block" width="40px" height="56px" />
+                                    <div className="flex-1">
+                                        <Skeleton variant="line" width="60%" height="14px" />
+                                        <Skeleton variant="line" width="30%" height="9px" style={{ marginTop: 4 }} />
+                                    </div>
+                                    <Skeleton variant="block" width="40px" height="30px" />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                             {Array.from({ length: 5 }).map((_, i) => (
+                                <div key={i} className="flex items-center gap-4 p-3 rounded-lg border border-[#2a2a35] bg-[#111118]">
+                                    <Skeleton variant="block" width="24px" height="24px" />
+                                    <Skeleton variant="block" width="40px" height="56px" />
+                                    <div className="flex-1">
+                                        <Skeleton variant="line" width="60%" height="14px" />
+                                        <Skeleton variant="line" width="30%" height="9px" style={{ marginTop: 4 }} />
+                                    </div>
+                                    <Skeleton variant="block" width="40px" height="30px" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="flex flex-col gap-2">
@@ -632,7 +661,11 @@ function Home() {
                                             {index < 2 && <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#ff5c5c]/15 text-[#ff5c5c]">HOT</span>}
                                         </div>
                                     </div>
-                                    <RatingDisplay game={game} />
+                                    <RatingDisplay 
+                                        myRating={getMyRating(game.id)} 
+                                        platformAvg={gameStats[game.id]?.avgRating}
+                                        hasUser={!!user} 
+                                    />
                                 </div>
                             ))}
                         </div>
@@ -654,7 +687,11 @@ function Home() {
                                                 <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#2a2a35] text-[#7a7a90]">{game.genre}</span>
                                             </div>
                                         </div>
-                                        <RatingDisplay game={game} />
+                                        <RatingDisplay 
+                                        myRating={getMyRating(game.id)} 
+                                        platformAvg={gameStats[game.id]?.avgRating}
+                                        hasUser={!!user} 
+                                    />
                                     </div>
                                 ))}
                             </div>
@@ -671,8 +708,10 @@ function Home() {
                     <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Coming Soon</h2>
                     <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Upcoming &amp; announced</span>
                 </div>
-                {loadingComing ? (
-                    <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">Loading...</div>
+                {loading ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                        {Array.from({ length: 6 }).map((_, i) => <GameCardSkeleton key={i} />)}
+                    </div>
                 ) : comingSoon.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                         {comingSoon.map(game => (
@@ -708,8 +747,18 @@ function Home() {
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Recent Activity</h2>
                     </div>
-                    {loadingActivity ? (
-                        <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">Loading...</div>
+                    {loading ? (
+                        <div className="flex flex-col gap-3">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <div key={i} className="flex items-center gap-4 px-5 py-4 bg-[#111118] border border-[#2a2a35] rounded-lg">
+                                    <Skeleton variant="block" width="36px" height="36px" />
+                                    <div className="flex-1">
+                                        <Skeleton variant="line" width="60%" height="12px" />
+                                    </div>
+                                    <Skeleton variant="line" width="40px" height="10px" />
+                                </div>
+                            ))}
+                        </div>
                     ) : activity.length > 0 ? (
                         <>
                             <div className="flex flex-col divide-y divide-[#2a2a35] border border-[#2a2a35] rounded-lg overflow-hidden">
@@ -733,11 +782,11 @@ function Home() {
                             </div>
                         </>
                     ) : (
-                        <div className="text-center py-10">
-                            <div className="text-4xl mb-3">🎮</div>
-                            <div className="text-[#7a7a90] font-mono text-sm">No activity yet. Start logging games!</div>
+                        <div className="text-center py-10 flex flex-col items-center">
+                            <Gamepad2 size={48} className="text-[#2a2a35] mb-4" />
+                            <div className="text-[#7a7a90] font-mono text-sm mb-4">No activity yet. Start logging games!</div>
                             <Link to="/library">
-                                <button className="mt-4 px-5 py-2 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all">
+                                <button className="btn-apple btn-apple-primary px-6 py-2.5">
                                     + Log a Game
                                 </button>
                             </Link>

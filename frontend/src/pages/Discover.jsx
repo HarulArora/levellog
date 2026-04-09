@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
+import { Search } from 'lucide-react'
+import { GameCardSkeleton } from '../components/ui/Skeleton'
 
 const GENRE_CARDS = [
     { label: 'Action RPG', igdb: 'Role-playing (RPG)', emoji: '⚔️' },
@@ -105,20 +107,7 @@ function StatusPill({ status }) {
     )
 }
 
-function GameCardSkeleton() {
-    return (
-        <div className="animate-pulse" style={{ background: '#111118', border: '1px solid #2a2a35', borderRadius: 8, overflow: 'hidden' }}>
-            <div style={{ height: 110, background: '#18181f' }} />
-            <div style={{ padding: '8px 10px 10px' }}>
-                <div style={{ height: 12, background: '#18181f', borderRadius: 3, width: '70%', marginBottom: 8 }} />
-                <div style={{ display: 'flex', gap: 3, marginBottom: 10 }}>
-                    {[28, 24, 32].map((w, i) => <div key={i} style={{ height: 14, width: w, background: '#18181f', borderRadius: 2 }} />)}
-                </div>
-                <div style={{ height: 18, background: '#18181f', borderRadius: 3, width: '30%' }} />
-            </div>
-        </div>
-    )
-}
+
 
 function GameCard({ game, entry, onClick }) {
     const status = entry?.status
@@ -286,6 +275,12 @@ export default function Discover() {
     const [libraryMap, setLibraryMap] = useState({})
     const [showMore, setShowMore] = useState(false)
 
+    // Search Mode State
+    const [searchQuery, setSearchQuery] = useState('')
+    const [searchResults, setSearchResults] = useState([])
+    const [isSearching, setIsSearching] = useState(false)
+    const abortControllerRef = useRef(null)
+
     const LIMIT = 24
 
     useEffect(() => {
@@ -344,6 +339,69 @@ export default function Discover() {
         window.scrollTo({ top: 0, behavior: 'smooth' })
         fetchGames()
     }, [fetchGames])
+
+    useEffect(() => {
+        const q = searchQuery.trim()
+        if (q.length < 2) {
+            setSearchResults([])
+            setIsSearching(false)
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+                abortControllerRef.current = null
+            }
+            return
+        }
+
+        setIsSearching(true)
+
+        const timer = setTimeout(async () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort()
+            }
+            abortControllerRef.current = new AbortController()
+            try {
+                const res = await api.get(`/igdb/search?q=${encodeURIComponent(q)}`, {
+                    signal: abortControllerRef.current.signal
+                })
+                const fetchedSearchedGames = res.data.games || []
+                
+                const ids = fetchedSearchedGames.map(g => g.id).filter(Boolean)
+                if (ids.length > 0) {
+                    try {
+                        const statsRes = await api.post('/games/stats/batch', { igdbIds: ids }, {
+                            signal: abortControllerRef.current.signal
+                        })
+                        const stats = statsRes.data.stats || {}
+                        const enriched = fetchedSearchedGames.map(g => {
+                            const igdbId = g.igdbId || g.id
+                            return {
+                                ...g,
+                                id: igdbId,
+                                igdbId: igdbId,
+                                avgRating: stats[igdbId]?.avgRating || null
+                            }
+                        })
+                        setSearchResults(enriched)
+                    } catch (err) {
+                        if (err.name !== 'CanceledError' && err.message !== 'canceled') {
+                            setSearchResults(fetchedSearchedGames)
+                        }
+                    }
+                } else {
+                    setSearchResults(fetchedSearchedGames)
+                }
+            } catch (err) {
+                if (err.name !== 'CanceledError' && err.message !== 'canceled') {
+                    console.error('Search error:', err)
+                    setSearchResults([])
+                }
+            } finally {
+                setIsSearching(false)
+            }
+        }, 400)
+
+        return () => clearTimeout(timer)
+    }, [searchQuery])
 
     const selectGenre = (card) => {
         setActiveGenre(prev => prev?.label === card.label ? null : card)
@@ -427,11 +485,53 @@ export default function Discover() {
             <div className="discover-page-padding">
 
                 {/* ── Browse by Genre ── */}
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 28, paddingBottom: 16, borderBottom: '1px solid #2a2a35' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 28, paddingBottom: 16, borderBottom: '1px solid #2a2a35', flexWrap: 'wrap' }}>
                     <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 3 }}>BROWSE BY GENRE</span>
+                    
+                    {/* Native Search Input */}
+                    <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
+                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a7a90', display: 'flex', alignItems: 'center' }}>
+                            <Search size={16} strokeWidth={2.5} />
+                        </span>
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search games..."
+                            style={{
+                                width: '100%',
+                                background: '#111118',
+                                border: '1px solid #2a2a35',
+                                borderRadius: 8,
+                                padding: '10px 14px 10px 42px',
+                                color: '#fff',
+                                fontFamily: "'DM Mono', monospace",
+                                fontSize: 13,
+                                transition: 'all 0.2s',
+                                outline: 'none',
+                            }}
+                            onFocus={e => e.currentTarget.style.borderColor = '#c8ff57'}
+                            onBlur={e => e.currentTarget.style.borderColor = '#2a2a35'}
+                        />
+                        {isSearching && (
+                            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a7a90', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>
+                                loading...
+                            </span>
+                        )}
+                        {searchQuery.length > 0 && !isSearching && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a7a90', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12 }}
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
                 </div>
 
-                {/* Genre cards */}
+                {searchQuery.trim().length < 2 && (
+                    <>
+                        {/* Genre cards */}
                 <div className="genre-grid-responsive">
                     {GENRE_CARDS.map(card => {
                         const isActive = activeGenre?.label === card.label
@@ -539,29 +639,42 @@ export default function Discover() {
                     </div>
                 )}
 
-                {/* All Games header */}
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #2a2a35' }}>
-                    <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 3 }}>
-                        {activeGenre ? activeGenre.label.toUpperCase() : 'ALL GAMES'}
-                    </span>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#7a7a90' }}>
-                        {total > 0 ? `${total.toLocaleString()} games` : ''}
-                    </span>
-                    {activeGenre && (
-                        <button
-                            onClick={() => { setActiveGenre(null); setPage(1) }}
-                            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#7a7a90', cursor: 'pointer', fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}
-                        >
-                            ✕ Clear filter
-                        </button>
-                    )}
-                </div>
+                        {/* All Games header */}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #2a2a35' }}>
+                            <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 3 }}>
+                                {activeGenre ? activeGenre.label.toUpperCase() : 'ALL GAMES'}
+                            </span>
+                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#7a7a90' }}>
+                                {total > 0 ? `${total.toLocaleString()} games` : ''}
+                            </span>
+                            {activeGenre && (
+                                <button
+                                    onClick={() => { setActiveGenre(null); setPage(1) }}
+                                    style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#7a7a90', cursor: 'pointer', fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}
+                                >
+                                    ✕ Clear filter
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {searchQuery.trim().length >= 2 && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #2a2a35' }}>
+                        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 3 }}>
+                            SEARCH RESULTS
+                        </span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#7a7a90' }}>
+                            "{searchQuery}"
+                        </span>
+                    </div>
+                )}
 
                 {/* Games Grid — 6 cols */}
                 <div className="discover-grid">
-                    {loading
+                    {(searchQuery.trim().length >= 2 ? isSearching : loading)
                         ? Array.from({ length: LIMIT }).map((_, i) => <GameCardSkeleton key={i} />)
-                        : games.map(game => (
+                        : (searchQuery.trim().length >= 2 ? searchResults : games).map(game => (
                             <GameCard
                                 key={game.id}
                                 game={game}
@@ -572,8 +685,16 @@ export default function Discover() {
                     }
                 </div>
 
+                {/* No Results Empty State */}
+                {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#7a7a90', fontFamily: "'DM Mono', monospace", fontSize: 14 }}>
+                        <div style={{ fontSize: 40, marginBottom: 12 }}>😕</div>
+                        No games found for "{searchQuery}"
+                    </div>
+                )}
+
                 {/* Pagination */}
-                {!loading && totalPages > 1 && (
+                {!loading && totalPages > 1 && searchQuery.trim().length < 2 && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'wrap', paddingBottom: 16 }}>
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}

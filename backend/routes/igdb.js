@@ -1,14 +1,25 @@
 import express from 'express'
+import { LRUCache } from 'lru-cache'
 import { searchGames, getAccessToken } from '../utils/igdb.js'
 import Game from '../models/Game.js'
+import GameLike from '../models/GameLike.js'
 
 const router = express.Router()
+
+const igdbCache = new LRUCache({
+    max: 500,
+    ttl: 1000 * 60 * 60 * 12, // 12 hours
+})
 
 // ── GET /api/igdb/search?q=query ──
 router.get('/search', async (req, res) => {
     try {
         const query = req.query.q
         if (!query) return res.status(400).json({ success: false, message: 'Query is required' })
+        
+        const cacheKey = `search-${query}`
+        if (igdbCache.has(cacheKey)) return res.json({ success: true, ...igdbCache.get(cacheKey) })
+        
         const raw = await searchGames(query)
 
         const normCover = (c) => {
@@ -35,7 +46,7 @@ router.get('/search', async (req, res) => {
             const rating = g.rating != null ? g.rating : (g.igdbRating != null ? g.igdbRating : null)
 
             return {
-                id: g.id,
+                id: g.igdbId || g.id,
                 igdbId: g.igdbId || g.id,
                 title,
                 cover,
@@ -48,6 +59,7 @@ router.get('/search', async (req, res) => {
             }
         })
 
+        igdbCache.set(cacheKey, { games })
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({ success: false, message: 'IGDB search failed', error: error.message })
@@ -60,6 +72,10 @@ router.get('/discover', async (req, res) => {
         const { genre, page = 1, limit = 24 } = req.query
         const pageNum = Math.max(1, parseInt(page) || 1)
         const limitNum = Math.min(50, parseInt(limit) || 24)
+        
+        const cacheKey = `discover-${genre}-${pageNum}-${limitNum}`
+        if (igdbCache.has(cacheKey)) return res.json({ success: true, ...igdbCache.get(cacheKey) })
+        
         const offset = (pageNum - 1) * limitNum
 
         const genreFilter = genre && genre.toLowerCase() !== 'all'
@@ -143,14 +159,15 @@ router.get('/discover', async (req, res) => {
 
         const total = countData.count || 0
 
-        res.json({
-            success: true,
+        const result = {
             games,
             total,
             page: pageNum,
             limit: limitNum,
             totalPages: Math.ceil(total / limitNum),
-        })
+        }
+        igdbCache.set(cacheKey, result)
+        res.json({ success: true, ...result })
     } catch (error) {
         console.error('Discover error:', error)
         res.status(500).json({ success: false, message: 'Failed to fetch games', error: error.message })
@@ -278,6 +295,7 @@ router.get('/game/:id', async (req, res) => {
 // ── GET /api/igdb/trending ──
 router.get('/trending', async (req, res) => {
     try {
+        if (igdbCache.has('trending')) return res.json({ success: true, games: igdbCache.get('trending') })
         const token = await getAccessToken()
         const response = await fetch('https://api.igdb.com/v4/games', {
             method: 'POST',
@@ -304,6 +322,7 @@ router.get('/trending', async (req, res) => {
             rating: game.rating ? (game.rating / 10).toFixed(1) : null,
             ratingCount: game.rating_count
         }))
+        igdbCache.set('trending', games)
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch trending', error: error.message })
@@ -313,6 +332,7 @@ router.get('/trending', async (req, res) => {
 // ── GET /api/igdb/top-rated ──
 router.get('/top-rated', async (req, res) => {
     try {
+        if (igdbCache.has('top-rated')) return res.json({ success: true, games: igdbCache.get('top-rated') })
         const token = await getAccessToken()
         const response = await fetch('https://api.igdb.com/v4/games', {
             method: 'POST',
@@ -338,6 +358,7 @@ router.get('/top-rated', async (req, res) => {
             genre: game.genres?.[0]?.name || 'Unknown',
             rating: game.rating ? (game.rating / 10).toFixed(1) : null,
         }))
+        igdbCache.set('top-rated', games)
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch top rated', error: error.message })
@@ -347,6 +368,7 @@ router.get('/top-rated', async (req, res) => {
 // ── GET /api/igdb/coming-soon ──
 router.get('/coming-soon', async (req, res) => {
     try {
+        if (igdbCache.has('coming-soon')) return res.json({ success: true, games: igdbCache.get('coming-soon') })
         const token = await getAccessToken()
         const now = Math.floor(Date.now() / 1000)
         const sixMonths = now + (60 * 60 * 24 * 180)
@@ -381,9 +403,119 @@ router.get('/coming-soon', async (req, res) => {
                 : 'TBA',
             hypes: game.hypes
         }))
+        igdbCache.set('coming-soon', games)
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch coming soon', error: error.message })
+    }
+})
+
+// ── GET /api/igdb/home ─────────────────────────────────────────────────────────
+// Single bundled endpoint for the Home page.
+// Fires trending + top-rated + coming-soon in parallel, then fetches DB stats
+// for all returned game IDs in one batch. Result cached for 12 h.
+router.get('/home', async (req, res) => {
+    try {
+        const cacheKey = 'home-bundle'
+        if (igdbCache.has(cacheKey)) return res.json({ success: true, ...igdbCache.get(cacheKey) })
+
+        const token = await getAccessToken()
+        const now = Math.floor(Date.now() / 1000)
+        const sixMonths = now + 60 * 60 * 24 * 180
+        const headers = {
+            'Client-ID': process.env.IGDB_CLIENT_ID,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'text/plain'
+        }
+
+        // All 3 IGDB network calls fire in parallel
+        const [trendRes, topRes, comingRes] = await Promise.all([
+            fetch('https://api.igdb.com/v4/games', {
+                method: 'POST', headers,
+                body: 'fields name, cover.url, genres.name, rating, rating_count; where rating > 85 & rating_count > 500 & cover != null & genres != null; sort rating_count desc; limit 15;'
+            }),
+            fetch('https://api.igdb.com/v4/games', {
+                method: 'POST', headers,
+                body: 'fields name, cover.url, genres.name, rating, rating_count; where rating > 90 & rating_count > 200 & cover != null & genres != null; sort rating desc; limit 15;'
+            }),
+            fetch('https://api.igdb.com/v4/games', {
+                method: 'POST', headers,
+                body: `fields name, cover.url, genres.name, first_release_date, hypes; where first_release_date > ${now} & first_release_date < ${sixMonths} & cover != null & hypes > 5; sort hypes desc; limit 6;`
+            })
+        ])
+
+        const [trendData, topData, comingData] = await Promise.all([
+            trendRes.json(), topRes.json(), comingRes.json()
+        ])
+
+        const normCover = (url) => url
+            ? url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
+            : null
+
+        const trending = (Array.isArray(trendData) ? trendData : []).map(g => ({
+            id: g.id, title: g.name,
+            cover: normCover(g.cover?.url),
+            genre: g.genres?.[0]?.name || 'Unknown',
+            rating: g.rating ? (g.rating / 10).toFixed(1) : null,
+            ratingCount: g.rating_count
+        }))
+
+        const topRated = (Array.isArray(topData) ? topData : []).map(g => ({
+            id: g.id, title: g.name,
+            cover: normCover(g.cover?.url),
+            genre: g.genres?.[0]?.name || 'Unknown',
+            rating: g.rating ? (g.rating / 10).toFixed(1) : null
+        }))
+
+        const comingSoon = (Array.isArray(comingData) ? comingData : []).map(g => ({
+            id: g.id, title: g.name,
+            cover: normCover(g.cover?.url),
+            genre: g.genres?.[0]?.name || 'Unknown',
+            releaseDate: g.first_release_date
+                ? new Date(g.first_release_date * 1000).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric'
+                })
+                : 'TBA',
+            hypes: g.hypes
+        }))
+
+        // Batch-fetch platform stats from MongoDB for the game cards (parallel with nothing — IGDB already done)
+        const allIds = [...trending, ...topRated].map(g => g.id).filter(Boolean)
+        let gameStats = {}
+        if (allIds.length > 0) {
+            const [reviewData, likeCounts, logCounts] = await Promise.all([
+                Game.aggregate([
+                    { $match: { igdbId: { $in: allIds }, rating: { $gt: 0 } } },
+                    { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
+                ]),
+                GameLike.aggregate([
+                    { $match: { igdbId: { $in: allIds } } },
+                    { $group: { _id: '$igdbId', count: { $sum: 1 } } }
+                ]),
+                Game.aggregate([
+                    { $match: { igdbId: { $in: allIds } } },
+                    { $group: { _id: '$igdbId', count: { $sum: 1 } } }
+                ])
+            ])
+            allIds.forEach(id => {
+                const review = reviewData.find(r => r._id === id)
+                const like = likeCounts.find(l => l._id === id)
+                const log = logCounts.find(l => l._id === id)
+                gameStats[id] = {
+                    avgRating: review ? parseFloat(review.avg.toFixed(1)) : null,
+                    ratingCount: review?.count || 0,
+                    likeCount: like?.count || 0,
+                    loggedCount: log?.count || 0
+                }
+            })
+        }
+
+        const bundle = { trending, topRated, comingSoon, gameStats }
+        igdbCache.set(cacheKey, bundle)
+        res.json({ success: true, ...bundle })
+    } catch (error) {
+        console.error('Home bundle error:', error)
+        res.status(500).json({ success: false, message: 'Failed to fetch home data', error: error.message })
     }
 })
 

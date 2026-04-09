@@ -8,6 +8,10 @@ import igdbRouter from './routes/igdb.js'
 import notificationsRouter from './routes/notifications.js'
 import listsRouter from './routes/lists.js'
 import commentsRouter from './routes/comments.js'
+import dealsRouter from './routes/deals.js'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
+import mongoSanitize from 'express-mongo-sanitize'
 
 // import paymentRouter from './routes/payment.js'
 dotenv.config()
@@ -23,6 +27,26 @@ app.use(cors({
 }))
 
 app.use(express.json())
+app.use(helmet({ 
+    crossOriginResourcePolicy: false,
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: false
+}))
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 15,
+    message: { success: false, message: 'Too many attempts, please try again later' }
+})
+
+const appLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 1000, // high limit for standard API calls
+})
+app.use('/api/', appLimiter)
+
+app.use('/api/auth/login', authLimiter)
+app.use('/api/auth/signup', authLimiter)
 
 app.use('/api/auth', authRouter)
 app.use('/api/games', gamesRouter)
@@ -30,6 +54,7 @@ app.use('/api/igdb', igdbRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/lists', listsRouter)
 app.use('/api/comments', commentsRouter)
+app.use('/api/deals', dealsRouter)
 // app.use('/api/payment', paymentRouter)
 app.get('/health', (req, res) => res.send('OK'))
 

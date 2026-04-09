@@ -12,7 +12,7 @@ import { awardXP, deductXP } from '../utils/xp.js'
 const router = express.Router()
 
 const createToken = (userId) =>
-    jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '30d' })
+    jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' })
 
 const userPayload = (user) => ({
     id: user._id,
@@ -65,7 +65,7 @@ router.post('/signup', async (req, res) => {
         const token = createToken(user._id)
         res.status(201).json({ success: true, message: 'Account created successfully!', token, user: userPayload(user) })
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Signup failed', error: error.message })
+        res.status(500).json({ success: false, message: 'Signup failed. Please try again.' })
     }
 })
 
@@ -90,7 +90,7 @@ router.post('/login', async (req, res) => {
         const token = createToken(user._id)
         res.json({ success: true, message: 'Logged in successfully', token, user: userPayload(user) })
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Login failed', error: error.message })
+        res.status(500).json({ success: false, message: 'Login failed. Please try again.' })
     }
 })
 
@@ -157,25 +157,32 @@ router.get('/profile/:username', async (req, res) => {
             Follow.countDocuments({ followerId: user._id }),
         ])
 
-        // check if the logged-in user follows this profile
+        // check if the logged-in user follows this profile or has a pending request
         let isFollowedByMe = false
+        let isRequestedByMe = false
+        let followsMe = false
         const authHeader = req.headers.authorization
         if (authHeader?.startsWith('Bearer ')) {
             try {
                 const token = authHeader.split(' ')[1]
                 const decoded = jwt.verify(token, process.env.JWT_SECRET)
-                const followDoc = await Follow.findOne({
-                    followerId: decoded.userId,
-                    followingId: user._id,
-                })
+                const [followDoc, requestDoc, followsMeDoc] = await Promise.all([
+                    Follow.findOne({ followerId: decoded.userId, followingId: user._id }),
+                    FollowRequest.findOne({ sender: decoded.userId, recipient: user._id, status: 'pending' }),
+                    Follow.findOne({ followerId: user._id, followingId: decoded.userId })
+                ])
                 isFollowedByMe = !!followDoc
-            } catch { /* not logged in or bad token — fine, stays false */ }
+                isRequestedByMe = !!requestDoc
+                followsMe = !!followsMeDoc
+            } catch { /* not logged in or bad token */ }
         }
 
         const userObj = user.toObject()
         userObj.followerCount = followerCount
         userObj.followingCount = followingCount
         userObj.isFollowedByMe = isFollowedByMe
+        userObj.isRequestedByMe = isRequestedByMe
+        userObj.followsMe = followsMe
 
         res.json({ success: true, user: userObj })
     } catch (error) {
@@ -240,6 +247,24 @@ router.post('/unfollow/:userId', protect, async (req, res) => {
     }
 })
 
+// ── DELETE /api/auth/follow-request/cancel/:userId ───────────────────
+router.delete('/follow-request/cancel/:userId', protect, async (req, res) => {
+    try {
+        const targetId = req.params.userId
+        const deletedRequest = await FollowRequest.findOneAndDelete({
+            sender: req.user._id,
+            recipient: targetId,
+            status: 'pending'
+        })
+        if (!deletedRequest) return res.status(404).json({ success: false, message: 'No pending follow request found' })
+
+        await Notification.findOneAndDelete({ recipient: targetId, sender: req.user._id, type: 'follow_request' })
+        res.json({ success: true, message: 'Follow request cancelled' })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to cancel request', error: error.message })
+    }
+})
+
 // ── PATCH /api/auth/privacy ───────────────────────────────────────────────────
 router.patch('/privacy', protect, async (req, res) => {
     try {
@@ -276,9 +301,33 @@ router.get('/search', async (req, res) => {
     try {
         const query = req.query.q
         if (!query || query.trim().length < 2) return res.json({ success: true, users: [] })
-        const users = await User.find({ username: { $regex: query.trim(), $options: 'i' } })
+        const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const users = await User.find({ username: { $regex: escapedQuery, $options: 'i' } })
             .select('-password -email').limit(10)
-        res.json({ success: true, users })
+
+        // check followsMe for each user if logged in
+        let loggedInId = null
+        const authHeader = req.headers.authorization
+        if (authHeader?.startsWith('Bearer ')) {
+            try {
+                const token = authHeader.split(' ')[1]
+                const decoded = jwt.verify(token, process.env.JWT_SECRET)
+                loggedInId = decoded.userId
+            } catch { }
+        }
+
+        const enriched = await Promise.all(users.map(async u => {
+            const uObj = u.toObject()
+            if (loggedInId) {
+                const f = await Follow.findOne({ followerId: u._id, followingId: loggedInId })
+                uObj.followsMe = !!f
+            } else {
+                uObj.followsMe = false
+            }
+            return uObj
+        }))
+
+        res.json({ success: true, users: enriched })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Search failed', error: error.message })
     }
@@ -347,14 +396,52 @@ router.put('/profile', protect, async (req, res) => {
 router.get('/suggestions', protect, async (req, res) => {
     try {
         const following = await Follow.find({ followerId: req.user._id }).select('followingId')
-        const followingIds = following.map(f => f.followingId)
-        const excludeIds = [req.user._id, ...followingIds]
+        const myFollowingIds = following.map(f => f.followingId)
+        const excludeIds = [req.user._id, ...myFollowingIds]
 
-        const users = await User.find({ _id: { $nin: excludeIds } })
+        // Find users strictly followed by my following (mutual context)
+        const mutualFollows = await Follow.find({
+            followerId: { $in: myFollowingIds },
+            followingId: { $nin: excludeIds }
+        })
+
+        const mutualCounts = {}
+        mutualFollows.forEach(f => {
+            const id = f.followingId.toString()
+            mutualCounts[id] = (mutualCounts[id] || 0) + 1
+        })
+
+        let suggestedIds = Object.keys(mutualCounts).sort((a, b) => mutualCounts[b] - mutualCounts[a])
+
+        // Fallback to non-followed users if needed
+        if (suggestedIds.length < 20) {
+            const randomUsers = await User.find({ _id: { $nin: [...excludeIds, ...suggestedIds] } })
+                .limit(20 - suggestedIds.length)
+                .select('_id')
+            randomUsers.forEach(u => suggestedIds.push(u._id.toString()))
+        }
+
+        suggestedIds = suggestedIds.slice(0, 20)
+
+        const users = await User.find({ _id: { $in: suggestedIds } })
             .select('username avatar bio level badge isPrivate followerCount followingCount')
-            .limit(50)
 
-        res.json({ success: true, users })
+        const enriched = await Promise.all(users.map(async u => {
+            const uObj = u.toObject()
+            const idStr = u._id.toString()
+            uObj.mutualCount = mutualCounts[idStr] || 0
+            const f = await Follow.findOne({ followerId: u._id, followingId: req.user._id })
+            uObj.followsMe = !!f
+            return uObj
+        }))
+
+        // Sort by mutual first, then global follower count
+        enriched.sort((a, b) => {
+            if (b.mutualCount !== a.mutualCount) return b.mutualCount - a.mutualCount
+            return (b.followerCount || 0) - (a.followerCount || 0)
+        })
+
+        res.json({ success: true, users: enriched })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch suggestions', error: error.message })
     }

@@ -4,6 +4,7 @@ import CommentLike from '../models/CommentLike.js'
 import Notification from '../models/Notification.js'
 import { protect } from '../middleware/auth.js'
 import { awardXP, deductXP } from '../utils/xp.js'
+import { censorText } from '../utils/moderation.js'
 
 const router = express.Router()
 
@@ -38,7 +39,7 @@ router.post('/:igdbId', protect, async (req, res) => {
         const comment = await Comment.create({
             igdbId: Number(req.params.igdbId),
             userId: req.user._id,
-            text: text.trim(),
+            text: censorText(text.trim()),
             parentId: parentId || null
         })
 
@@ -83,7 +84,7 @@ router.put('/:id', protect, async (req, res) => {
         if (!text?.trim()) return res.status(400).json({ success: false, message: 'Comment text is required' })
         const comment = await Comment.findOne({ _id: req.params.id, userId: req.user._id })
         if (!comment) return res.status(404).json({ success: false, message: 'Comment not found or not authorized' })
-        comment.text = text.trim()
+        comment.text = censorText(text.trim())
         comment.edited = true
         await comment.save()
         const populated = await Comment.findById(comment._id).populate('userId', 'username avatar badge level')
