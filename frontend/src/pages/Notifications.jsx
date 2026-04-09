@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
+import useCachedFetch from '../hooks/useCachedFetch'
+import { invalidateCache } from '../utils/cache'
 import { Bell, UserPlus, Check, MessageSquare, Trash2, X, Plus, Users } from 'lucide-react'
 
 function Notifications() {
@@ -9,39 +11,45 @@ function Notifications() {
     const { user } = useAuth()
     const navigate = useNavigate()
 
-    const [notifications, setNotifications] = useState([])
-    const [requests, setRequests] = useState([])
+    const userId = user?.id || user?._id
+
+    // Cached fetches — fast on return visits within 30s
+    const { data: notifData, loading: loadingNotif, refetch: refetchNotifs } = useCachedFetch(
+        userId ? `notif_${userId}` : null,
+        userId ? '/notifications' : null,
+        { enabled: !!userId, ttl: 30 * 1000 }
+    )
+    const { data: reqData, loading: loadingReq, refetch: refetchReqs } = useCachedFetch(
+        userId ? `notif_req_${userId}` : null,
+        userId ? '/notifications/requests' : null,
+        { enabled: !!userId, ttl: 30 * 1000 }
+    )
+    const loading = loadingNotif || loadingReq
+
+    // Local shadows allow optimistic UI mutations without breaking cache
+    const [localNotifs, setLocalNotifs] = useState(null)
+    const [localRequests, setLocalRequests] = useState(null)
+    const notifications = localNotifs ?? (notifData?.notifications || [])
+    const requests      = localRequests ?? (reqData?.requests || [])
+
     const [activeTab, setActiveTab] = useState('notifications')
-    const [loading, setLoading] = useState(true)
     const [selected, setSelected] = useState(new Set())
     const [selectMode, setSelectMode] = useState(false)
 
+    // Full refetch — invalidates cache, fetches fresh, clears shadows
     const fetchAll = useCallback(async () => {
-        try {
-            setLoading(true)
-            const [notifRes, reqRes] = await Promise.all([
-                api.get('/notifications'),
-                api.get('/notifications/requests')
-            ])
-            setNotifications(notifRes.data.notifications || [])
-            setRequests(reqRes.data.requests || [])
-        } catch (err) {
-            console.error('Notifications error:', err)
-        } finally {
-            setLoading(false)
-        }
-    }, [])
-
-    useEffect(() => {
-        if (!user) return
-        fetchAll()
-    }, [user, fetchAll])
+        invalidateCache(userId ? `notif_${userId}` : '')
+        invalidateCache(userId ? `notif_req_${userId}` : '')
+        setLocalNotifs(null)
+        setLocalRequests(null)
+        await Promise.all([refetchNotifs(), refetchReqs()])
+    }, [userId, refetchNotifs, refetchReqs])
 
     // ── Mark all as read ──
     const handleMarkAllRead = async () => {
         try {
             await api.patch('/notifications/mark-read')
-            setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+            setLocalNotifs(prev => (prev ?? notifications).map(n => ({ ...n, read: true })))
         } catch (err) {
             console.error('Mark read error:', err)
         }
@@ -51,9 +59,7 @@ function Notifications() {
     const handleMarkOneRead = async (id) => {
         try {
             await api.patch(`/notifications/mark-read/${id}`)
-            setNotifications(prev =>
-                prev.map(n => n._id === id ? { ...n, read: true } : n)
-            )
+            setLocalNotifs(prev => (prev ?? notifications).map(n => n._id === id ? { ...n, read: true } : n))
         } catch (err) {
             console.error('Mark one read error:', err)
         }
@@ -66,7 +72,7 @@ function Notifications() {
             await api.delete('/notifications/delete-selected', {
                 data: { ids: Array.from(selected) }
             })
-            setNotifications(prev => prev.filter(n => !selected.has(n._id)))
+            setLocalNotifs(prev => (prev ?? notifications).filter(n => !selected.has(n._id)))
             setSelected(new Set())
             setSelectMode(false)
         } catch (err) {
@@ -78,7 +84,7 @@ function Notifications() {
     const handleDeleteAll = async () => {
         try {
             await api.delete('/notifications/delete-all')
-            setNotifications([])
+            setLocalNotifs([])
             setSelected(new Set())
             setSelectMode(false)
         } catch (err) {
@@ -108,7 +114,7 @@ function Notifications() {
     const handleAccept = async (id) => {
         try {
             await api.post(`/notifications/requests/${id}/accept`)
-            setRequests(prev => prev.filter(r => r._id !== id))
+            setLocalRequests(prev => (prev ?? requests).filter(r => r._id !== id))
         } catch (err) {
             console.error('Accept error:', err)
         }
@@ -117,7 +123,7 @@ function Notifications() {
     const handleDecline = async (id) => {
         try {
             await api.post(`/notifications/requests/${id}/decline`)
-            setRequests(prev => prev.filter(r => r._id !== id))
+            setLocalRequests(prev => (prev ?? requests).filter(r => r._id !== id))
         } catch (err) {
             console.error('Decline error:', err)
         }

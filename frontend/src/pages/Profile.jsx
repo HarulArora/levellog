@@ -2,6 +2,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
+import useCachedFetch from '../hooks/useCachedFetch'
+import { invalidateCache } from '../utils/cache'
+import { useFollow } from '../context/FollowContext'
 import FollowListModal from '../components/profile/FollowListModal'
 import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List } from 'lucide-react'
 
@@ -10,18 +13,45 @@ function Profile() {
     const navigate = useNavigate()
     const { user: currentUser } = useAuth()
 
-    const [user, setUser] = useState(null)
-    const [games, setGames] = useState([])
-    const [lists, setLists] = useState([])
-    const [selectedList, setSelectedList] = useState(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState(null)
-    const [followLoading, setFollowLoading] = useState(false)
     const [privacyLoading, setPrivacyLoading] = useState(false)
-    const [requestSent, setRequestSent] = useState(false)
     const [followModal, setFollowModal] = useState(null)
     const [xpToast, setXpToast] = useState(null)
     const [activeTab, setActiveTab] = useState('games')
+    const [selectedList, setSelectedList] = useState(null)
+
+    // ── CACHED FETCHES ──
+    const { data: profileData, loading: profileLoading, error: profileError, refetch: refetchProfile } = useCachedFetch(
+        `profile_${username}`,
+        `/auth/profile/${username}`,
+        { ttl: 5 * 6 * 1000, deps: [username] }
+    )
+
+    const user = profileData?.user
+    const isOwnProfile = currentUser?.username === username
+    const { getFollowStatus, handleFollowToggle, loadingMap } = useFollow()
+    
+    const followStatus = getFollowStatus(user)
+    const isFollowing = followStatus === 'following'
+    const requestSent = followStatus === 'requested'
+    const canSeeGames = !user?.isPrivate || isOwnProfile || isFollowing
+
+    const { data: gamesData } = useCachedFetch(
+        user?._id && canSeeGames ? `profile_games_${user._id}` : null,
+        user?._id && canSeeGames ? `/games/user/${user._id}` : null,
+        { enabled: !!user?._id && canSeeGames, deps: [user?._id] }
+    )
+
+    const { data: listsData } = useCachedFetch(
+        user?._id && canSeeGames ? `profile_lists_${user._id}` : null,
+        user?._id && canSeeGames ? `/lists/user/${user._id}` : null,
+        { enabled: !!user?._id && canSeeGames, deps: [user?._id] }
+    )
+
+    const loading = profileLoading
+    const error = profileError
+    const games = gamesData?.games || []
+    const lists = listsData?.lists || []
+    const followLoading = user ? loadingMap[user._id] : false
 
     const showXpToast = (msg, type = 'gain') => {
         setXpToast({ msg, type })
@@ -36,28 +66,7 @@ function Profile() {
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
     }
 
-    const isOwnProfile = currentUser?.username === username
 
-    // ── Uses isFollowedByMe from backend instead of searching arrays ──
-    const isFollowing = useMemo(() => {
-        if (!currentUser || !user) return false
-        return user.isFollowedByMe || false
-    }, [currentUser, user])
-
-    const canSeeGames = useMemo(() => {
-        if (!user) return false
-        if (!user.isPrivate) return true
-        if (isOwnProfile) return true
-        if (isFollowing) return true
-        return false
-    }, [user, isOwnProfile, isFollowing])
-
-    const canSeeLists = useMemo(() => {
-        if (!user) return false
-        if (isOwnProfile) return true
-        if (user.isPrivate) return isFollowing
-        return true
-    }, [user, isOwnProfile, isFollowing])
 
     const visibleLists = useMemo(() => {
         if (!lists.length) return []
@@ -65,101 +74,49 @@ function Profile() {
         return lists.filter(l => l.isPublic)
     }, [lists, isOwnProfile])
 
-    // ── FETCH PROFILE ──
-    const fetchProfile = useCallback(async () => {
-        try {
-            const userRes = await api.get(`/auth/profile/${username}`)
-            const fetchedUser = userRes.data.user
-            setUser(fetchedUser)
-
-            // use state from backend — no more array scanning
-            const following = fetchedUser.isFollowedByMe || false
-            setRequestSent(fetchedUser.isRequestedByMe || false)
-
-            const canSee = !fetchedUser.isPrivate ||
-                currentUser?.username === username ||
-                following
-
-            if (canSee) {
-                const gamesRes = await api.get(`/games/user/${fetchedUser._id}`)
-                setGames(gamesRes.data.games)
-                try {
-                    const listsRes = await api.get(`/lists/user/${fetchedUser._id}`)
-                    setLists(listsRes.data.lists || [])
-                } catch {
-                    setLists([])
-                }
-            } else {
-                setGames([])
-                setLists([])
-            }
-        } catch (err) {
-            setError(err.response?.data?.message || 'User not found')
+    const handleInvalidateAndRefetch = useCallback(() => {
+        invalidateCache(`profile_${username}`)
+        if (user?._id) {
+            invalidateCache(`profile_games_${user._id}`)
+            invalidateCache(`profile_lists_${user._id}`)
         }
-    }, [username, currentUser])
-
-    useEffect(() => {
-        const load = async () => {
-            setLoading(true)
-            setRequestSent(false)
-            setUser(null)
-            setGames([])
-            setLists([])
-            setSelectedList(null)
-            setError(null)
-            await fetchProfile()
-            setLoading(false)
-        }
-        load()
-    }, [fetchProfile])
+        refetchProfile()
+    }, [username, user?._id, refetchProfile])
 
     // ── STATS ──
-    const stats = useMemo(() => ({
-        total: games.length,
-        completed: games.filter(g => g.status === 'completed').length,
-        playing: games.filter(g => g.status === 'playing').length,
-        planned: games.filter(g => g.status === 'planned').length,
-        dropped: games.filter(g => g.status === 'dropped').length,
-        paused: games.filter(g => g.status === 'paused').length,
-        hours: games.reduce((sum, g) => sum + (g.hours || 0), 0),
-        avgRating: games.filter(g => g.rating > 0).length > 0
-            ? (games.filter(g => g.rating > 0).reduce((sum, g) => sum + g.rating, 0) /
-                games.filter(g => g.rating > 0).length).toFixed(1)
-            : null,
-        rated: games.filter(g => g.rating > 0).length,
-    }), [games])
+    const stats = useMemo(() => {
+        // Fallback to manual calculation if gameStats is missing (legacy support)
+        const s = user?.gameStats || {}
+        return {
+            total: s.total ?? games.length,
+            completed: s.completed ?? games.filter(g => g.status === 'completed').length,
+            playing: s.playing ?? games.filter(g => g.status === 'playing').length,
+            planned: s.planned ?? games.filter(g => g.status === 'planned').length,
+            dropped: s.dropped ?? games.filter(g => g.status === 'dropped').length,
+            paused: s.paused ?? games.filter(g => g.status === 'paused').length,
+            hours: s.totalHours ?? games.reduce((sum, g) => sum + (g.hours || 0), 0),
+            avgRating: s.avgRating ?? (games.filter(g => g.rating > 0).length > 0
+                ? (games.filter(g => g.rating > 0).reduce((sum, g) => sum + g.rating, 0) /
+                    games.filter(g => g.rating > 0).length).toFixed(1)
+                : null),
+            rated: s.ratingCount ?? games.filter(g => g.rating > 0).length,
+        }
+    }, [user, games])
 
     const recentGames = games.slice(0, 6)
 
     // ── FOLLOW / UNFOLLOW ──
     const handleFollow = async () => {
-        if (!currentUser) return
-        setFollowLoading(true)
-        try {
-            if (isFollowing) {
-                const res = await api.post(`/auth/unfollow/${user._id}`)
-                setRequestSent(false)
-                showXpToast(res.data.message || 'Unfollowed · -1 XP', 'loss')
-                await fetchProfile()
-            } else if (requestSent) {
-                const res = await api.delete(`/auth/follow-request/cancel/${user._id}`)
-                setRequestSent(false)
-                showXpToast(res.data.message || 'Follow request cancelled', 'loss')
-                await fetchProfile()
-            } else {
-                const res = await api.post(`/auth/follow/${user._id}`)
-                if (res.data.type === 'request_sent') {
-                    setRequestSent(true)
-                    showXpToast('Follow request sent · XP awarded on accept', 'pending')
-                } else {
-                    showXpToast(res.data.message || 'Following · +1 XP', 'gain')
-                    await fetchProfile()
-                }
-            }
-        } catch (err) {
-            console.error('Follow error:', err)
-        } finally {
-            setFollowLoading(false)
+        if (!user) return
+        const result = await handleFollowToggle(user)
+        if (result.success) {
+            if (result.type === 'unfollowed') showXpToast('Unfollowed · -1 XP', 'loss')
+            else if (result.type === 'cancelled') showXpToast('Follow request cancelled', 'loss')
+            else if (result.type === 'requested') showXpToast('Follow request sent · XP awarded on accept', 'pending')
+            else showXpToast('Following · +1 XP', 'gain')
+            handleInvalidateAndRefetch()
+        } else {
+            showXpToast(result.message, 'loss')
         }
     }
 
@@ -167,8 +124,8 @@ function Profile() {
     const handlePrivacyToggle = async () => {
         setPrivacyLoading(true)
         try {
-            const res = await api.patch('/auth/privacy')
-            setUser(prev => ({ ...prev, isPrivate: res.data.isPrivate }))
+            await api.patch('/auth/privacy')
+            handleInvalidateAndRefetch()
         } catch (err) {
             console.error('Privacy error:', err)
         } finally {
@@ -246,23 +203,17 @@ function Profile() {
                     )}
 
                     {/* Info */}
-                    <div className="flex-1 text-center sm:text-left">
+                    <div className="flex-1 text-center sm:text-left min-w-0 w-full">
                         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-2">
-                            <h1 className="font-black text-3xl md:text-4xl tracking-widest text-white flex items-center gap-2">
-                                {user.username}
+                            <h1 className="font-black text-3xl md:text-4xl tracking-widest text-white flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 min-w-0">
+                                <span className="break-all leading-tight">{user.username}</span>
                                 {user.followsMe && (
                                     <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-sm
-                                                     bg-[#7a7a90]/15 text-[#7a7a90] border border-[#7a7a90]/30 select-none">
+                                                     bg-[#7a7a90]/15 text-[#7a7a90] border border-[#7a7a90]/30 select-none whitespace-nowrap">
                                         Follows you
                                     </span>
                                 )}
                             </h1>
-                            {user.isPrivate && (
-                                <span className="font-mono text-[10px] uppercase tracking-wider px-2 py-1 rounded-sm
-                                                 bg-[#ff5c5c]/15 text-[#ff5c5c] border border-[#ff5c5c]/30">
-                                    🔒 Private
-                                </span>
-                            )}
                         </div>
 
                         {/* XP + Level */}
@@ -288,7 +239,7 @@ function Profile() {
                         </div>
 
                         {user.bio && (
-                            <p className="text-[#7a7a90] text-sm mt-1 max-w-md">{user.bio}</p>
+                            <p className="text-[#7a7a90] text-sm mt-1 max-w-md break-words whitespace-pre-wrap">{user.bio}</p>
                         )}
 
                         <p className="text-[#7a7a90] font-mono text-xs mt-2">
@@ -327,13 +278,13 @@ function Profile() {
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 items-center">
                         {isOwnProfile && (
                             <>
                                 <button
                                     onClick={handlePrivacyToggle}
                                     disabled={privacyLoading}
-                                    className={`btn-apple px-4 py-2 text-sm font-semibold border transition-all disabled:opacity-50
+                                    className={`btn-apple px-5 py-2.5 text-xs font-semibold border transition-all disabled:opacity-50
                                                ${user.isPrivate
                                             ? 'border-[#c8ff57]/50 text-[#c8ff57] bg-[#c8ff57]/10 hover:bg-[#c8ff57]/20'
                                             : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-[#c8ff57]'}`}
@@ -344,7 +295,7 @@ function Profile() {
                                 </button>
                                 <button
                                     onClick={() => navigate('/edit-profile')}
-                                    className="btn-apple btn-apple-secondary px-4 py-2 flex items-center justify-center gap-1.5"
+                                    className="btn-apple btn-apple-secondary px-5 py-2.5 flex items-center justify-center gap-1.5"
                                 >
                                     <Pencil size={14} /> Edit Profile
                                 </button>
@@ -355,7 +306,7 @@ function Profile() {
                             <button
                                 onClick={handleFollow}
                                 disabled={followLoading}
-                                className={`btn-apple px-6 py-2 text-sm font-bold transition-all disabled:opacity-70
+                                className={`btn-apple px-8 py-3 text-sm font-bold transition-all disabled:opacity-70
                                            ${isFollowing
                                         ? 'btn-apple-secondary hover:border-[#ff5c5c] hover:text-[#ff5c5c] hover:bg-[#ff5c5c]/10'
                                         : requestSent
@@ -378,6 +329,16 @@ function Profile() {
                                     Login to Follow
                                 </button>
                             </Link>
+                        )}
+
+                        {/* Private Badge - Moved here for others' profiles */}
+                        {!isOwnProfile && user.isPrivate && (
+                            <div className="mt-1 flex justify-center">
+                                <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-1 rounded
+                                                 bg-[#ff5c5c]/10 text-[#ff5c5c] border border-[#ff5c5c]/20 flex items-center gap-1.5">
+                                    <Lock size={10} /> Private Profile
+                                </span>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -411,7 +372,7 @@ function Profile() {
                     {[
                         { id: 'games', label: <><Gamepad2 size={14} className="mr-1" /> Recent Games</> },
                         { id: 'stats', label: <><BarChart2 size={14} className="mr-1" /> Stats</> },
-                        ...(canSeeLists ? [{ id: 'lists', label: <><List size={14} className="mr-1" /> Lists</> }] : []),
+                        ...(canSeeGames ? [{ id: 'lists', label: <><List size={14} className="mr-1" /> Lists</> }] : []),
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -496,7 +457,7 @@ function Profile() {
                         </div>
                     ) : (
                         <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">
-                            No games logged yet
+                            No games decked yet
                         </div>
                     )}
                 </div>

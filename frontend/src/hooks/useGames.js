@@ -32,7 +32,7 @@ const useGames = () => {
 
             setError(null)
 
-            const token = localStorage.getItem('levellog_token')
+            const token = localStorage.getItem('questdeck_token')
 
             const res = await api.get('/games', {
 
@@ -77,7 +77,7 @@ const useGames = () => {
 
         try {
 
-            const token = localStorage.getItem('levellog_token')
+            const token = localStorage.getItem('questdeck_token')
 
             // Check if game already exists (case-insensitive title match)
             const existing = games.find(
@@ -115,7 +115,7 @@ const useGames = () => {
 
         try {
 
-            const token = localStorage.getItem('levellog_token')
+            const token = localStorage.getItem('questdeck_token')
 
             const res = await api.put(`/games/${id}`, updates, {
 
@@ -146,7 +146,7 @@ const useGames = () => {
 
         try {
 
-            const token = localStorage.getItem('levellog_token')
+            const token = localStorage.getItem('questdeck_token')
 
             await api.delete(`/games/${id}`, {
 

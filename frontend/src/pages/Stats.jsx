@@ -1,36 +1,15 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import useGames from '../hooks/useGames'
+import { useGamesContext } from '../context/GamesContext'
 import { Target, Heart, Search, Gamepad2, TrendingUp, Trophy, Star, Sparkles, Flame, Diamond, Crown, Rocket, Zap, Clock, BarChart3, Check, X } from 'lucide-react'
+import { getLevelInfo, getXPProgress, LEVELS } from '../utils/levels'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const LEVELS = [
-    { level: 1, xpRequired: 0, badge: '🎮', title: 'Newbie' },
-    { level: 2, xpRequired: 5, badge: '🕹️', title: 'Gamer' },
-    { level: 3, xpRequired: 25, badge: '⭐', title: 'Enthusiast' },
-    { level: 4, xpRequired: 60, badge: '🔥', title: 'Veteran' },
-    { level: 5, xpRequired: 100, badge: '💎', title: 'Legend' },
-    { level: 6, xpRequired: 150, badge: '👑', title: 'Elite' },
-    { level: 7, xpRequired: 500, badge: '🚀', title: 'Master' },
-    { level: 8, xpRequired: 1000, badge: '🌟', title: 'Immortal' },
-]
-
-const getLevelInfo = (xp) => {
-    let current = LEVELS[0]
-    let next = LEVELS[1]
-    for (let i = 0; i < LEVELS.length; i++) {
-        if (xp >= LEVELS[i].xpRequired) {
-            current = LEVELS[i]
-            next = LEVELS[i + 1] || null
-        }
-    }
-    return { current, next }
-}
 
 function Stats() {
     const { user } = useAuth()
-    const { games } = useGames()
+    const { games } = useGamesContext()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'stats')
@@ -49,9 +28,7 @@ function Stats() {
 
     const xp = user?.xp || 0
     const { current: currentLevel, next: nextLevel } = useMemo(() => getLevelInfo(xp), [xp])
-    const xpProgress = nextLevel
-        ? ((xp - currentLevel.xpRequired) / (nextLevel.xpRequired - currentLevel.xpRequired)) * 100
-        : 100
+    const xpProgress = useMemo(() => getXPProgress(xp), [xp])
 
     if (!user) {
         return (
@@ -596,7 +573,7 @@ function Stats() {
                                 <button onClick={() => navigate('/library')}
                                     className="px-6 py-3 bg-[#c8ff57] text-black font-bold
                                                text-sm rounded hover:bg-[#d4ff6e] transition-all">
-                                    + Log a Game
+                                    + Add to Deck
                                 </button>
                             </div>
                         )}
@@ -714,7 +691,7 @@ function Stats() {
                                 </div>
                                 <div className="p-2">
                                     {[
-                                        { action: 'Log a game (any status)', xp: '+1 XP', icon: <Gamepad2 size={16} />, color: '#c8ff57' },
+                                        { action: 'Add to deck (any status)', xp: '+1 XP', icon: <Gamepad2 size={16} />, color: '#c8ff57' },
                                         { action: 'Rate a game', xp: '+1 XP', icon: <Star size={16} />, color: '#ff9f5c' },
                                         { action: 'Like a game', xp: '+1 XP', icon: <Heart size={16} />, color: '#ff5c5c' },
                                         { action: 'Follow someone', xp: '+1 XP', icon: <Zap size={16} />, color: '#5c9fff' },

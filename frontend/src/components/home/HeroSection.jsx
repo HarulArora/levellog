@@ -18,7 +18,7 @@ function HeroSection() {
                 <div className="inline-block bg-[#c8ff57]/10 border border-[#c8ff57]/30
                         text-[#c8ff57] font-mono text-xs tracking-widest
                         px-3 py-1 rounded-sm mb-5 uppercase">
-                    Your Game Diary
+                    Your Gaming Odyssey
                 </div>
 
                 {/* Heading */}
@@ -26,14 +26,14 @@ function HeroSection() {
                     className="font-black uppercase leading-none tracking-wide mb-5 text-white"
                     style={{ fontSize: 'clamp(2.5rem, 7vw, 5.5rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                 >
-                    Track Every <br />
-                    <em className="not-italic text-[#c8ff57]">Game You Play</em>
+                    Build Your <br />
+                    <em className="not-italic text-[#c8ff57]">Ultimate Deck</em>
                 </h1>
 
                 {/* Description */}
                 <p className="text-[#7a7a90] leading-relaxed text-sm md:text-base mb-8 max-w-md">
-                    Log your games, track your hours, rate your experiences.
-                    Your personal gaming journal — built for gamers who care
+                    Add your games, track your hours, rate your experiences.
+                    Your personal gaming deck — built for gamers who care
                     about what they play.
                 </p>
 
@@ -43,7 +43,7 @@ function HeroSection() {
                         <button className="w-full sm:w-auto px-6 py-3 bg-[#c8ff57] text-black
                                font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all
                                hover:shadow-[0_0_20px_rgba(200,255,87,0.3)]">
-                            Start Logging Free
+                            Start Questing Free
                         </button>
                     </Link>
                     <Link to="/library">
@@ -58,7 +58,7 @@ function HeroSection() {
                 {/* Stats */}
                 <div className="flex gap-6 md:gap-8 mt-10">
                     {[
-                        { number: '12K+', label: 'Games Logged' },
+                        { number: '12K+', label: 'Games Decked' },
                         { number: '3.4K', label: 'Active Users' },
                         { number: '180K', label: 'Hours Tracked' },
                     ].map(stat => (

@@ -22,14 +22,14 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         const initAuth = async () => {
-            const token = localStorage.getItem('levellog_token')
+            const token = localStorage.getItem('questdeck_token')
             if (!token) { setLoading(false); return }
             try {
                 api.defaults.headers.common['Authorization'] = `Bearer ${token}`
                 const res = await api.get('/auth/me')
                 setUser(buildUser(res.data.user))
             } catch {
-                localStorage.removeItem('levellog_token')
+                localStorage.removeItem('questdeck_token')
                 delete api.defaults.headers.common['Authorization']
             } finally {
                 setLoading(false)
@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
     }, [])
 
     const _setSession = (token, userData) => {
-        localStorage.setItem('levellog_token', token)
+        localStorage.setItem('questdeck_token', token)
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`
         setUser(buildUser(userData))
     }
@@ -82,7 +82,7 @@ export function AuthProvider({ children }) {
     }
 
     const logout = () => {
-        localStorage.removeItem('levellog_token')
+        localStorage.removeItem('questdeck_token')
         delete api.defaults.headers.common['Authorization']
         setUser(null)
     }

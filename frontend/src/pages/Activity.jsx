@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
-import useGames from '../hooks/useGames'
+import { useGamesContext } from '../context/GamesContext'
+import useCachedFetch from '../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Gamepad2, Users } from 'lucide-react'
 
 const timeAgo = (date) => {
@@ -117,41 +117,30 @@ const makeActivityConfig = (navigate) => ({
 })
 
 function Activity() {
-
     const { user } = useAuth()
-    const { games: myGames } = useGames()
+    const { games: myGames } = useGamesContext()
     const navigate = useNavigate()
-    const [activity, setActivity] = useState([])
-    const [feed, setFeed] = useState([])
-    const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('mine')
 
     const activityConfig = makeActivityConfig(navigate)
 
-    useEffect(() => {
-        if (!user) {
-            setLoading(false)
-            return
-        }
+    const userId = user?.id || user?._id
 
-        const fetchAll = async () => {
-            setLoading(true)
-            try {
-                const [activityRes, feedRes] = await Promise.all([
-                    api.get(`/games/activity/${user.id || user._id}`),
-                    api.get('/auth/feed')
-                ])
-                setActivity(activityRes.data.activity)
-                setFeed(feedRes.data.games)
-            } catch (err) {
-                console.error('Activity error:', err)
-            } finally {
-                setLoading(false)
-            }
-        }
+    // Cached — instant on return within 2 min
+    const { data: activityData, loading: loadingActivity } = useCachedFetch(
+        userId ? `activity_${userId}` : null,
+        userId ? `/games/activity/${userId}` : null,
+        { enabled: !!userId, ttl: 2 * 60 * 1000 }
+    )
+    const { data: feedData, loading: loadingFeed } = useCachedFetch(
+        userId ? `feed_${userId}` : null,
+        userId ? '/auth/feed' : null,
+        { enabled: !!userId, ttl: 2 * 60 * 1000 }
+    )
 
-        fetchAll()
-    }, [user])
+    const loading = loadingActivity || loadingFeed
+    const activity = activityData?.activity ?? []
+    const feed     = feedData?.games ?? []
 
     const statusConfig = {
         playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
@@ -267,11 +256,11 @@ function Activity() {
                         <div className="text-center py-16 flex flex-col items-center">
                             <Gamepad2 size={48} className="text-[#2a2a35] mb-4" />
                             <div className="text-[#7a7a90] font-mono text-sm mb-4">
-                                No activity yet. Start logging games!
+                                No activity yet. Start your odyssey!
                             </div>
                             <Link to="/library">
                                 <button className="btn-apple btn-apple-primary px-6 py-2.5">
-                                    + Log a Game
+                                    + Add to Deck
                                 </button>
                             </Link>
                         </div>

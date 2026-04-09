@@ -7,6 +7,7 @@ import Wishlist from '../models/Wishlist.js'
 import GameReview from '../models/GameReview.js'
 import User from '../models/User.js'
 import { awardXP, deductXP } from '../utils/xp.js'
+import { updateGlobalStats } from '../utils/stats.js'
 
 const router = express.Router()
 
@@ -146,19 +147,24 @@ router.delete('/custom/:id', protect, async (req, res) => {
 router.post('/like', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, genre } = req.body
-        const existing = await GameLike.findOne({ userId: req.user._id, igdbId: Number(igdbId) })
+        const idNum = Number(igdbId)
+        const existing = await GameLike.findOne({ userId: req.user._id, igdbId: idNum })
 
         if (existing) {
             await GameLike.findByIdAndDelete(existing._id)
             const updatedUser = await deductXP(req.user._id, 1)
+            // Atomic decrement
+            await updateGlobalStats(idNum, { likeCount: -1 })
             return res.json({
                 success: true, liked: false, message: 'Like removed · -1 XP',
                 xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge
             })
         }
 
-        await GameLike.create({ userId: req.user._id, igdbId: Number(igdbId), gameTitle, gameCover, genre })
+        await GameLike.create({ userId: req.user._id, igdbId: idNum, gameTitle, gameCover, genre })
         const updatedUser = await awardXP(req.user._id, 1)
+        // Atomic increment
+        await updateGlobalStats(idNum, { likeCount: 1 })
         res.json({
             success: true, liked: true, message: 'Game liked · +1 XP',
             xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge
@@ -172,14 +178,17 @@ router.post('/like', protect, async (req, res) => {
 router.post('/wishlist', protect, async (req, res) => {
     try {
         const { igdbId, gameTitle, gameCover, genre, releaseYear } = req.body
-        const existing = await Wishlist.findOne({ userId: req.user._id, igdbId: Number(igdbId) })
+        const idNum = Number(igdbId)
+        const existing = await Wishlist.findOne({ userId: req.user._id, igdbId: idNum })
 
         if (existing) {
             await Wishlist.findByIdAndDelete(existing._id)
+            await updateGlobalStats(idNum, { wishlistCount: -1 })
             return res.json({ success: true, wishlisted: false, message: 'Removed from wishlist' })
         }
 
-        await Wishlist.create({ userId: req.user._id, igdbId: Number(igdbId), gameTitle, gameCover, genre, releaseYear })
+        await Wishlist.create({ userId: req.user._id, igdbId: idNum, gameTitle, gameCover, genre, releaseYear })
+        await updateGlobalStats(idNum, { wishlistCount: 1 })
         res.json({ success: true, wishlisted: true, message: 'Added to wishlist' })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })

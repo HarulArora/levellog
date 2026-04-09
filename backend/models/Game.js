@@ -66,6 +66,7 @@ const gameSchema = new mongoose.Schema(
 gameSchema.index({ igdbId: 1 })              // game detail page stats lookup
 gameSchema.index({ userId: 1, status: 1 })   // filter library by status
 gameSchema.index({ userId: 1, igdbId: 1 })   // check if user has a specific game
+gameSchema.index({ userId: 1, createdAt: -1 }) // recent games / social feed
 
 const Game = mongoose.model('Game', gameSchema)
 export default Game

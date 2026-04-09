@@ -14,6 +14,7 @@ import GameDetail from './pages/GameDetail'
 import EditProfile from './pages/EditProfile'
 import Discover from './pages/Discover'
 import Deals from './pages/Deals'
+import ScrollToTop from './components/ScrollToTop'
 
 function NotFound() {
     return (
@@ -33,9 +34,12 @@ function NotFound() {
     )
 }
 
+
+
 function App() {
     return (
         <BrowserRouter>
+            <ScrollToTop />
             <div className="bg-[#0a0a0f] min-h-screen">
                 <Routes>
                     <Route path="/login" element={<Login />} />

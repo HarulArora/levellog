@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
-import useGames from '../hooks/useGames'
+import { useGamesContext } from '../context/GamesContext'
+import useCachedFetch from '../hooks/useCachedFetch'
+import { invalidateCache } from '../utils/cache'
 import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play } from 'lucide-react'
 import AddGameModal from '../components/library/AddGameModal'
 import Skeleton from '../components/ui/Skeleton'
 
 // ── Single comment + replies ──
 function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) {
+    const navigate = useNavigate()
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [replyText, setReplyText] = useState('')
     const [submittingReply, setSubmittingReply] = useState(false)
@@ -59,7 +62,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
     const replyCount = comment.replies?.length || 0
 
     const handleLike = async () => {
-        if (!currentUser) return
+        if (!currentUser) { navigate('/login'); return }
         try {
             const res = await api.post(`/comments/${comment._id}/like`)
             setLikes(res.data.likes); setDislikes(res.data.dislikes)
@@ -68,7 +71,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
     }
 
     const handleDislike = async () => {
-        if (!currentUser) return
+        if (!currentUser) { navigate('/login'); return }
         try {
             const res = await api.post(`/comments/${comment._id}/dislike`)
             setLikes(res.data.likes); setDislikes(res.data.dislikes)
@@ -265,14 +268,10 @@ function GameDetail() {
     const { igdbId } = useParams()
     const navigate = useNavigate()
     const { user } = useAuth()
-    const { games, addGame, updateGame } = useGames()
+    const { games: userGames, addGame, updateGame } = useGamesContext()
 
-    const [game, setGame] = useState(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState(null)
     const [activeTab, setActiveTab] = useState('overview')
     const [expanded, setExpanded] = useState(false)
-
     const [showAddModal, setShowAddModal] = useState(false)
     const [showListModal, setShowListModal] = useState(false)
     const [customLists, setCustomLists] = useState([])
@@ -284,15 +283,46 @@ function GameDetail() {
     const [liking, setLiking] = useState(false)
     const [wishing, setWishing] = useState(false)
 
-    const [comments, setComments] = useState([])
     const [commentText, setCommentText] = useState('')
     const [submittingComment, setSubmittingComment] = useState(false)
-
     const [xpToast, setXpToast] = useState(null)
-    const [platformStats, setPlatformStats] = useState(null)
-    const [similarStats, setSimilarStats] = useState({})
     const [lightboxIndex, setLightboxIndex] = useState(null)
     const [shareCopied, setShareCopied] = useState(false)
+
+    // ── CACHED FETCHES ──
+    const { data: gameData, loading: loadingGame, error: gameError } = useCachedFetch(
+        `game_${igdbId}`,
+        `/igdb/game/${igdbId}`,
+        { ttl: 30 * 60 * 1000, deps: [igdbId] } // Cache game info for 30m
+    )
+
+    const { data: statsData, refetch: refetchStats } = useCachedFetch(
+        `game_stats_v2_${igdbId}`,
+        `/games/stats/${igdbId}`,
+        { ttl: 5 * 60 * 1000, deps: [igdbId] }
+    )
+
+    const { data: commentsData, refetch: refetchComments } = useCachedFetch(
+        `game_comments_${igdbId}`,
+        `/comments/${igdbId}`,
+        { ttl: 1 * 60 * 1000, deps: [igdbId] } // Comments cache shorter
+    )
+
+    const game = gameData?.game
+    const loading = loadingGame
+    const error = gameError
+    const platformStats = statsData?.stats
+    const comments = commentsData?.comments || []
+
+    const [similarStats, setSimilarStats] = useState({})
+    useEffect(() => {
+        if (game?.similarGames?.length) {
+            const ids = game.similarGames.map(g => g.id).filter(Boolean)
+            api.post('/games/stats/batch', { igdbIds: ids })
+                .then(res => setSimilarStats(res.data.stats || {}))
+                .catch(() => { })
+        }
+    }, [game])
 
     const showXpToast = (msg, type = 'gain') => {
         setXpToast({ msg, type })
@@ -300,51 +330,13 @@ function GameDetail() {
     }
     const showListToast = (msg, type = 'success') => { setListToast({ msg, type }); setTimeout(() => setListToast(null), 3000) }
 
-    const myGame = games.find(g =>
+    const myGame = userGames.find(g =>
         g.igdbId === parseInt(igdbId) || g.title?.toLowerCase() === game?.title?.toLowerCase()
     )
 
-    const fetchPlatformStats = async () => {
-        try {
-            const res = await api.get(`/games/stats/${igdbId}`)
-            setPlatformStats(res.data.stats)
-        } catch (err) { }
-    }
+    const fetchPlatformStats = refetchStats
+    const fetchComments = refetchComments
 
-    const fetchSimilarStats = async (similarGames) => {
-        if (!similarGames?.length) return
-        try {
-            const ids = similarGames.map(g => g.id).filter(Boolean)
-            const res = await api.post('/games/stats/batch', { igdbIds: ids })
-            setSimilarStats(res.data.stats || {})
-        } catch (err) { }
-    }
-
-    const fetchComments = async () => {
-        try {
-            const res = await api.get(`/comments/${igdbId}`)
-            setComments(res.data.comments || [])
-        } catch (err) { }
-    }
-
-    useEffect(() => {
-        const fetchGame = async () => {
-            try {
-                setLoading(true)
-                setError(null)
-                const res = await api.get(`/igdb/game/${igdbId}`)
-                setGame(res.data.game)
-                await fetchPlatformStats()
-                fetchSimilarStats(res.data.game.similarGames)
-            } catch (err) {
-                setError('Failed to load game details')
-            } finally {
-                setLoading(false)
-            }
-        }
-        fetchGame()
-        fetchComments()
-    }, [igdbId])
 
     useEffect(() => {
         if (!game || !user) return
@@ -380,7 +372,8 @@ function GameDetail() {
     }
 
     const handleLike = async () => {
-        if (!user || liking) return
+        if (!user) { navigate('/login'); return }
+        if (liking) return
         setLiking(true)
         try {
             const res = await api.post('/lists/like', {
@@ -389,12 +382,15 @@ function GameDetail() {
             setLiked(res.data.liked)
             if (res.data.liked) showXpToast('❤️ Liked! +1 XP', 'gain')
             else showXpToast('💔 Unliked · -1 XP', 'loss')
+            invalidateCache(`lists_${user.id || user._id}`)
+            invalidateCache(`game_stats_v2_${igdbId}`)
             await fetchPlatformStats()
         } catch (err) { } finally { setLiking(false) }
     }
 
     const handleWishlist = async () => {
-        if (!user || wishing) return
+        if (!user) { navigate('/login'); return }
+        if (wishing) return
         setWishing(true)
         try {
             const res = await api.post('/lists/wishlist', {
@@ -403,6 +399,9 @@ function GameDetail() {
             })
             setWishlisted(res.data.wishlisted)
             if (res.data.wishlisted) showXpToast('🎯 Wishlisted!', 'gain')
+            invalidateCache(`lists_${user.id || user._id}`)
+            invalidateCache(`game_stats_v2_${igdbId}`)
+            await fetchPlatformStats()
         } catch (err) { } finally { setWishing(false) }
     }
 
@@ -422,6 +421,7 @@ function GameDetail() {
                 gameCover: game.cover, genre: game.genre, action: 'add'
             })
             showListToast(`Added to "${listName}"`)
+            invalidateCache(`lists_${user.id || user._id}`)
             setShowListModal(false)
         } catch (err) { showListToast('Failed to add to list', 'error') }
     }
@@ -436,6 +436,7 @@ function GameDetail() {
             })
             showXpToast(res.data.message || '💬 Comment posted · +1 XP', 'gain')
             setCommentText('')
+            invalidateCache(`game_comments_${igdbId}`)
             await fetchComments()
         } catch (err) { console.error('Comment error:', err) }
         finally { setSubmittingComment(false) }
@@ -477,7 +478,7 @@ function GameDetail() {
     if (error || !game) return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
             <div className="text-5xl">😵</div>
-            <div className="text-white font-mono text-sm">{error || 'Game not found'}</div>
+            <div className="text-white font-mono text-sm">{(error?.message || error || 'Game not found').toString()}</div>
             <button onClick={() => navigate(-1)}
                 className="px-5 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded
                            hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">← Go Back</button>
@@ -629,12 +630,17 @@ function GameDetail() {
                                 <div>
                                     <div className="font-black text-4xl text-[#ff9f5c] leading-none"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{platformStats?.loggedCount ?? '—'}</div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Logged</div>
+                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Decked</div>
                                 </div>
                                 <div>
                                     <div className="font-black text-4xl text-[#ff5c5c] leading-none"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{platformStats?.likeCount ?? '—'}</div>
                                     <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Likes</div>
+                                </div>
+                                <div>
+                                    <div className="font-black text-4xl text-[#5c9fff] leading-none"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{platformStats?.wishlistCount ?? '—'}</div>
+                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Wishlists</div>
                                 </div>
                             </div>
 
@@ -651,16 +657,17 @@ function GameDetail() {
                                         </button>
                                     ) : (
                                         <button onClick={() => setShowAddModal(true)} className="btn-apple btn-apple-primary px-5 py-2.5 gap-1.5">
-                                            <Plus size={16} strokeWidth={3} /> Log This Game
+                                            <Plus size={16} strokeWidth={3} /> Add to Deck
                                         </button>
                                     )
                                 ) : (
                                     <Link to="/login">
                                         <button className="btn-apple btn-apple-primary px-5 py-2.5">
-                                            Login to Track
+                                            Join QuestDeck
                                         </button>
                                     </Link>
                                 )}
+
 
                                 {user && (
                                     <button onClick={handleLike} disabled={liking}

@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
+import { useGamesContext } from '../context/GamesContext'
+import useCachedFetch from '../hooks/useCachedFetch'
 import { Search } from 'lucide-react'
 import { GameCardSkeleton } from '../components/ui/Skeleton'
 
@@ -265,14 +267,10 @@ function GameCard({ game, entry, onClick }) {
 export default function Discover() {
     const { user } = useAuth()
     const navigate = useNavigate()
+    const { games: userLibrary } = useGamesContext()
 
-    const [games, setGames] = useState([])
-    const [loading, setLoading] = useState(true)
     const [activeGenre, setActiveGenre] = useState(null)
     const [page, setPage] = useState(1)
-    const [totalPages, setTotalPages] = useState(1)
-    const [total, setTotal] = useState(0)
-    const [libraryMap, setLibraryMap] = useState({})
     const [showMore, setShowMore] = useState(false)
 
     // Search Mode State
@@ -283,62 +281,39 @@ export default function Discover() {
 
     const LIMIT = 24
 
-    useEffect(() => {
-        if (!user) return
-        api.get('/games').then(res => {
-            const map = {}
-            for (const g of res.data.games || []) {
-                if (g.igdbId) {
-                    // store under both string and number keys to handle any mismatch
-                    map[String(g.igdbId)] = { status: g.status, rating: g.rating }
-                    map[Number(g.igdbId)] = { status: g.status, rating: g.rating }
-                }
+    // Map library for quick lookups
+    const libraryMap = useMemo(() => {
+        const map = {}
+        for (const g of userLibrary || []) {
+            if (g.igdbId) {
+                map[String(g.igdbId)] = { status: g.status, rating: g.rating }
+                map[Number(g.igdbId)] = { status: g.status, rating: g.rating }
             }
-            setLibraryMap(map)
-        }).catch(() => { })
-    }, [user])
-
-    const fetchGames = useCallback(async () => {
-        setLoading(true)
-        try {
-            const params = new URLSearchParams({ page, limit: LIMIT })
-            if (activeGenre) params.set('genre', activeGenre.igdb)
-            const res = await api.get(`/igdb/discover?${params}`)
-            const data = res.data
-            const fetchedGames = data.games || []
-            setTotalPages(data.totalPages || 1)
-            setTotal(data.total || 0)
-
-            // Fetch YOUR platform's avg ratings for these games
-            const ids = fetchedGames.map(g => g.id).filter(Boolean)
-            if (ids.length > 0) {
-                try {
-                    const statsRes = await api.post('/games/stats/batch', { igdbIds: ids })
-                    const stats = statsRes.data.stats || {}
-                    // Override game.avgRating with your platform's avgRating
-                    const enriched = fetchedGames.map(g => ({
-                        ...g,
-                        avgRating: stats[g.id]?.avgRating || null
-                    }))
-                    setGames(enriched)
-                } catch {
-                    setGames(fetchedGames)
-                }
-            } else {
-                setGames(fetchedGames)
-            }
-        } catch (err) {
-            console.error(err)
-            setGames([])
-        } finally {
-            setLoading(false)
         }
-    }, [activeGenre, page])
+        return map
+    }, [userLibrary])
+
+    // Cached discovery data
+    const genreKey = activeGenre?.label || 'all'
+    const { data: discoverData, loading } = useCachedFetch(
+        `discover_${genreKey}_${page}`,
+        `/igdb/discover?page=${page}&limit=${LIMIT}${activeGenre ? `&genre=${activeGenre.igdb}` : ''}`,
+        { ttl: 15 * 60 * 1000, deps: [genreKey, page] }
+    )
+
+    const games = discoverData?.games || []
+    const totalPages = discoverData?.totalPages || 1
+    const total = discoverData?.total || 0
+
+    // Enrichment — average ratings per platform
+    // Note: We could build a more complex hook if we wanted to cache enrichment too,
+    // but the discovery endpoint itself usually returns what's needed for the feed.
+    // If enriched stats are needed, the backend discover endpoint should preferrably bundle them.
+
 
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' })
-        fetchGames()
-    }, [fetchGames])
+    }, [page, genreKey])
 
     useEffect(() => {
         const q = searchQuery.trim()

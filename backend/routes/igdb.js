@@ -73,9 +73,6 @@ router.get('/discover', async (req, res) => {
         const pageNum = Math.max(1, parseInt(page) || 1)
         const limitNum = Math.min(50, parseInt(limit) || 24)
         
-        const cacheKey = `discover-${genre}-${pageNum}-${limitNum}`
-        if (igdbCache.has(cacheKey)) return res.json({ success: true, ...igdbCache.get(cacheKey) })
-        
         const offset = (pageNum - 1) * limitNum
 
         const genreFilter = genre && genre.toLowerCase() !== 'all'
@@ -127,27 +124,42 @@ router.get('/discover', async (req, res) => {
             return null // skip obscure platforms
         }
 
-        const rawGames = (Array.isArray(gamesData) ? gamesData : []).map(game => ({
-            id: game.id,
-            title: game.name,
-            cover: game.cover?.url
-                ? game.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-                : null,
-            genre: game.genres?.[0]?.name || null,
-            platforms: [...new Set(
-                (game.platforms || [])
-                    .map(p => shortPlatform(p.name))
-                    .filter(Boolean)
-            )].slice(0, 4),
-            ratingCount: game.rating_count || 0,
-        }))
+        // ── CACHE WRAPPER FOR IGDB DATA ONLY ──
+        const igdbDataCacheKey = `igdb-discover-v2-${genre}-${pageNum}-${limitNum}`
+        let igdbResult = igdbCache.get(igdbDataCacheKey)
 
-        // Batch fetch avg platform (user) ratings from DB
+        if (!igdbResult) {
+            const rawGames = (Array.isArray(gamesData) ? gamesData : []).map(game => ({
+                id: game.id,
+                title: game.name,
+                cover: game.cover?.url
+                    ? game.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
+                    : null,
+                genre: game.genres?.[0]?.name || null,
+                platforms: [...new Set(
+                    (game.platforms || [])
+                        .map(p => shortPlatform(p.name))
+                        .filter(Boolean)
+                )].slice(0, 4),
+                ratingCount: game.rating_count || 0,
+            }))
+
+            const total = countData.count || 0
+            const totalPages = Math.ceil(total / limitNum)
+            
+            igdbResult = { rawGames, total, totalPages }
+            igdbCache.set(igdbDataCacheKey, igdbResult, { ttl: 1000 * 60 * 60 * 12 }) // Static data stays 12h
+        }
+
+        const { rawGames, total, totalPages } = igdbResult
+
+        // ── FRESH STATS FETCHING (NOT CACHED) ──
         const igdbIds = rawGames.map(g => g.id)
         const avgRatings = await Game.aggregate([
-            { $match: { igdbId: { $in: igdbIds }, rating: { $ne: null } } },
+            { $match: { igdbId: { $in: igdbIds }, rating: { $gt: 0 } } },
             { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
         ])
+
         const ratingMap = {}
         for (const r of avgRatings) ratingMap[r._id] = { avg: r.avg, count: r.count }
 
@@ -157,17 +169,14 @@ router.get('/discover', async (req, res) => {
             avgRatingCount: ratingMap[g.id]?.count || 0,
         }))
 
-        const total = countData.count || 0
-
-        const result = {
+        res.json({
+            success: true,
             games,
             total,
             page: pageNum,
             limit: limitNum,
-            totalPages: Math.ceil(total / limitNum),
-        }
-        igdbCache.set(cacheKey, result)
-        res.json({ success: true, ...result })
+            totalPages
+        })
     } catch (error) {
         console.error('Discover error:', error)
         res.status(500).json({ success: false, message: 'Failed to fetch games', error: error.message })
@@ -258,6 +267,13 @@ router.get('/game/:id', async (req, res) => {
             return p.name
         }) || []
 
+        // ── Community Stats Fetching ──
+        const [wishlistCount, likeCount, loggedCount] = await Promise.all([
+            import('../models/Wishlist.js').then(m => m.default.countDocuments({ igdbId: parseInt(req.params.id) })),
+            import('../models/GameLike.js').then(m => m.default.countDocuments({ igdbId: parseInt(req.params.id) })),
+            import('../models/Game.js').then(m => m.default.countDocuments({ igdbId: parseInt(req.params.id) }))
+        ])
+
         const game = {
             id: g.id,
             title: g.name,
@@ -282,7 +298,10 @@ router.get('/game/:id', async (req, res) => {
             themes: g.themes?.map(t => t.name) || [],
             similarGames,
             screenshots,
-            videoId: g.videos?.[0]?.video_id || null
+            videoId: g.videos?.[0]?.video_id || null,
+            communityWishlist: wishlistCount,
+            communityLikes: likeCount,
+            communityLogged: loggedCount
         }
 
         res.json({ success: true, game })
@@ -416,9 +435,6 @@ router.get('/coming-soon', async (req, res) => {
 // for all returned game IDs in one batch. Result cached for 12 h.
 router.get('/home', async (req, res) => {
     try {
-        const cacheKey = 'home-bundle'
-        if (igdbCache.has(cacheKey)) return res.json({ success: true, ...igdbCache.get(cacheKey) })
-
         const token = await getAccessToken()
         const now = Math.floor(Date.now() / 1000)
         const sixMonths = now + 60 * 60 * 24 * 180
@@ -444,6 +460,10 @@ router.get('/home', async (req, res) => {
             })
         ])
 
+        if (!trendRes.ok || !topRes.ok || !comingRes.ok) {
+            throw new Error(`IGDB API Error: ${trendRes.status} ${trendRes.statusText}`)
+        }
+
         const [trendData, topData, comingData] = await Promise.all([
             trendRes.json(), topRes.json(), comingRes.json()
         ])
@@ -452,7 +472,7 @@ router.get('/home', async (req, res) => {
             ? url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
             : null
 
-        const trending = (Array.isArray(trendData) ? trendData : []).map(g => ({
+        let trending = (Array.isArray(trendData) ? trendData : []).map(g => ({
             id: g.id, title: g.name,
             cover: normCover(g.cover?.url),
             genre: g.genres?.[0]?.name || 'Unknown',
@@ -460,14 +480,14 @@ router.get('/home', async (req, res) => {
             ratingCount: g.rating_count
         }))
 
-        const topRated = (Array.isArray(topData) ? topData : []).map(g => ({
+        let topRated = (Array.isArray(topData) ? topData : []).map(g => ({
             id: g.id, title: g.name,
             cover: normCover(g.cover?.url),
             genre: g.genres?.[0]?.name || 'Unknown',
             rating: g.rating ? (g.rating / 10).toFixed(1) : null
         }))
 
-        const comingSoon = (Array.isArray(comingData) ? comingData : []).map(g => ({
+        let comingSoon = (Array.isArray(comingData) ? comingData : []).map(g => ({
             id: g.id, title: g.name,
             cover: normCover(g.cover?.url),
             genre: g.genres?.[0]?.name || 'Unknown',
@@ -479,7 +499,24 @@ router.get('/home', async (req, res) => {
             hypes: g.hypes
         }))
 
-        // Batch-fetch platform stats from MongoDB for the game cards (parallel with nothing — IGDB already done)
+        // ── CACHE WRAPPER FOR IGDB DATA ONLY (v4 to fix everything) ──
+        const igdbCacheKey = 'home_igdb_data_v4'
+        let igdbBundle = igdbCache.get(igdbCacheKey)
+
+        if (!igdbBundle) {
+            // ONLY cache if we actually got data back to avoid caching empty states
+            if (trending.length > 0 || topRated.length > 0) {
+                igdbBundle = { trending, topRated, comingSoon }
+                igdbCache.set(igdbCacheKey, igdbBundle, { ttl: 1000 * 60 * 60 * 12 }) 
+            }
+        } else {
+            // Use cached lists
+            trending = igdbBundle.trending
+            topRated = igdbBundle.topRated
+            comingSoon = igdbBundle.comingSoon
+        }
+
+        // ── FRESH STATS FETCHING (NOT CACHED) ──
         const allIds = [...trending, ...topRated].map(g => g.id).filter(Boolean)
         let gameStats = {}
         if (allIds.length > 0) {
@@ -510,9 +547,7 @@ router.get('/home', async (req, res) => {
             })
         }
 
-        const bundle = { trending, topRated, comingSoon, gameStats }
-        igdbCache.set(cacheKey, bundle)
-        res.json({ success: true, ...bundle })
+        res.json({ success: true, trending, topRated, comingSoon, gameStats })
     } catch (error) {
         console.error('Home bundle error:', error)
         res.status(500).json({ success: false, message: 'Failed to fetch home data', error: error.message })

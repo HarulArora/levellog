@@ -1,10 +1,15 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect, lazy, Suspense } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
-import useGames from '../hooks/useGames'
+import { useGamesContext } from '../context/GamesContext'
+import useCachedFetch from '../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Gamepad2, Flame, Plus } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../components/ui/Skeleton'
+import Toast from '../components/ui/Toast'
+import { getXPProgress } from '../utils/levels'
+
+const AddGameModal = lazy(() => import('../components/library/AddGameModal'))
 
 const RatingDisplay = ({ myRating, platformAvg, hasUser }) => {
     return (
@@ -213,7 +218,7 @@ function GameSearchBar() {
                                placeholder:text-[#3a3a4a] transition-all"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#3a3a4a] pointer-events-none">
-                    {loading ? <span className="text-[#7a7a90] animate-pulse">searching…</span> : 'LevelLog'}
+                    {loading ? <span className="text-[#7a7a90] animate-pulse">searching…</span> : 'QuestDeck'}
                 </span>
             </div>
 
@@ -286,48 +291,40 @@ function GameSearchBar() {
 function Home() {
     const { user } = useAuth()
     const navigate = useNavigate()
-    const { games } = useGames()
+    const { games, addGame } = useGamesContext()
+    const [showAddModal, setShowAddModal] = useState(false)
+    const [toast, setToast] = useState(null)
     const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
 
-    const [trending, setTrending] = useState([])
-    const [topRated, setTopRated] = useState([])
-    const [comingSoon, setComingSoon] = useState([])
-    const [activity, setActivity] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [gameStats, setGameStats] = useState({})
-
-    // Consolidated Home Fetcher (Optimized with backend bundle)
-    useEffect(() => {
-        const fetchGlobalData = async () => {
-            try {
-                setLoading(true)
-                const res = await api.get('/igdb/home')
-                const { trending, topRated, comingSoon, gameStats } = res.data
-                setTrending(trending || [])
-                setTopRated(topRated || [])
-                setComingSoon(comingSoon || [])
-                setGameStats(gameStats || {})
-            } catch (err) {
-                console.error('Home data error:', err)
-            } finally {
-                setLoading(false)
-            }
+    const showToast = (message, type = 'success') => setToast({ message, type })
+    const handleAddGame = async (gameData) => {
+        const res = await addGame(gameData)
+        if (res.success) {
+            showToast(res.updated ? `"${res.game.title}" updated!` : `"${res.game.title}" added to deck!`)
+            setShowAddModal(false)
+        } else {
+            showToast(res.error || 'Failed to log game', 'error')
         }
-        fetchGlobalData()
-    }, [])
+    }
 
-    useEffect(() => {
-        if (!user) return
-        const fetchActivity = async () => {
-            try {
-                const res = await api.get(`/games/activity/${user.id || user._id}`)
-                setActivity(res.data.activity)
-            } catch (err) {
-                console.error('Activity fetch error:', err)
-            }
-        }
-        fetchActivity()
-    }, [user])
+    // ── Cached fetches — instant on return visits ──────────────────────────────
+    const { data: homeData, loading } = useCachedFetch(
+        'home_data',
+        '/igdb/home',
+        { ttl: 10 * 60 * 1000 } // home data is stable — cache 10 min
+    )
+    const userId = user?.id || user?._id
+    const { data: activityData } = useCachedFetch(
+        userId ? `activity_${userId}` : null,
+        userId ? `/games/activity/${userId}` : null,
+        { enabled: !!userId, ttl: 2 * 60 * 1000 }
+    )
+
+    const trending  = homeData?.trending   ?? []
+    const topRated  = homeData?.topRated   ?? []
+    const comingSoon = homeData?.comingSoon ?? []
+    const gameStats  = homeData?.gameStats  ?? {}
+    const activity   = activityData?.activity ?? []
 
     const userStats = useMemo(() => ({
         total: games.length,
@@ -391,8 +388,8 @@ function Home() {
                                 className="font-black uppercase leading-none tracking-wide text-white mb-6"
                                 style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                             >
-                                Your Game<br />
-                                <span className="text-[#c8ff57]">Diary.</span>
+                                Your Quest<br />
+                                <span className="text-[#c8ff57]">Deck.</span>
                             </h1>
 
                             <p className="text-[#7a7a90] text-sm leading-relaxed mb-6 max-w-md">
@@ -404,9 +401,9 @@ function Home() {
                             <div className="flex flex-wrap gap-3 mb-10">
                                 {user ? (
                                     <>
-                                        <button onClick={() => navigate('/library')}
+                                        <button onClick={() => setShowAddModal(true)}
                                             className="btn-apple btn-apple-primary px-6 py-3 gap-1.5">
-                                            <Plus size={16} strokeWidth={2.5} /> Log a Game
+                                            <Plus size={16} strokeWidth={2.5} /> Add to Deck
                                         </button>
                                         <button onClick={() => navigate('/library')}
                                             className="btn-apple btn-apple-secondary px-6 py-3 gap-1.5">
@@ -432,7 +429,7 @@ function Home() {
                             {user && games.length > 0 ? (
                                 <div className="flex gap-8">
                                     {[
-                                        { value: userStats.total, label: 'Games Logged' },
+                                        { value: userStats.total, label: 'Games Decked' },
                                         { value: userStats.totalHours, label: 'Hours Played' },
                                         { value: userStats.avgRating, label: 'Avg Rating' }
                                     ].map(stat => (
@@ -476,7 +473,7 @@ function Home() {
                             {recentGames.length > 0 ? (
                                 <>
                                     <div className="font-mono text-[10px] text-[#3a3a4a] uppercase tracking-widest">
-                                        Recently logged
+                                        Recent Quests
                                     </div>
                                     {recentGames.map(game => {
                                         const sc = statusConfig[game.status] || statusConfig.planned
@@ -514,16 +511,18 @@ function Home() {
                                     })}
                                     <button onClick={() => navigate('/library')}
                                         className="w-full py-3 border border-dashed border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded-lg hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
-                                        + Log More Games →
+                                        + Add More Games →
                                     </button>
                                 </>
                             ) : (
                                 <>
                                     <div className="font-mono text-[10px] text-[#3a3a4a] uppercase tracking-widest">
-                                        Recently logged
+                                        Recent Quests
                                     </div>
                                     {['Elden Ring', 'Hollow Knight', 'Hades', 'Celeste'].map((title, i) => (
-                                        <div key={title} className="flex items-center gap-4 bg-[#111118]/80 border border-[#2a2a35] rounded-lg p-3 opacity-40">
+                                        <div key={title} 
+                                            onClick={() => navigate('/library')}
+                                            className="flex items-center gap-4 bg-[#111118]/80 border border-[#2a2a35] rounded-lg p-3 opacity-40 cursor-pointer hover:opacity-60 transition-all hover:border-[#c8ff57]/30">
                                             <div className="w-14 h-10 rounded bg-[#18181f] flex-shrink-0 flex items-center justify-center text-lg">🎮</div>
                                             <div className="flex-1">
                                                 <div className="text-white font-semibold text-sm">{title}</div>
@@ -537,7 +536,7 @@ function Home() {
                                     ))}
                                     <Link to={user ? '/library' : '/signup'}>
                                         <button className="w-full py-3 border border-dashed border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded-lg hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
-                                            + Start Logging Your Games
+                                            + Build Your Quest Deck
                                         </button>
                                     </Link>
                                 </>
@@ -573,7 +572,7 @@ function Home() {
                                         <div className="flex items-center gap-2 group/xp cursor-pointer">
                                             <div className="w-16 h-1 bg-[#2a2a35] rounded-full flex-shrink-0 overflow-hidden">
                                                 <div className="h-full rounded-full bg-gradient-to-r from-[#c8ff57] to-[#5c9fff] transition-all group-hover/xp:shadow-[0_0_8px_rgba(200,255,87,0.5)]"
-                                                    style={{ width: `${Math.min(((user.xp || 0) / 100) * 100, 100)}%` }} />
+                                                    style={{ width: `${getXPProgress(user.xp || 0)}%` }} />
                                             </div>
                                             <span className="font-mono text-[10px] text-[#7a7a90] group-hover/xp:text-[#c8ff57] flex-shrink-0 tabular-nums font-bold tracking-tight whitespace-nowrap leading-none transition-colors">{user.xp || 0} XP</span>
                                         </div>
@@ -611,7 +610,7 @@ function Home() {
                 <div className="flex items-center gap-3 mb-6">
                     <span className="text-2xl"><Flame className="text-[#ff5c5c] fill-current" size={24} /></span>
                     <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Trending Now</h2>
-                    <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Most logged this week</span>
+                    <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Most decked this week</span>
                 </div>
                 {loading ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -784,15 +783,36 @@ function Home() {
                     ) : (
                         <div className="text-center py-10 flex flex-col items-center">
                             <Gamepad2 size={48} className="text-[#2a2a35] mb-4" />
-                            <div className="text-[#7a7a90] font-mono text-sm mb-4">No activity yet. Start logging games!</div>
-                            <Link to="/library">
-                                <button className="btn-apple btn-apple-primary px-6 py-2.5">
-                                    + Log a Game
-                                </button>
-                            </Link>
+                            <div className="text-[#7a7a90] font-mono text-sm mb-4">No activity yet. Start adding games!</div>
+                            <button 
+                                onClick={() => setShowAddModal(true)}
+                                className="btn-apple btn-apple-primary px-6 py-2.5"
+                            >
+                                + Add to Deck
+                            </button>
                         </div>
                     )}
                 </section>
+            )}
+
+            {/* ── Add Game Modal ── */}
+            {showAddModal && (
+                <Suspense fallback={null}>
+                    <AddGameModal 
+                        onClose={() => setShowAddModal(false)}
+                        onAdd={handleAddGame}
+                        games={games}
+                    />
+                </Suspense>
+            )}
+
+            {/* ── Toast ── */}
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={() => setToast(null)} 
+                />
             )}
         </div>
     )

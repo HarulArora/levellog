@@ -2,7 +2,9 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
-import { Search, X, Check, Loader2, List, Trash2, Heart, Target, Sparkles, Flame, Star, Rocket, Gamepad2, Diamond, Crown, Joystick } from 'lucide-react'
+import useCachedFetch from '../hooks/useCachedFetch'
+import { invalidateCache } from '../utils/cache'
+import { Search as SearchIcon, X, Check, Loader2, List, Trash2, Heart, Target, Sparkles, Flame, Star, Rocket, Gamepad2, Diamond, Crown, Joystick } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 12
@@ -25,15 +27,15 @@ const totalPages = (items) => Math.max(1, Math.ceil(items.length / PAGE_SIZE))
 
 function SearchBar({ value, onChange, placeholder = 'Search...' }) {
     return (
-        <div className="relative mb-4 group">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors pointer-events-none" />
+        <div className="relative flex-1 group">
+            <SearchIcon size={16} strokeWidth={2.5} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] z-10 transition-colors pointer-events-none" />
             <input
                 type="text"
                 value={value}
                 onChange={e => onChange(e.target.value)}
                 placeholder={placeholder}
                 className="w-full bg-[#111118]/80 backdrop-blur-sm border border-[#2a2a35] rounded-xl
-                           px-3 py-2.5 pl-10 text-sm text-white
+                           px-3 py-2.5 pl-10 text-sm text-white font-mono
                            focus:outline-none focus:border-[#c8ff57]/50
                            placeholder:text-[#7a7a90] transition-all shadow-sm focus:shadow-[#c8ff57]/5"
             />
@@ -133,7 +135,7 @@ function EmptyState({ icon, text }) {
 }
 
 // ── ListDetail ────────────────────────────────────────────────────────────────
-function ListDetail({ list, onBack, onUpdate, showToast }) {
+function ListDetail({ list, onBack, onUpdate, showToast, deleteConfirmGame, setDeleteConfirmGame }) {
     const navigate = useNavigate()
     const [editMode, setEditMode] = useState(false)
     const [editForm, setEditForm] = useState({ name: list.name, description: list.description || '', isPublic: list.isPublic })
@@ -174,14 +176,18 @@ function ListDetail({ list, onBack, onUpdate, showToast }) {
         finally { setSaving(false) }
     }, [editForm, currentList._id, showToast, onUpdate])
 
-    const handleRemoveGame = useCallback(async (igdbId) => {
+    const handleRemoveGame = useCallback(async () => {
+        if (!deleteConfirmGame) return
+        const { igdbId } = deleteConfirmGame
         try {
             await api.put(`/lists/custom/${currentList._id}/game`, { igdbId, action: 'remove' })
             setCurrentList(prev => ({ ...prev, games: prev.games.filter(g => g.igdbId !== igdbId) }))
             showToast('Game removed')
             onUpdate()
+            invalidateCache('lists_')
         } catch { showToast('Failed to remove game', 'error') }
-    }, [currentList._id, showToast, onUpdate])
+        finally { setDeleteConfirmGame(null) }
+    }, [currentList._id, deleteConfirmGame, showToast, onUpdate, setDeleteConfirmGame])
 
     // Debounced IGDB search
     const searchTimer = useMemo(() => ({ id: null }), [])
@@ -205,16 +211,23 @@ function ListDetail({ list, onBack, onUpdate, showToast }) {
     }, [currentList.games, searchTimer])
 
     const handleAddGame = useCallback(async (game) => {
+        // Optimistic update
+        setCurrentList(prev => ({ ...prev, games: [...prev.games, game] }))
+        setSearchResults(prev => prev.filter(g => g.igdbId !== game.igdbId))
+        showToast('Game added!')
+
         try {
             await api.put(`/lists/custom/${currentList._id}/game`, {
                 igdbId: game.igdbId, gameTitle: game.gameTitle,
                 gameCover: game.gameCover, action: 'add'
             })
-            setCurrentList(prev => ({ ...prev, games: [...prev.games, game] }))
-            setSearchResults(prev => prev.filter(g => g.igdbId !== game.igdbId))
-            showToast('Game added!')
             onUpdate()
-        } catch { showToast('Failed to add game', 'error') }
+            invalidateCache('lists_')
+        } catch { 
+            // Rollback on failure
+            setCurrentList(prev => ({ ...prev, games: prev.games.filter(g => g.igdbId !== game.igdbId) }))
+            showToast('Failed to add game', 'error') 
+        }
     }, [currentList._id, showToast, onUpdate])
 
     return (
@@ -228,16 +241,30 @@ function ListDetail({ list, onBack, onUpdate, showToast }) {
             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                 {editMode ? (
                     <div className="flex flex-col gap-3">
-                        <input type="text" value={editForm.name}
-                            onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
-                            className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white
-                                       focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90]"
-                            placeholder="List name" />
-                        <textarea value={editForm.description} rows={2}
-                            onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
-                            className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white resize-none
-                                       focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90]"
-                            placeholder="Description (optional)" />
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="font-mono text-[9px] text-[#7a7a90] uppercase tracking-widest">Name</label>
+                                <span className={`font-mono text-[9px] ${editForm.name.length >= 50 ? 'text-[#ff5c5c]' : 'text-[#7a7a90]'}`}>{editForm.name.length}/50</span>
+                            </div>
+                            <input type="text" value={editForm.name}
+                                maxLength={50}
+                                onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white
+                                           focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90]"
+                                placeholder="List name" />
+                        </div>
+                        <div>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="font-mono text-[9px] text-[#7a7a90] uppercase tracking-widest">Description</label>
+                                <span className={`font-mono text-[9px] ${editForm.description.length >= 200 ? 'text-[#ff5c5c]' : 'text-[#7a7a90]'}`}>{editForm.description.length}/200</span>
+                            </div>
+                            <textarea value={editForm.description} rows={2}
+                                maxLength={200}
+                                onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
+                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white resize-none
+                                           focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90]"
+                                placeholder="Description (optional)" />
+                        </div>
                         <div className="flex items-center gap-3">
                             <button onClick={() => setEditForm(p => ({ ...p, isPublic: !p.isPublic }))}
                                 className={`w-10 h-5 rounded-full transition-all flex-shrink-0 ${editForm.isPublic ? 'bg-[#c8ff57]' : 'bg-[#2a2a35]'}`}>
@@ -258,19 +285,19 @@ function ListDetail({ list, onBack, onUpdate, showToast }) {
                     </div>
                 ) : (
                     <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
+                        <div className="flex items-start gap-4 min-w-0">
                             <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center text-2xl flex-shrink-0">📋</div>
-                            <div>
+                            <div className="min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h2 className="font-black text-xl text-white tracking-widest uppercase"
+                                    <h2 className="font-black text-xl text-white tracking-widest uppercase break-words overflow-hidden"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{currentList.name}</h2>
-                                    <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm
+                                    <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm flex-shrink-0
                                                      ${currentList.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
                                         {currentList.isPublic ? 'Public' : 'Private'}
                                     </span>
                                 </div>
                                 {currentList.description && (
-                                    <div className="font-mono text-xs text-[#7a7a90] mt-1">{currentList.description}</div>
+                                    <p className="text-[#a0a0b8] font-mono text-xs leading-relaxed max-w-2xl break-words whitespace-pre-wrap mt-1">{currentList.description}</p>
                                 )}
                                 <div className="font-mono text-[10px] text-[#7a7a90] mt-1">{currentList.games?.length || 0} games</div>
                             </div>
@@ -294,10 +321,13 @@ function ListDetail({ list, onBack, onUpdate, showToast }) {
 
             {showAddGame && (
                 <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-4 flex flex-col gap-3">
-                    <input type="text" placeholder="Search in Database..." value={searchQuery}
-                        onChange={e => handleSearchGames(e.target.value)}
-                        className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white
-                                   focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90]" />
+                    <div className="mb-1">
+                        <SearchBar
+                            value={searchQuery}
+                            onChange={handleSearchGames}
+                            placeholder="Search in Database..."
+                        />
+                    </div>
                     {searching && <div className="font-mono text-[10px] text-[#7a7a90]">Searching...</div>}
                     {!searching && searchResults.length > 0 && (
                         <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
@@ -328,14 +358,16 @@ function ListDetail({ list, onBack, onUpdate, showToast }) {
             {/* Games in list — search + pagination */}
             {(currentList.games?.length > 0) ? (
                 <>
-                    <SearchBar
-                        value={listSearch}
-                        onChange={setListSearch}
-                        placeholder="Search in this list..."
-                    />
+                    <div className="mb-4">
+                        <SearchBar
+                            value={listSearch}
+                            onChange={setListSearch}
+                            placeholder="Search in this list..."
+                        />
+                    </div>
                     {filteredGames.length > 0 ? (
                         <>
-                            <GameGrid games={pagedGames} onRemove={handleRemoveGame} navigate={navigate} />
+                            <GameGrid games={pagedGames} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'custom' })} navigate={navigate} />
                             <Pagination
                                 currentPage={listPage}
                                 total={filteredGames.length}
@@ -343,7 +375,7 @@ function ListDetail({ list, onBack, onUpdate, showToast }) {
                             />
                         </>
                     ) : (
-                        <EmptyState icon={<Search size={40} className="text-[#2a2a35]" strokeWidth={1} />} text={`No games match "${listSearch}"`} />
+                        <EmptyState icon={<SearchIcon size={40} className="text-[#2a2a35]" strokeWidth={1} />} text={`No games match "${listSearch}"`} />
                     )}
                 </>
             ) : (
@@ -358,12 +390,11 @@ function Lists() {
     const { user } = useAuth()
     const navigate = useNavigate()
 
-    const [data, setData] = useState(null)
-    const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState('lists')
-    const [selectedList, setSelectedList] = useState(null)
+    const [selectedListId, setSelectedListId] = useState(null)
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
+    const [deleteConfirmList, setDeleteConfirmList] = useState(null)
+    const [deleteConfirmGame, setDeleteConfirmGame] = useState(null)
     const [createForm, setCreateForm] = useState({ name: '', description: '', isPublic: true })
     const [creating, setCreating] = useState(false)
     const [createError, setCreateError] = useState('')
@@ -384,23 +415,28 @@ function Lists() {
         setTimeout(() => setToast(null), 3000)
     }, [])
 
+    const userId = user?.id || user?._id
+    const { data, loading, refetch: refetchLists } = useCachedFetch(
+        userId ? `lists_${userId}` : null,
+        userId ? '/lists/me' : null,
+        { enabled: !!userId, ttl: 60 * 1000 } // 1 min — lists change frequently
+    )
+
+    // After mutations, sync selected list from fresh data
+    const [localData, setLocalData] = useState(null)
+    const effectiveData = localData ?? data
+
     const fetchData = useCallback(async () => {
-        try {
-            setLoading(true)
-            const res = await api.get('/lists/me')
-            setData(res.data)
-            if (selectedList) {
-                const updated = res.data.customLists?.find(l => l._id === selectedList._id)
-                if (updated) setSelectedList(updated)
-            }
-        } catch (err) { console.error(err) }
-        finally { setLoading(false) }
-    }, [selectedList])
+        invalidateCache(userId ? `lists_${userId}` : '')
+        await refetchLists()
+        setLocalData(null)
+    }, [userId, refetchLists])
 
-    useEffect(() => { if (user) fetchData() }, [user])
+    const { customLists = [], likes = [], wishlist = [], user: userData } = effectiveData || {}
 
-    // Derived filtered + paged data — computed in JS, zero extra API calls
-    const { customLists = [], likes = [], wishlist = [], user: userData } = data || {}
+    const selectedList = useMemo(() => 
+        selectedListId ? customLists.find(l => l._id === selectedListId) : null
+    , [selectedListId, customLists])
 
     const filteredLikes = useMemo(() => filterByQuery(likes, likedSearch), [likes, likedSearch])
     const pagedLikes = useMemo(() => paginate(filteredLikes, likedPage), [filteredLikes, likedPage])
@@ -434,33 +470,56 @@ function Lists() {
         try {
             await api.delete(`/lists/custom/${id}`)
             showToast('List deleted')
-            setShowDeleteConfirm(null)
-            if (selectedList?._id === id) setSelectedList(null)
+            setDeleteConfirmList(null)
+            if (selectedListId === id) setSelectedListId(null)
             fetchData()
         } catch { showToast('Failed to delete', 'error') }
-    }, [selectedList, showToast, fetchData])
+    }, [selectedListId, showToast, fetchData])
 
-    const handleRemoveLike = useCallback(async (igdbId) => {
+    const handleRemoveLike = useCallback(async () => {
+        if (!deleteConfirmGame) return
+        const { igdbId } = deleteConfirmGame
         try {
             await api.post('/lists/like', { igdbId })
-            // Optimistic update — no refetch needed
-            setData(prev => ({ ...prev, likes: prev.likes.filter(g => g.igdbId !== igdbId) }))
+            setLocalData(prev => {
+                const base = prev ?? data
+                return { ...base, likes: (base?.likes || []).filter(g => g.igdbId !== igdbId) }
+            })
             showToast('Like removed')
+            invalidateCache(`lists_${userId}`)
         } catch { showToast('Failed', 'error') }
-    }, [showToast])
+        finally { setDeleteConfirmGame(null) }
+    }, [deleteConfirmGame, userId, data, showToast])
 
-    const handleRemoveWishlist = useCallback(async (igdbId) => {
+    const handleRemoveWishlist = useCallback(async () => {
+        if (!deleteConfirmGame) return
+        const { igdbId } = deleteConfirmGame
         try {
             await api.post('/lists/wishlist', { igdbId })
-            // Optimistic update
-            setData(prev => ({ ...prev, wishlist: prev.wishlist.filter(g => g.igdbId !== igdbId) }))
-            showToast('Removed from wishlist')
+            setLocalData(prev => {
+                const base = prev ?? data
+                return { ...base, wishlist: (base?.wishlist || []).filter(g => g.igdbId !== igdbId) }
+            })
+            showToast('Wishlist updated')
+            invalidateCache(`lists_${userId}`)
         } catch { showToast('Failed', 'error') }
-    }, [showToast])
+        finally { setDeleteConfirmGame(null) }
+    }, [deleteConfirmGame, userId, data, showToast])
+
+    const handleRemoveGameFromCustom = useCallback(async () => {
+        if (!deleteConfirmGame || !selectedListId) return
+        const { igdbId } = deleteConfirmGame
+        try {
+            await api.put(`/lists/custom/${selectedListId}/game`, { igdbId, action: 'remove' })
+            showToast('Game removed')
+            fetchData()
+        } catch { showToast('Failed to remove game', 'error') }
+        finally { setDeleteConfirmGame(null) }
+    }, [deleteConfirmGame, selectedListId, showToast, fetchData])
 
     const handleTabChange = useCallback((id) => {
         setActiveTab(id)
-        setSelectedList(null)
+        setSelectedListId(null)
     }, [])
 
     if (!user) return (
@@ -475,7 +534,7 @@ function Lists() {
         </div>
     )
 
-    if (loading) return (
+    if (loading && !effectiveData) return (
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-[#7a7a90] font-mono text-sm">Loading...</div>
         </div>
@@ -512,7 +571,7 @@ function Lists() {
 
             {/* List detail view */}
             {selectedList && activeTab === 'lists' ? (
-                <ListDetail list={selectedList} onBack={() => setSelectedList(null)} onUpdate={fetchData} showToast={showToast} />
+                <ListDetail list={selectedList} onBack={() => setSelectedListId(null)} onUpdate={fetchData} showToast={showToast} deleteConfirmGame={deleteConfirmGame} setDeleteConfirmGame={setDeleteConfirmGame} />
             ) : (
                 <>
                     {/* Tabs */}
@@ -553,7 +612,7 @@ function Lists() {
                             {customLists.map(list => (
                                 <div key={list._id}
                                     className="bg-[#111118] border border-[#2a2a35] rounded-lg hover:border-[#c8ff57]/30 transition-all overflow-hidden">
-                                    <div className="flex items-center gap-4 p-4 cursor-pointer" onClick={() => setSelectedList(list)}>
+                                    <div className="flex items-center gap-4 p-4 cursor-pointer" onClick={() => setSelectedListId(list._id)}>
                                         <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center text-2xl flex-shrink-0">📋</div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
@@ -564,11 +623,11 @@ function Lists() {
                                                 </span>
                                             </div>
                                             {list.description && (
-                                                <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5 truncate">{list.description}</div>
+                                                <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5 line-clamp-2 break-words">{list.description}</div>
                                             )}
                                             <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5">{list.games?.length || 0} games · tap to open</div>
                                         </div>
-                                        <button onClick={e => { e.stopPropagation(); setShowDeleteConfirm(list._id) }}
+                                        <button onClick={e => { e.stopPropagation(); setDeleteConfirmList(list._id) }}
                                             className="text-[#7a7a90] hover:text-[#ff5c5c] transition-colors font-mono text-xs px-2 py-1 flex-shrink-0">✕</button>
                                     </div>
                                     {list.games?.length > 0 && (
@@ -576,12 +635,12 @@ function Lists() {
                                             {list.games.slice(0, 6).map(game => (
                                                 game.gameCover
                                                     ? <img key={game.igdbId} src={game.gameCover} alt={game.gameTitle} loading="lazy"
-                                                        onClick={() => setSelectedList(list)}
+                                                        onClick={() => setSelectedListId(list._id)}
                                                         className="w-12 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition-all" />
                                                     : <div key={game.igdbId} className="w-12 h-16 bg-[#2a2a35] rounded flex items-center justify-center text-sm">🎮</div>
                                             ))}
                                             {list.games.length > 6 && (
-                                                <div onClick={() => setSelectedList(list)}
+                                                <div onClick={() => setSelectedListId(list._id)}
                                                     className="w-12 h-16 bg-[#2a2a35] rounded flex items-center justify-center font-mono text-[10px] text-[#7a7a90] cursor-pointer hover:bg-[#3a3a45] transition-all">
                                                     +{list.games.length - 6}
                                                 </div>
@@ -638,10 +697,12 @@ function Lists() {
                             </div>
                             {likes.length > 0 ? (
                                 <>
-                                    <SearchBar value={likedSearch} onChange={setLikedSearch} placeholder="Search liked games..." />
+                                    <div className="mb-4">
+                                        <SearchBar value={likedSearch} onChange={setLikedSearch} placeholder="Search liked games..." />
+                                    </div>
                                     {filteredLikes.length > 0 ? (
                                         <>
-                                            <GameGrid games={pagedLikes} onRemove={handleRemoveLike} navigate={navigate} />
+                                            <GameGrid games={pagedLikes} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'like' })} navigate={navigate} />
                                             <Pagination currentPage={likedPage} total={filteredLikes.length} onPageChange={setLikedPage} />
                                         </>
                                     ) : (
@@ -666,10 +727,12 @@ function Lists() {
                             </div>
                             {wishlist.length > 0 ? (
                                 <>
-                                    <SearchBar value={wishSearch} onChange={setWishSearch} placeholder="Search wishlist..." />
+                                    <div className="mb-4">
+                                        <SearchBar value={wishSearch} onChange={setWishSearch} placeholder="Search wishlist..." />
+                                    </div>
                                     {filteredWish.length > 0 ? (
                                         <>
-                                            <GameGrid games={pagedWish} onRemove={handleRemoveWishlist} navigate={navigate} />
+                                            <GameGrid games={pagedWish} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'wishlist' })} navigate={navigate} />
                                             <Pagination currentPage={wishPage} total={filteredWish.length} onPageChange={setWishPage} />
                                         </>
                                     ) : (
@@ -696,19 +759,33 @@ function Lists() {
                         </div>
                         <div className="p-5 flex flex-col gap-4">
                             <div>
-                                <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">List Name *</label>
-                                <input type="text" placeholder="e.g. My Top RPGs" value={createForm.name}
-                                    onChange={e => setCreateForm(p => ({ ...p, name: e.target.value }))}
-                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white
-                                               focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors" />
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">List Name</label>
+                                    <span className={`font-mono text-[10px] opacity-60 ${createForm.name.length >= 50 ? 'text-[#ff5c5c]' : 'text-[#7a7a90]'}`}>
+                                        {createForm.name.length}/50
+                                    </span>
+                                </div>
+                                <input type="text" placeholder="e.g. My Favorite RPGs"
+                                    value={createForm.name}
+                                    maxLength={50}
+                                    onChange={e => setCreateForm({ ...createForm, name: e.target.value })}
+                                    className="w-full bg-[#111118] border border-[#2a2a35] rounded px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#c8ff57]" />
                             </div>
+
                             <div>
-                                <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">Description</label>
-                                <textarea placeholder="What's this list about?" value={createForm.description} rows={3}
-                                    onChange={e => setCreateForm(p => ({ ...p, description: e.target.value }))}
-                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white resize-none
-                                               focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors" />
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Description</label>
+                                    <span className={`font-mono text-[10px] opacity-60 ${createForm.description.length >= 200 ? 'text-[#ff5c5c]' : 'text-[#7a7a90]'}`}>
+                                        {createForm.description.length}/200
+                                    </span>
+                                </div>
+                                <textarea placeholder="Tell us more about this list..."
+                                    value={createForm.description}
+                                    maxLength={200}
+                                    onChange={e => setCreateForm({ ...createForm, description: e.target.value })}
+                                    className="w-full bg-[#111118] border border-[#2a2a35] rounded px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] h-24 resize-none" />
                             </div>
+
                             <div className="flex items-center gap-3">
                                 <button onClick={() => setCreateForm(p => ({ ...p, isPublic: !p.isPublic }))}
                                     className={`w-10 h-5 rounded-full transition-all flex-shrink-0 ${createForm.isPublic ? 'bg-[#c8ff57]' : 'bg-[#2a2a35]'}`}>
@@ -731,23 +808,54 @@ function Lists() {
                 </div>
             )}
 
-            {/* ══ DELETE CONFIRM ══ */}
-            {showDeleteConfirm && (
+            {/* ══ DELETE CONFIRM (LIST) ══ */}
+            {deleteConfirmList && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                    onClick={e => e.target === e.currentTarget && setShowDeleteConfirm(null)}>
-                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-sm p-6 flex flex-col gap-4">
+                    onClick={e => e.target === e.currentTarget && setDeleteConfirmList(null)}>
+                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-sm p-6 flex flex-col gap-4 shadow-2xl">
                         <div className="text-center">
                             <div className="text-3xl mb-2">🗑️</div>
                             <div className="text-white font-semibold text-sm">Delete this list?</div>
-                            <div className="font-mono text-[10px] text-[#7a7a90] mt-1">This cannot be undone.</div>
+                            <div className="font-mono text-[10px] text-[#7a7a90] mt-1">This cannot be undone. All games in this list will be un-categorized.</div>
                         </div>
                         <div className="flex gap-3">
-                            <button onClick={() => setShowDeleteConfirm(null)}
+                            <button onClick={() => setDeleteConfirmList(null)}
                                 className="flex-1 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded
                                            hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">Cancel</button>
-                            <button onClick={() => handleDeleteList(showDeleteConfirm)}
-                                className="flex-1 py-2 bg-[#ff5c5c] text-white font-bold text-xs rounded hover:bg-[#ff3333] transition-all">
+                            <button onClick={() => handleDeleteList(deleteConfirmList)}
+                                className="flex-1 py-2 bg-[#ff5c5c] text-white font-bold text-xs rounded hover:bg-[#ff3333] transition-all shadow-[0_4px_10px_rgba(255,92,92,0.2)]">
                                 Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══ DELETE CONFIRM (GAME FROM LIST) ══ */}
+            {deleteConfirmGame && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={e => e.target === e.currentTarget && setDeleteConfirmGame(null)}>
+                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-sm p-6 flex flex-col gap-4 shadow-2xl">
+                        <div className="text-center">
+                            <div className="text-3xl mb-2">🧊</div>
+                            <div className="text-white font-semibold text-sm">
+                                {deleteConfirmGame.context === 'like' ? 'Remove from Liked?'
+                                    : deleteConfirmGame.context === 'wishlist' ? 'Remove from Wishlist?'
+                                        : 'Remove from this list?'}
+                            </div>
+                            <div className="font-mono text-[10px] text-[#7a7a90] mt-1">This will remove the game from your current selection.</div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setDeleteConfirmGame(null)}
+                                className="flex-1 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded
+                                           hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">Cancel</button>
+                            <button onClick={() => {
+                                if (deleteConfirmGame.context === 'like') handleRemoveLike()
+                                else if (deleteConfirmGame.context === 'wishlist') handleRemoveWishlist()
+                                else handleRemoveGameFromCustom()
+                            }}
+                                className="flex-1 py-2 bg-[#ff5c5c] text-white font-bold text-xs rounded hover:bg-[#ff3333] transition-all shadow-[0_4px_10px_rgba(255,92,92,0.2)]">
+                                Remove
                             </button>
                         </div>
                     </div>

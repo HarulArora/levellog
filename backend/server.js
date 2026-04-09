@@ -75,3 +75,12 @@ mongoose
     .catch((error) => {
         console.error('❌ MongoDB connection failed:', error.message)
     })
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error(`[Server Error] ${req.method} ${req.url}:`, err)
+    res.status(err.status || 500).json({
+        success: false,
+        message: err.message || 'Internal Server Error'
+    })
+})

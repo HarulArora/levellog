@@ -3,10 +3,10 @@ import bcrypt from 'bcryptjs'
 
 const userSchema = new mongoose.Schema(
     {
-        username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 20 },
+        username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 12 },
         email: { type: String, required: true, unique: true, trim: true, lowercase: true },
         password: { type: String, minlength: 6 },
-        bio: { type: String, default: '', maxlength: 200 },
+        bio: { type: String, default: '', maxlength: 150 },
         avatar: { type: String, default: '' },
         isPrivate: { type: Boolean, default: false },
 
@@ -14,7 +14,20 @@ const userSchema = new mongoose.Schema(
         followerCount: { type: Number, default: 0 },
         followingCount: { type: Number, default: 0 },
 
-        gamesCount: { type: Number, default: 0 },
+        // ── High Performance Stats (Denormalized) ──────────────────
+        gameStats: {
+            total: { type: Number, default: 0 },
+            completed: { type: Number, default: 0 },
+            playing: { type: Number, default: 0 },
+            planned: { type: Number, default: 0 },
+            paused: { type: Number, default: 0 },
+            dropped: { type: Number, default: 0 },
+            totalHours: { type: Number, default: 0 },
+            ratingCount: { type: Number, default: 0 },
+            totalRatingSum: { type: Number, default: 0 },
+            avgRating: { type: Number, default: 0 },
+        },
+
         xp: { type: Number, default: 0 },
         level: { type: Number, default: 1 },
         badge: { type: String, default: '🎮' },
