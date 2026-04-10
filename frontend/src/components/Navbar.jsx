@@ -41,11 +41,16 @@ function Navbar() {
         return () => document.removeEventListener('mousedown', handler)
     }, [])
 
-    const handleLogout = () => {
-        logout()
-        navigate('/')
-        setMenuOpen(false)
-        setDropdownOpen(false)
+    const handleLogout = async () => {
+        try {
+            await logout()
+            navigate('/')
+        } catch (err) {
+            console.error('Logout error:', err)
+        } finally {
+            setMenuOpen(false)
+            setDropdownOpen(false)
+        }
     }
 
     const handleLinkClick = () => {

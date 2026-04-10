@@ -423,7 +423,7 @@ function Notifications() {
                                                     <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-black tracking-widest leading-none">Lv.{req.sender?.level || 1}</span>
                                                 </div>
                                             </div>
-                                            <div className="text-[11px] opacity-70">wants to follow you</div>
+                                            <div className="text-[11px] text-[#7a7a90]">wants to follow you</div>
                                         </div>
                                         <div className="flex gap-2 flex-shrink-0">
                                             <button onClick={() => handleAccept(req._id)}
