@@ -42,7 +42,7 @@ const sendTokenResponse = (user, statusCode, res) => {
         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax', // or 'strict' depending on cross-site needs
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     }
 
     res.status(statusCode)
@@ -182,6 +182,17 @@ router.post('/login', async (req, res) => {
         logger.error('Login error:', error)
         res.status(500).json({ success: false, message: 'Login failed. Please try again.' })
     }
+})
+
+// ── POST /api/auth/logout ─────────────────────────────────────────────────────
+router.post('/logout', (req, res) => {
+    res.cookie('questdeck_token', '', {
+        expires: new Date(0),
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    })
+    res.json({ success: true, message: 'Logged out successfully' })
 })
 
 // ── POST /api/auth/verify-email ────────────────────────────────────────────────
