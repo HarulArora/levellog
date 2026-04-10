@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Gamepad2, Users } from 'lucide-react'
+import { getIGDBImage, SIZES } from '../utils/igdb'
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000)
@@ -148,6 +149,12 @@ function Activity() {
         planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
         dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
+        // TitleCase variants for robustness
+        Playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
+        Completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
+        Planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
+        Dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
+        Paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
     }
 
     const getMyRating = (gameTitle) => {
@@ -275,11 +282,7 @@ function Activity() {
                         <div className="flex flex-col gap-3">
                             {feed.map(game => {
                                 const sc = statusConfig[game.status] || statusConfig.planned
-                                const imageUrl = game.cover
-                                    ? game.cover
-                                    : game.steamId
-                                        ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
-                                        : null
+                                const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.CONSTANT)
 
                                 const myRating = getMyRating(game.title)
 

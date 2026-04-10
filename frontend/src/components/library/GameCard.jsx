@@ -1,10 +1,11 @@
-// GameCard.jsx
 // ONE single game card shown in the grid
 // Updated to support IGDB cover images + clicking opens game detail page
 
+import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { getIGDBImage, SIZES } from '../../utils/igdb'
 
-function GameCard({ game, onDelete, onEdit }) {
+const GameCard = memo(({ game, onDelete, onEdit }) => {
 
     const navigate = useNavigate()
 
@@ -17,23 +18,19 @@ function GameCard({ game, onDelete, onEdit }) {
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
     }
 
-    // Platform colors
     const platformConfig = {
         PC: 'text-[#5c9fff] border-[#5c9fff]/35',
         PS: 'text-[#5daeff] border-[#5daeff]/35',
         Xbox: 'text-[#5dc55d] border-[#5dc55d]/35',
-        SW: 'text-[#ff6464] border-[#ff6464]/35',
+        Switch: 'text-[#ff6464] border-[#ff6464]/35', // Changed from SW
         Mac: 'text-[#aaaaaa] border-white/10',
+        Mobile: 'text-[#c45cff] border-[#c45cff]/35',
     }
 
     const sc = statusConfig[game.status] || statusConfig.planned
 
     // ── IMAGE URL ──
-    const imageUrl = game.cover
-        ? game.cover
-        : game.steamId
-            ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
-            : null
+    const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_BIG)
 
     // ── Navigate to game detail page if igdbId exists ──
     const handleCardClick = () => {
@@ -168,6 +165,6 @@ function GameCard({ game, onDelete, onEdit }) {
             </div>
         </div>
     )
-}
+})
 
 export default GameCard

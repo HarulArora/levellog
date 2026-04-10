@@ -2,6 +2,14 @@ import express from 'express'
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
+import mongoSanitize from 'express-mongo-sanitize'
+import cookieParser from 'cookie-parser'
+import compression from 'compression'
+import * as Sentry from "@sentry/node"
+
+import logger from './utils/logger.js'
 import gamesRouter from './routes/games.js'
 import authRouter from './routes/auth.js'
 import igdbRouter from './routes/igdb.js'
@@ -9,42 +17,66 @@ import notificationsRouter from './routes/notifications.js'
 import listsRouter from './routes/lists.js'
 import commentsRouter from './routes/comments.js'
 import dealsRouter from './routes/deals.js'
-import helmet from 'helmet'
-import rateLimit from 'express-rate-limit'
-import mongoSanitize from 'express-mongo-sanitize'
 
-// import paymentRouter from './routes/payment.js'
 dotenv.config()
 
 const app = express()
 
+// ── Sentry Initialization ──────────────────────────────────────────────
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        integrations: [
+            ...Sentry.autoDiscoverNodeJSIntegrations(),
+        ],
+        tracesSampleRate: 1.0,
+    })
+    app.use(Sentry.Handlers.requestHandler())
+    app.use(Sentry.Handlers.tracingHandler())
+}
+
 app.use(cors({
     origin: [
         'http://localhost:5173',
-        'https://levellog-frontend.onrender.com'
-    ],
+        'https://levellog-frontend.onrender.com',
+        process.env.FRONTEND_URL
+    ].filter(Boolean),
     credentials: true
 }))
 
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
+app.use(cookieParser())
+app.use(compression()) // 🚀 Rocket fuel for payload speed
+
+// 🛡️ Express 5 Fix: Manually allow Mutation for Sanitization
+app.use((req, res, next) => {
+    if (req.query) {
+        Object.defineProperty(req, 'query', { value: { ...req.query }, writable: true, configurable: true, enumerable: true })
+    }
+    if (req.params) {
+        Object.defineProperty(req, 'params', { value: { ...req.params }, writable: true, configurable: true, enumerable: true })
+    }
+    next()
+})
+app.use(mongoSanitize())
 app.use(helmet({ 
     crossOriginResourcePolicy: false,
     crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: false
+    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false
 }))
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 15,
+    max: 20,
     message: { success: false, message: 'Too many attempts, please try again later' }
 })
 
 const appLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 1000, // high limit for standard API calls
+    max: 1000,
 })
-app.use('/api/', appLimiter)
 
+app.use('/api/', appLimiter)
 app.use('/api/auth/login', authLimiter)
 app.use('/api/auth/signup', authLimiter)
 
@@ -55,32 +87,32 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/lists', listsRouter)
 app.use('/api/comments', commentsRouter)
 app.use('/api/deals', dealsRouter)
-// app.use('/api/payment', paymentRouter)
-app.get('/health', (req, res) => res.send('OK'))
 
+app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }))
 
-app.get('/', (req, res) => {
-    res.json({ message: '🎮 LevelLog API is running!' })
+// ── Sentry Error Handler ──────────────────────────────────────────────
+if (process.env.SENTRY_DSN) {
+    app.use(Sentry.Handlers.errorHandler())
+}
+
+// Global error handler
+app.use((err, req, res, next) => {
+    logger.error(`[Server Error] ${req.method} ${req.url}:`, err)
+    res.status(err.status || 500).json({
+        success: false,
+        message: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
+    })
 })
 
 mongoose
     .connect(process.env.MONGODB_URI)
     .then(() => {
-        console.log('✅ Connected to MongoDB')
+        logger.info('✅ Connected to MongoDB')
         const PORT = process.env.PORT || 5000
         app.listen(PORT, () => {
-            console.log(`🚀 Server running on http://localhost:${PORT}`)
+            logger.info(`🚀 Server running on port ${PORT}`)
         })
     })
     .catch((error) => {
-        console.error('❌ MongoDB connection failed:', error.message)
+        logger.error('❌ MongoDB connection failed:', error)
     })
-
-// Global error handler
-app.use((err, req, res, next) => {
-    console.error(`[Server Error] ${req.method} ${req.url}:`, err)
-    res.status(err.status || 500).json({
-        success: false,
-        message: err.message || 'Internal Server Error'
-    })
-})
