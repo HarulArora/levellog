@@ -60,7 +60,7 @@ export const sendVerificationEmail = async (email, username, code) => {
             </div>
             <p style="font-size: 14px; color: #94a3b8;">This code will expire in 10 minutes.</p>
             <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
-            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; 2024 QuestDeck. All rights reserved.</p>
+            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; ${new Date().getFullYear()} QuestDeck. All rights reserved.</p>
         </div>
     `
     return await sendEmail({ to: email, subject, html })
@@ -78,7 +78,7 @@ export const sendResetPasswordEmail = async (email, username, code) => {
             </div>
             <p style="font-size: 14px; color: #94a3b8;">This code will expire in 10 minutes.</p>
             <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
-            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; 2024 QuestDeck. All rights reserved.</p>
+            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; ${new Date().getFullYear()} QuestDeck. All rights reserved.</p>
         </div>
     `
     return await sendEmail({ to: email, subject, html })
@@ -96,7 +96,7 @@ export const sendWelcomeEmail = async (email, username) => {
                 <a href="${process.env.CLIENT_URL}" style="display: inline-block; padding: 12px 24px; background-color: #c8ff57; color: #000; text-decoration: none; font-weight: bold; border-radius: 5px;">Go to My Library</a>
             </div>
             <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
-            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; 2024 QuestDeck. All rights reserved.</p>
+            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; ${new Date().getFullYear()} QuestDeck. All rights reserved.</p>
         </div>
     `
     return await sendEmail({ to: email, subject, html })
@@ -114,7 +114,7 @@ export const sendPasswordResetSuccessEmail = async (email, username) => {
                 <a href="${process.env.CLIENT_URL}/login" style="display: inline-block; padding: 12px 24px; background-color: #c8ff57; color: #000; text-decoration: none; font-weight: bold; border-radius: 5px;">Login Now</a>
             </div>
             <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
-            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; 2024 QuestDeck. All rights reserved.</p>
+            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; ${new Date().getFullYear()} QuestDeck. All rights reserved.</p>
         </div>
     `
     return await sendEmail({ to: email, subject, html })
@@ -129,7 +129,7 @@ export const sendAccountLinkedEmail = async (email, username, provider = 'Google
             <p style="font-size: 16px;">Your QuestDeck profile has been successfully connected to your <b>${provider}</b> account.</p>
             <p style="font-size: 16px;">You can now use either your password or your social account to log in.</p>
             <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
-            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; 2024 QuestDeck. All rights reserved.</p>
+            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; ${new Date().getFullYear()} QuestDeck. All rights reserved.</p>
         </div>
     `
     return await sendEmail({ to: email, subject, html })
@@ -144,7 +144,7 @@ export const sendAccountUnlinkedEmail = async (email, username, provider = 'Goog
             <p style="font-size: 16px;">This is to confirm that you have disconnected your <b>${provider}</b> account from your QuestDeck profile.</p>
             <p style="font-size: 14px; color: #94a3b8;">You should now use your email and password to log in.</p>
             <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
-            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; 2024 QuestDeck. All rights reserved.</p>
+            <p style="font-size: 12px; color: #64748b; text-align: center;">&copy; ${new Date().getFullYear()} QuestDeck. All rights reserved.</p>
         </div>
     `
     return await sendEmail({ to: email, subject, html })
