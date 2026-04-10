@@ -1,40 +1,40 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 import dotenv from 'dotenv'
 import logger from './logger.js'
 
 dotenv.config()
 
-// Create transporter with more explicit settings
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
-})
+// Create Resend instance
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
-// Verify transporter connection on startup
-transporter.verify((error, success) => {
-    if (error) {
-        logger.error('❌ SMTP Connection Error:', error)
-    } else {
-        logger.info('🚀 SMTP Server is ready to take messages')
-    }
-})
+if (resend) {
+    logger.info('🚀 Resend SDK is ready for HTTP delivery')
+} else {
+    logger.error('❌ Resend API Key missing. Email delivery will fail.')
+}
 
 export const sendEmail = async ({ to, subject, html }) => {
     try {
-        logger.info(`Attempting to send email to: ${to}...`)
+        if (!resend) {
+            throw new Error('Resend client not initialized')
+        }
+
+        logger.info(`Attempting to send API email to: ${to}...`)
         
-        const info = await transporter.sendMail({
-            from: `"QuestDeck" <${process.env.SMTP_USER}>`,
-            to,
+        const { data, error } = await resend.emails.send({
+            from: 'QuestDeck <onboarding@resend.dev>', // Update to your domain later (e.g. hello@questdeck.com)
+            to: [to],
             subject,
             html,
         })
 
-        logger.info('✅ Email sent successfully! MessageId:', { messageId: info.messageId })
-        return { success: true, data: info }
+        if (error) {
+            logger.error('❌ Resend API Error:', error)
+            return { success: false, error }
+        }
+
+        logger.info('✅ Email sent via Resend API! ID:', data.id)
+        return { success: true, data }
     } catch (error) {
         logger.error('❌ Email send exception error:', error)
         return { success: false, error }
