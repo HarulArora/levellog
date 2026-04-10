@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
 import Navbar from './components/Navbar'
 
 const Home = lazy(() => import('./pages/Home'))
@@ -62,28 +62,22 @@ function App() {
                         <Route path="/verify-email" element={<VerifyEmail />} />
                         <Route path="/forgot-password" element={<ForgotPassword />} />
                         <Route path="/reset-password" element={<ResetPassword />} />
-                        <Route path="/*" element={
-                            <>
-                                <Navbar />
-                                <Suspense fallback={<PageLoader />}>
-                                    <Routes>
-                                        <Route path="/" element={<Home />} />
-                                        <Route path="/library" element={<Library />} />
-                                        <Route path="/lists" element={<Lists />} />
-                                        <Route path="/activity" element={<Activity />} />
-                                        <Route path="/stats" element={<Stats />} />
-                                        <Route path="/user/:username" element={<Profile />} />
-                                        <Route path="/notifications" element={<Notifications />} />
-                                        <Route path="/search" element={<Search />} />
-                                        <Route path="/game/:igdbId" element={<GameDetail />} />
-                                        <Route path="/edit-profile" element={<EditProfile />} />
-                                        <Route path="/discover" element={<Discover />} />
-                                        <Route path="/deals" element={<Deals />} />
-                                        <Route path="*" element={<NotFound />} />
-                                    </Routes>
-                                </Suspense>
-                            </>
-                        } />
+                        
+                        {/* Main Layout Routes */}
+                        <Route element={<><Navbar /><div className="content-wrapper"><Suspense fallback={<PageLoader />}><Outlet /></Suspense></div></>}>
+                            <Route path="/" element={<Home />} />
+                            <Route path="/library" element={<Library />} />
+                            <Route path="/lists" element={<Lists />} />
+                            <Route path="/activity" element={<Activity />} />
+                            <Route path="/stats" element={<Stats />} />
+                            <Route path="/user/:username" element={<Profile />} />
+                            <Route path="/notifications" element={<Notifications />} />
+                            <Route path="/search" element={<Search />} />
+                            <Route path="/game/:igdbId" element={<GameDetail />} />
+                            <Route path="/edit-profile" element={<EditProfile />} />
+                            <Route path="/discover" element={<Discover />} />
+                            <Route path="/deals" element={<Deals />} />
+                        <Route path="*" element={<><Navbar /><NotFound /></>} />
                     </Routes>
                 </Suspense>
             </div>
