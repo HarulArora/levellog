@@ -156,7 +156,7 @@ function Library() {
             <FilterBar activeFilter={activeFilter} onFilter={handleFilter} counts={counts} />
 
             {/* ── Loading skeleton ── */}
-            {loading && (
+            {loading && filteredGames.length === 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                     {Array.from({ length: PAGE_SIZE }).map((_, i) => <SkeletonCard key={i} />)}
                 </div>
@@ -170,7 +170,7 @@ function Library() {
             )}
 
             {/* ── Game Grid ── */}
-            {!loading && !error && (
+            {(!loading || filteredGames.length > 0) && !error && (
                 filteredGames.length > 0 ? (
                     <>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">

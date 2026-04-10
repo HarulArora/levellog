@@ -376,7 +376,7 @@ function Home() {
                 HERO
             ══════════════════════════ */}
             <section className="relative py-12 md:py-20 overflow-hidden">
-                {!loading && trending.length > 0 && (
+                {(trending.length > 0 || (!loading && trending.length > 0)) && (
                     <HeroBanner games={[...trending, ...topRated, ...comingSoon]} />
                 )}
 
@@ -620,7 +620,7 @@ function Home() {
                     <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Trending Now</h2>
                     <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Most decked this week</span>
                 </div>
-                {loading ? (
+                {loading && trending.length === 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="flex flex-col gap-2">
                             {Array.from({ length: 5 }).map((_, i) => (
@@ -715,7 +715,7 @@ function Home() {
                     <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Coming Soon</h2>
                     <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Upcoming &amp; announced</span>
                 </div>
-                {loading ? (
+                {loading && comingSoon.length === 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                         {Array.from({ length: 6 }).map((_, i) => <GameCardSkeleton key={i} />)}
                     </div>
@@ -754,7 +754,7 @@ function Home() {
                     <div className="flex items-center justify-between mb-6">
                         <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Recent Activity</h2>
                     </div>
-                    {loading ? (
+                    {loading && activity.length === 0 ? (
                         <div className="flex flex-col gap-3">
                             {Array.from({ length: 3 }).map((_, i) => (
                                 <div key={i} className="flex items-center gap-4 px-5 py-4 bg-[#111118] border border-[#2a2a35] rounded-lg">
