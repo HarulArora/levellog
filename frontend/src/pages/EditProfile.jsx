@@ -34,6 +34,11 @@ function EditProfile() {
     const [googleLoading, setGoogleLoading] = useState(false)
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
     const [confirmInput, setConfirmInput] = useState('')
+    const [showPasswords, setShowPasswords] = useState({
+        current: false,
+        new: false,
+        confirm: false
+    })
 
     const fileInputRef = useRef(null)
 
@@ -499,20 +504,42 @@ function EditProfile() {
                                         You can log in via <b>{user?.email}</b> if you set a password and later choose to disconnect your Google account.
                                     </p>
                                 )}
-                                <input
-                                    type="password"
-                                    placeholder="New Password"
-                                    value={passwordData.new}
-                                    onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
-                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Confirm New Password"
-                                    value={passwordData.confirm}
-                                    onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
-                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showPasswords.new ? 'text' : 'password'}
+                                        placeholder="New Password"
+                                        autoComplete="new-password"
+                                        value={passwordData.new}
+                                        onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
+                                        className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7a7a90] hover:text-[#c8ff57] transition-colors"
+                                        tabIndex={-1}
+                                    >
+                                        {showPasswords.new ? <EyeOffIcon /> : <EyeIcon />}
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        type={showPasswords.confirm ? 'text' : 'password'}
+                                        placeholder="Confirm New Password"
+                                        autoComplete="new-password"
+                                        value={passwordData.confirm}
+                                        onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
+                                        className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7a7a90] hover:text-[#c8ff57] transition-colors"
+                                        tabIndex={-1}
+                                    >
+                                        {showPasswords.confirm ? <EyeOffIcon /> : <EyeIcon />}
+                                    </button>
+                                </div>
                                 <button
                                     type="submit"
                                     disabled={passwordLoading || !passwordData.new}
@@ -531,28 +558,61 @@ function EditProfile() {
                                             Forgot?
                                         </Link>
                                     </div>
-                                    <input
-                                        type="password"
-                                        placeholder="Enter your current password"
-                                        value={passwordData.current}
-                                        onChange={e => setPasswordData({ ...passwordData, current: e.target.value })}
-                                        className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type={showPasswords.current ? 'text' : 'password'}
+                                            placeholder="Enter your current password"
+                                            autoComplete="new-password"
+                                            value={passwordData.current}
+                                            onChange={e => setPasswordData({ ...passwordData, current: e.target.value })}
+                                            className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7a7a90] hover:text-[#c8ff57] transition-colors"
+                                            tabIndex={-1}
+                                        >
+                                            {showPasswords.current ? <EyeOffIcon /> : <EyeIcon />}
+                                        </button>
+                                    </div>
                                 </div>
-                                <input
-                                    type="password"
-                                    placeholder="New Password"
-                                    value={passwordData.new}
-                                    onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
-                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
-                                />
-                                <input
-                                    type="password"
-                                    placeholder="Confirm New Password"
-                                    value={passwordData.confirm}
-                                    onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
-                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type={showPasswords.new ? 'text' : 'password'}
+                                        placeholder="New Password"
+                                        autoComplete="new-password"
+                                        value={passwordData.new}
+                                        onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
+                                        className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7a7a90] hover:text-[#c8ff57] transition-colors"
+                                        tabIndex={-1}
+                                    >
+                                        {showPasswords.new ? <EyeOffIcon /> : <EyeIcon />}
+                                    </button>
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        type={showPasswords.confirm ? 'text' : 'password'}
+                                        placeholder="Confirm New Password"
+                                        autoComplete="new-password"
+                                        value={passwordData.confirm}
+                                        onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
+                                        className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7a7a90] hover:text-[#c8ff57] transition-colors"
+                                        tabIndex={-1}
+                                    >
+                                        {showPasswords.confirm ? <EyeOffIcon /> : <EyeIcon />}
+                                    </button>
+                                </div>
                                 <button
                                     type="submit"
                                     disabled={passwordLoading || !passwordData.new}
@@ -649,5 +709,23 @@ function EditProfile() {
     )
 }
 
+
+function EyeIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+        </svg>
+    )
+}
+
+function EyeOffIcon() {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+        </svg>
+    )
+}
 
 export default EditProfile
