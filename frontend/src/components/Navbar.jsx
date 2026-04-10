@@ -9,7 +9,7 @@ import Avatar from './ui/Avatar'
 function Navbar() {
     const location = useLocation()
     const navigate = useNavigate()
-    const { user, logout } = useAuth()
+    const { user, logout, loading } = useAuth()
     const { unreadCount, setUnreadCount } = useNotifications()
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -109,82 +109,85 @@ function Navbar() {
                 </ul>
 
                 {/* Desktop right */}
-                <div className="hidden md:flex gap-3 items-center">
-                    {user ? (
-                        <>
-                            {/* Notifications */}
-                            <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
-                                <Bell size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
-                                {unreadCount > 0 && (
-                                    <div className="absolute top-1 right-1 w-4 h-4 bg-[#ff5c5c] rounded-full flex items-center justify-center font-mono text-[9px] text-white font-bold ring-2 ring-[#0a0a0f]">
-                                        {unreadCount > 9 ? '9+' : unreadCount}
-                                    </div>
-                                )}
-                            </Link>
+                <div className="hidden md:flex gap-3 items-center min-w-[120px] justify-end">
+                    {!loading && (
+                        user ? (
+                            <>
+                                {/* Notifications */}
+                                <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
+                                    <Bell size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
+                                    {unreadCount > 0 && (
+                                        <div className="absolute top-1 right-1 w-4 h-4 bg-[#ff5c5c] rounded-full flex items-center justify-center font-mono text-[9px] text-white font-bold ring-2 ring-[#0a0a0f]">
+                                            {unreadCount > 9 ? '9+' : unreadCount}
+                                        </div>
+                                    )}
+                                </Link>
 
-                            {/* Avatar dropdown */}
-                            <div className="relative" ref={dropdownRef}>
-                                <button onClick={() => setDropdownOpen(o => !o)} className="flex items-center gap-1.5 focus:outline-none p-1 pr-2 hover:bg-[#2a2a35]/30 rounded-full transition-all border border-transparent hover:border-[#2a2a35]">
-                                    <Avatar />
-                                    <ChevronDown size={14} className={`text-[#7a7a90] transition-transform duration-300 ${dropdownOpen ? 'rotate-180' : ''}`} />
-                                </button>
+                                {/* Avatar dropdown */}
+                                <div className="relative" ref={dropdownRef}>
+                                    <button onClick={() => setDropdownOpen(o => !o)} className="flex items-center gap-1.5 focus:outline-none p-1 pr-2 hover:bg-[#2a2a35]/30 rounded-full transition-all border border-transparent hover:border-[#2a2a35]">
+                                        <Avatar />
+                                        <ChevronDown size={14} className={`text-[#7a7a90] transition-transform duration-300 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                                    </button>
 
-                                {dropdownOpen && (
-                                    <div className="absolute right-0 top-[calc(100%+10px)] w-52 bg-[#111118] border border-[#2a2a35] rounded-lg shadow-2xl overflow-hidden z-50">
+                                    {dropdownOpen && (
+                                        <div className="absolute right-0 top-[calc(100%+10px)] w-52 bg-[#111118] border border-[#2a2a35] rounded-lg shadow-2xl overflow-hidden z-50">
 
-                                        {/* User info */}
-                                        <div className="px-4 py-4 border-b border-[#2a2a35] bg-[#1a1a25]/30">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <Avatar size="sm" />
-                                                <div className="min-w-0">
-                                                    <div className="text-white font-bold text-sm truncate tracking-tight">{user.username}</div>
-                                                    <div className="text-[10px] text-[#7a7a90] truncate opacity-60">@{user.username.toLowerCase()}</div>
+                                            {/* User info */}
+                                            <div className="px-4 py-4 border-b border-[#2a2a35] bg-[#1a1a25]/30">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <Avatar size="sm" />
+                                                    <div className="min-w-0">
+                                                        <div className="text-white font-bold text-sm truncate tracking-tight">{user.username}</div>
+                                                        <div className="text-[10px] text-[#7a7a90] truncate opacity-60">@{user.username.toLowerCase()}</div>
+                                                    </div>
                                                 </div>
+                                                <Link to="/stats?tab=xp" onClick={handleLinkClick} className="flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2.5 py-1 border border-[#2a2a35] w-fit shadow-inner shadow-black/60 translate-y-[1px] hover:border-[#c8ff57]/50 transition-colors group/lv">
+                                                    <span className="flex items-center justify-center text-xs leading-none relative -top-[2px] flex-shrink-0">{user.badge || '🎮'}</span>
+                                                    <span className="font-mono text-[10px] text-[#c8ff57] uppercase font-black tracking-widest whitespace-nowrap leading-none pt-[1px] group-hover/lv:underline">Lv.{user.level || 1}</span>
+                                                </Link>
                                             </div>
-                                            <Link to="/stats?tab=xp" onClick={handleLinkClick} className="flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2.5 py-1 border border-[#2a2a35] w-fit shadow-inner shadow-black/60 translate-y-[1px] hover:border-[#c8ff57]/50 transition-colors group/lv">
-                                                <span className="flex items-center justify-center text-xs leading-none relative -top-[2px] flex-shrink-0">{user.badge || '🎮'}</span>
-                                                <span className="font-mono text-[10px] text-[#c8ff57] uppercase font-black tracking-widest whitespace-nowrap leading-none pt-[1px] group-hover/lv:underline">Lv.{user.level || 1}</span>
-                                            </Link>
+
+                                            {/* Dropdown Menu Links... (same as original) */}
+                                            <div className="py-1">
+                                                <Link to={`/user/${user.username}`} onClick={handleLinkClick}
+                                                    className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                    <User size={14} className="opacity-70" />
+                                                    <span>My Profile</span>
+                                                </Link>
+
+                                                <Link to="/search" onClick={handleLinkClick}
+                                                    className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                    <Search size={14} className="opacity-70" strokeWidth={2.5} />
+                                                    <span>Find Friends</span>
+                                                </Link>
+
+                                                <div className="border-t border-[#2a2a35] my-1" />
+
+                                                <button onClick={handleLogout}
+                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[#ff5c5c] hover:bg-[#ff5c5c]/10 transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                    <LogOut size={14} className="opacity-70" />
+                                                    <span>Logout</span>
+                                                </button>
+                                            </div>
                                         </div>
-
-                                        <div className="py-1">
-                                            <Link to={`/user/${user.username}`} onClick={handleLinkClick}
-                                                className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
-                                                <User size={14} className="opacity-70" />
-                                                <span>My Profile</span>
-                                            </Link>
-
-                                            <Link to="/search" onClick={handleLinkClick}
-                                                className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
-                                                <Search size={14} className="opacity-70" strokeWidth={2.5} />
-                                                <span>Find Friends</span>
-                                            </Link>
-
-                                            <div className="border-t border-[#2a2a35] my-1" />
-
-                                            <button onClick={handleLogout}
-                                                className="w-full flex items-center gap-3 px-4 py-2.5 text-[#ff5c5c] hover:bg-[#ff5c5c]/10 transition-all text-[11px] font-bold uppercase tracking-wider">
-                                                <LogOut size={14} className="opacity-70" />
-                                                <span>Logout</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <Link to="/login">
-                                <button className="px-4 py-2 text-sm font-semibold border border-[#2a2a35] text-white rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
-                                    Login
-                                </button>
-                            </Link>
-                            <Link to="/signup">
-                                <button className="px-4 py-2 text-sm font-semibold bg-[#c8ff57] text-black rounded hover:bg-[#d4ff6e] transition-all">
-                                    Sign Up
-                                </button>
-                            </Link>
-                        </>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Link to="/login">
+                                    <button className="px-4 py-2 text-sm font-semibold border border-[#2a2a35] text-white rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
+                                        Login
+                                    </button>
+                                </Link>
+                                <Link to="/signup">
+                                    <button className="px-4 py-2 text-sm font-semibold bg-[#c8ff57] text-black rounded hover:bg-[#d4ff6e] transition-all">
+                                        Sign Up
+                                    </button>
+                                </Link>
+                            </>
+                        )
                     )}
                 </div>
 
@@ -235,56 +238,58 @@ function Navbar() {
 
                     <div className="border-t border-[#2a2a35]" />
 
-                    {user ? (
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-3 py-2">
-                                {user.avatar ? (
-                                    <img src={user.avatar} alt={user.username} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2a2a35]" />
-                                ) : (
-                                    <div className="w-9 h-9 rounded-full bg-[#c8ff57]/15 border-2 border-[#2a2a35] flex items-center justify-center font-black text-[#c8ff57] uppercase text-xs">
-                                        {user.username?.[0] || '?'}
-                                    </div>
-                                )}
-                                <div>
-                                    <div className="text-white font-bold text-sm tracking-tight">{user.username}</div>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <Link to="/stats?tab=xp" onClick={handleLinkClick} className="flex items-center gap-1.5 bg-[#111118] rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm shadow-black/40 hover:border-[#c8ff57]/50 transition-colors group/mlv">
-                                            <span className="flex items-center justify-center text-[10px] leading-none relative -top-[1.8px]">{user.badge || '🎮'}</span>
-                                            <span className="font-mono text-[9px] text-[#c8ff57] uppercase font-black tracking-widest leading-none group-hover/mlv:underline">Lv.{user.level || 1}</span>
-                                        </Link>
+                    {!loading && (
+                        user ? (
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-3 py-2">
+                                    {user.avatar ? (
+                                        <img src={user.avatar} alt={user.username} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2a2a35]" />
+                                    ) : (
+                                        <div className="w-9 h-9 rounded-full bg-[#c8ff57]/15 border-2 border-[#2a2a35] flex items-center justify-center font-black text-[#c8ff57] uppercase text-xs">
+                                            {user.username?.[0] || '?'}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <div className="text-white font-bold text-sm tracking-tight">{user.username}</div>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <Link to="/stats?tab=xp" onClick={handleLinkClick} className="flex items-center gap-1.5 bg-[#111118] rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm shadow-black/40 hover:border-[#c8ff57]/50 transition-colors group/mlv">
+                                                <span className="flex items-center justify-center text-[10px] leading-none relative -top-[1.8px]">{user.badge || '🎮'}</span>
+                                                <span className="font-mono text-[9px] text-[#c8ff57] uppercase font-black tracking-widest leading-none group-hover/mlv:underline">Lv.{user.level || 1}</span>
+                                            </Link>
+                                        </div>
                                     </div>
                                 </div>
+
+                                <Link to={`/user/${user.username}`} onClick={handleLinkClick}
+                                    className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
+                                    <User size={16} />
+                                    <span>My Profile</span>
+                                </Link>
+
+                                <Link to="/search" onClick={handleLinkClick}
+                                    className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
+                                    <Search size={16} strokeWidth={3} />
+                                    <span>Find Friends</span>
+                                </Link>
+
+                                <div className="border-t border-[#2a2a35] my-1" />
+
+                                <button onClick={handleLogout}
+                                    className="flex items-center gap-3 py-3 text-[#ff5c5c] w-full transition-colors text-xs font-bold uppercase tracking-wider">
+                                    <LogOut size={16} />
+                                    <span>Logout</span>
+                                </button>
                             </div>
-
-                            <Link to={`/user/${user.username}`} onClick={handleLinkClick}
-                                className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
-                                <User size={16} />
-                                <span>My Profile</span>
-                            </Link>
-
-                            <Link to="/search" onClick={handleLinkClick}
-                                className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
-                                <Search size={16} strokeWidth={2.5} />
-                                <span>Find Friends</span>
-                            </Link>
-
-                            <div className="border-t border-[#2a2a35] my-1" />
-
-                            <button onClick={handleLogout}
-                                className="flex items-center gap-3 py-3 text-[#ff5c5c] w-full transition-colors text-xs font-bold uppercase tracking-wider">
-                                <LogOut size={16} />
-                                <span>Logout</span>
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-3">
-                            <Link to="/login" onClick={handleLinkClick}>
-                                <button className="w-full py-2 text-sm font-semibold border border-[#2a2a35] text-white rounded transition-all">Login</button>
-                            </Link>
-                            <Link to="/signup" onClick={handleLinkClick}>
-                                <button className="w-full py-2 text-sm font-semibold bg-[#c8ff57] text-black rounded transition-all">Sign Up</button>
-                            </Link>
-                        </div>
+                        ) : (
+                            <div className="flex flex-col gap-3">
+                                <Link to="/login" onClick={handleLinkClick}>
+                                    <button className="w-full py-2 text-sm font-semibold border border-[#2a2a35] text-white rounded transition-all">Login</button>
+                                </Link>
+                                <Link to="/signup" onClick={handleLinkClick}>
+                                    <button className="w-full py-2 text-sm font-semibold bg-[#c8ff57] text-black rounded transition-all">Sign Up</button>
+                                </Link>
+                            </div>
+                        )
                     )}
                 </div>
             )}
