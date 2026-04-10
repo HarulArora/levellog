@@ -24,10 +24,24 @@ if (import.meta.env.VITE_SENTRY_DSN) {
     })
 }
 
+const GoogleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
 createRoot(document.getElementById('root')).render(
     <StrictMode>
         <HelmetProvider>
-            <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+            {GoogleClientId ? (
+                <GoogleOAuthProvider clientId={GoogleClientId}>
+                    <AuthProvider>
+                        <GamesProvider>
+                            <DealsProvider>
+                                <FollowProvider>
+                                    <App />
+                                </FollowProvider>
+                            </DealsProvider>
+                        </GamesProvider>
+                    </AuthProvider>
+                </GoogleOAuthProvider>
+            ) : (
                 <AuthProvider>
                     <GamesProvider>
                         <DealsProvider>
@@ -37,7 +51,7 @@ createRoot(document.getElementById('root')).render(
                         </DealsProvider>
                     </GamesProvider>
                 </AuthProvider>
-            </GoogleOAuthProvider>
+            )}
         </HelmetProvider>
     </StrictMode>
 )
