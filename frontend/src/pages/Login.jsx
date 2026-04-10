@@ -133,7 +133,7 @@ function Login() {
                             id="email"
                             name="email"
                             type="email"
-                            autoComplete="username email"
+                            autoComplete="off"
                             placeholder="you@email.com"
                             value={formData.email}
                             onChange={e => handleChange('email', e.target.value)}
@@ -160,7 +160,7 @@ function Login() {
                             <input
                                 id="password"
                                 name="password"
-                                autoComplete="current-password"
+                                autoComplete="new-password"
                                 type={showPassword ? 'text' : 'password'}
                                 placeholder="••••••••"
                                 value={formData.password}

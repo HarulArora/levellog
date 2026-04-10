@@ -401,38 +401,40 @@ function Notifications() {
                         <div className="flex flex-col divide-y divide-[#2a2a35] border border-[#2a2a35] rounded-lg overflow-hidden">
                             {requests.map(req => (
                                 <div key={req._id}
-                                    className="flex items-center gap-4 px-5 py-4 bg-[#111118] hover:bg-[#18181f] transition-all">
+                                    className="flex items-start sm:items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 bg-[#111118] hover:bg-[#18181f] transition-all">
                                     {req.sender?.avatar ? (
                                         <img src={req.sender.avatar} alt={req.sender.username}
-                                            className="w-9 h-9 rounded-full object-cover flex-shrink-0 ring-2 ring-[#2a2a35]" />
+                                            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-[#2a2a35]" />
                                     ) : (
-                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] flex items-center justify-center font-black text-sm text-black flex-shrink-0"
+                                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] flex items-center justify-center font-black text-sm text-black flex-shrink-0"
                                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                             {req.sender?.username?.charAt(0).toUpperCase()}
                                         </div>
                                     )}
-                                    <div className="flex-1 text-sm text-[#7a7a90] min-w-0">
-                                        <div className="flex items-center gap-2 mb-0.5">
-                                            <Link to={`/user/${req.sender?.username}`}
-                                                className="text-[#c8ff57] font-bold hover:underline truncate">
-                                                {req.sender?.username}
-                                            </Link>
-                                            <div className="flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm shadow-black/40">
-                                                <span className="flex items-center justify-center text-[10px] leading-none relative -top-[1.8px]">{req.sender?.badge || '🎮'}</span>
-                                                <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-black tracking-widest leading-none">Lv.{req.sender?.level || 1}</span>
+                                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <Link to={`/user/${req.sender?.username}`}
+                                                    className="text-[#c8ff57] font-bold hover:underline truncate text-sm sm:text-base">
+                                                    {req.sender?.username}
+                                                </Link>
+                                                <div className="flex-shrink-0 flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm shadow-black/40">
+                                                    <span className="flex items-center justify-center text-[10px] leading-none relative -top-[1.8px]">{req.sender?.badge || '🎮'}</span>
+                                                    <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-black tracking-widest leading-none">Lv.{req.sender?.level || 1}</span>
+                                                </div>
                                             </div>
+                                            <div className="text-[11px] opacity-70">wants to follow you</div>
                                         </div>
-                                        <div className="text-[11px] opacity-70">wants to follow you</div>
-                                    </div>
-                                    <div className="flex gap-2 flex-shrink-0">
-                                        <button onClick={() => handleAccept(req._id)}
-                                            className="btn-apple btn-apple-primary px-4 py-2">
-                                            Accept
-                                        </button>
-                                        <button onClick={() => handleDecline(req._id)}
-                                            className="btn-apple btn-apple-secondary px-4 py-2 hover:bg-[#ff5c5c]/20 hover:text-[#ff5c5c] hover:border-[#ff5c5c]/50">
-                                            Decline
-                                        </button>
+                                        <div className="flex gap-2 flex-shrink-0">
+                                            <button onClick={() => handleAccept(req._id)}
+                                                className="btn-apple btn-apple-primary px-4 py-2 text-[11px] sm:text-xs">
+                                                Accept
+                                            </button>
+                                            <button onClick={() => handleDecline(req._id)}
+                                                className="btn-apple btn-apple-secondary px-4 py-2 text-[11px] sm:text-xs hover:bg-[#ff5c5c]/20 hover:text-[#ff5c5c] hover:border-[#ff5c5c]/50">
+                                                Decline
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
