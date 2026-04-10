@@ -29,8 +29,8 @@ function Login() {
             return
         }
 
-        // Email format validation
-        if (!isValidEmail(formData.email)) {
+        // Simple format validation: if it contains '@', it must be a valid email
+        if (formData.email.includes('@') && !isValidEmail(formData.email)) {
             setFieldError(prev => ({ ...prev, email: 'Please enter a valid email address' }))
             return
         }
@@ -128,13 +128,13 @@ function Login() {
                     {/* Email */}
                     <div className="mb-4">
                         <label className="block font-mono text-xs uppercase tracking-wider
-                                          text-[#7a7a90] mb-2" htmlFor="email">Email</label>
+                                          text-[#7a7a90] mb-2" htmlFor="email">Email or Username</label>
                         <input
                             id="email"
                             name="email"
                             type="email"
                             autoComplete="off"
-                            placeholder="you@email.com"
+                            placeholder="you@email.com or username"
                             value={formData.email}
                             onChange={e => handleChange('email', e.target.value)}
                             className={`w-full bg-[#18181f] border rounded

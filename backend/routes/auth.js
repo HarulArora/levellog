@@ -179,11 +179,20 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body
         if (!email || !password)
-            return res.status(400).json({ success: false, message: 'Please provide email and password' })
+            return res.status(400).json({ success: false, message: 'Please provide email/username and password' })
 
-        const user = await User.findOne({ email: email.toLowerCase().trim() })
+        // Accept email or username (case-insensitive)
+        const identifier = email.trim()
+        const identifierRegex = identifier.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+        const user = await User.findOne({
+            $or: [
+                { email: identifier.toLowerCase() },
+                { username: { $regex: new RegExp(`^${identifierRegex}$`, 'i') } }
+            ]
+        })
+
         if (!user)
-            return res.status(401).json({ success: false, message: 'Invalid email or password' })
+            return res.status(401).json({ success: false, message: 'Invalid email/username or password' })
 
         if (user.googleId && !user.password)
             return res.status(401).json({ success: false, message: 'This account uses Google Sign-In.' })
