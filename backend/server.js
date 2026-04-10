@@ -64,7 +64,18 @@ app.use(mongoSanitize())
 app.use(helmet({ 
     crossOriginResourcePolicy: false,
     crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: false // 🔓 Disabled to fix Firefox Production CORS blocks
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    contentSecurityPolicy: {
+        directives: {
+            "default-src": ["'self'"],
+            "script-src": ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
+            "connect-src": ["'self'", "https://*.onrender.com", "https://*.googleapis.com"],
+            "img-src": ["'self'", "data:", "https://images.igdb.com", "https://www.cheapshark.com", "https://*.googleusercontent.com"],
+            "frame-src": ["'self'", "https://accounts.google.com"],
+            "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            "font-src": ["'self'", "https://fonts.gstatic.com"],
+        },
+    }
 }))
 
 const authLimiter = rateLimit({
