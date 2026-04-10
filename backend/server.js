@@ -1,3 +1,5 @@
+import path from 'path'
+import { fileURLToPath } from 'url'
 import express from 'express'
 import mongoose from 'mongoose'
 import dotenv from 'dotenv'
@@ -17,6 +19,9 @@ import notificationsRouter from './routes/notifications.js'
 import listsRouter from './routes/lists.js'
 import commentsRouter from './routes/comments.js'
 import dealsRouter from './routes/deals.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 dotenv.config()
 
@@ -115,6 +120,16 @@ app.use((err, req, res, next) => {
         success: false,
         message: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message
     })
+})
+
+// ── Serve Frontend ─────────────────────────────────────────────────────
+const frontendDistPath = path.join(__dirname, '../frontend/dist')
+app.use(express.static(frontendDistPath))
+
+// Catch-all route for SPA clean URLs
+// Matches any path that does NOT start with /api
+app.get(/^((?!\/api).)*$/, (req, res) => {
+    res.sendFile(path.join(frontendDistPath, 'index.html'))
 })
 
 mongoose
