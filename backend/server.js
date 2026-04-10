@@ -39,7 +39,7 @@ app.use(cors({
     origin: [
         'http://localhost:5173',
         'https://questdeck.onrender.com',
-        process.env.FRONTEND_URL?.replace(/\/$/, '')
+        process.env.CLIENT_URL?.replace(/\/$/, '')
     ].filter(Boolean),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
