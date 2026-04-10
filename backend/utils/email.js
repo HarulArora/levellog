@@ -1,40 +1,72 @@
+import nodemailer from 'nodemailer'
 import { Resend } from 'resend'
 import dotenv from 'dotenv'
 import logger from './logger.js'
 
 dotenv.config()
 
-// Create Resend instance
+// Create SMTP Transporter (for Brevo, Gmail, etc.)
+const transporter = process.env.SMTP_HOST ? nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_PORT === '465', 
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+    },
+    tls: {
+        rejectUnauthorized: false
+    }
+}) : null
+
+// Create Resend instance (fallback)
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
-if (resend) {
-    logger.info('🚀 Resend SDK is ready for HTTP delivery')
+if (transporter) {
+    logger.info(`🚀 SMTP Email Delivery ready (${process.env.SMTP_HOST})`)
+} else if (resend) {
+    logger.info('🚀 Resend SDK ready (Fallback)')
 } else {
-    logger.error('❌ Resend API Key missing. Email delivery will fail.')
+    logger.error('❌ No email provider configured (SMTP or Resend). Email delivery will fail.')
 }
 
 export const sendEmail = async ({ to, subject, html }) => {
     try {
-        if (!resend) {
-            throw new Error('Resend client not initialized')
-        }
-
-        logger.info(`Attempting to send API email to: ${to}...`)
+        const fromEmail = process.env.EMAIL_FROM || 'QuestDeck <onboarding@resend.dev>'
         
-        const { data, error } = await resend.emails.send({
-            from: 'QuestDeck <onboarding@resend.dev>', // Update to your domain later (e.g. hello@questdeck.com)
-            to: [to],
-            subject,
-            html,
-        })
-
-        if (error) {
-            logger.error('❌ Resend API Error:', error)
-            return { success: false, error }
+        // 1. Try SMTP (Brevo) first
+        if (transporter) {
+            logger.info(`Attempting SMTP email to: ${to}...`)
+            const info = await transporter.sendMail({
+                from: fromEmail,
+                to,
+                subject,
+                html,
+            })
+            logger.info('✅ Email sent via SMTP! ID:', info.messageId)
+            return { success: true, messageId: info.messageId }
         }
 
-        logger.info('✅ Email sent via Resend API! ID:', data.id)
-        return { success: true, data }
+        // 2. Fallback to Resend API
+        if (resend) {
+            logger.info(`Attempting Resend API email to: ${to}...`)
+            const { data, error } = await resend.emails.send({
+                from: fromEmail,
+                to: [to],
+                subject,
+                html,
+            })
+
+            if (error) {
+                logger.error('❌ Resend API Error:', error)
+                return { success: false, error }
+            }
+
+            logger.info('✅ Email sent via Resend API! ID:', data.id)
+            return { success: true, data }
+        }
+
+        throw new Error('No email provider configured')
     } catch (error) {
         logger.error('❌ Email send exception error:', error)
         return { success: false, error }
