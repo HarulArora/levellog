@@ -10,11 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@formkit/auto-animate": "^0.9.0",
     "@react-oauth/google": "^0.13.4",
+    "@sentry/browser": "^10.48.0",
+    "@sentry/react": "^10.48.0",
     "axios": "^1.13.6",
     "lucide-react": "^1.7.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-helmet-async": "^3.0.0",
     "react-router-dom": "^7.13.1",
     "recharts": "^3.8.0"
   },

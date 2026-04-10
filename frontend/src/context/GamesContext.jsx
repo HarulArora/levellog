@@ -97,6 +97,11 @@ export function GamesProvider({ children }) {
             invalidateCache('home_data')
             invalidatePrefix('discover_')
             invalidatePrefix('game_stats_')
+            invalidateCache(`activity_${user?.id || user?._id}`)
+            invalidateCache(`feed_${user?.id || user?._id}`)
+            if (res.data.game?.igdbId) {
+                invalidateCache(`game_stats_v2_${res.data.game.igdbId}`)
+            }
 
             return { success: true, game: res.data.game }
         } catch (err) {
@@ -119,6 +124,11 @@ export function GamesProvider({ children }) {
             invalidateCache('home_data')
             invalidatePrefix('discover_')
             invalidatePrefix('game_stats_')
+            invalidateCache(`activity_${user?.id || user?._id}`)
+            invalidateCache(`feed_${user?.id || user?._id}`)
+            if (res.data.game?.igdbId) {
+                invalidateCache(`game_stats_v2_${res.data.game.igdbId}`)
+            }
 
             return { success: true, game: res.data.game }
         } catch (err) {

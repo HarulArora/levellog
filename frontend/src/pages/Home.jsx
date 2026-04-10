@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect, lazy, Suspense } from 'react'
+import { useState, useRef, useMemo, useEffect, lazy, Suspense, memo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
@@ -8,10 +8,11 @@ import { Trophy, Play, Star, ListChecks, X, Pause, Search, Gamepad2, Flame, Plus
 import Skeleton, { GameCardSkeleton } from '../components/ui/Skeleton'
 import Toast from '../components/ui/Toast'
 import { getXPProgress } from '../utils/levels'
+import { getIGDBImage, SIZES } from '../utils/igdb'
 
 const AddGameModal = lazy(() => import('../components/library/AddGameModal'))
 
-const RatingDisplay = ({ myRating, platformAvg, hasUser }) => {
+const RatingDisplay = memo(({ myRating, platformAvg, hasUser }) => {
     return (
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
             {myRating ? (
@@ -34,7 +35,7 @@ const RatingDisplay = ({ myRating, platformAvg, hasUser }) => {
             ) : null}
         </div>
     )
-}
+})
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000)
@@ -76,7 +77,10 @@ const makeActivityConfig = (navigate) => ({
 })
 
 // ── Mosaic banner ──
-function HeroBanner({ games }) {
+const HeroBanner = memo(({ games }) => {
+    // Detect mobile for tile reduction
+    const isMobile = window.innerWidth < 768
+
     const covers = useMemo(() => 
         games.filter(g => g.cover).map(g => g.cover).filter((v, i, a) => a.indexOf(v) === i),
         [games]
@@ -92,38 +96,40 @@ function HeroBanner({ games }) {
 
     const shuffled = useMemo(() => (covers.length > 0 ? [...covers].sort(() => 0.5 - Math.random()) : []), [covers])
 
-    const row1Tiles = useMemo(() => {
-        if (!shuffled.length) return []
-        return Array.from({ length: 15 }, (_, i) => ({
-            img: shuffled[i % shuffled.length],
-            ...sizePatterns[i % sizePatterns.length]
-        }))
-    }, [shuffled, sizePatterns])
-
     const row2Tiles = useMemo(() => {
         if (!shuffled.length) return []
+        const count = isMobile ? 8 : 15
         const offset = Math.ceil(shuffled.length / 2)
-        return Array.from({ length: 15 }, (_, i) => ({
+        return Array.from({ length: count }, (_, i) => ({
             img: shuffled[(offset + i) % shuffled.length],
             ...sizePatterns[(i + 5) % sizePatterns.length]
         }))
-    }, [shuffled, sizePatterns])
+    }, [shuffled, sizePatterns, isMobile])
+
+    const row1Tiles = useMemo(() => {
+        if (!shuffled.length) return []
+        const count = isMobile ? 8 : 15
+        return Array.from({ length: count }, (_, i) => ({
+            img: shuffled[i % shuffled.length],
+            ...sizePatterns[i % sizePatterns.length]
+        }))
+    }, [shuffled, sizePatterns, isMobile])
 
     if (covers.length === 0) return null
 
     return (
-        <div className="absolute inset-0 z-0 overflow-hidden">
+        <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none">
             <div className="absolute top-0 left-0 right-0 h-[55%] flex items-end gap-3 pb-2">
-                <div className="flex gap-3 items-end" style={{ animation: 'mosaicLeft 40s linear infinite', width: 'max-content' }}>
+                <div className="flex gap-3 items-end will-change-transform" style={{ animation: `mosaicLeft ${isMobile ? '25s' : '40s'} linear infinite`, width: 'max-content' }}>
                     {[...row1Tiles, ...row1Tiles].map((tile, i) => (
-                        <img key={i} src={tile.img} alt="" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
+                        <img key={i} src={getIGDBImage(tile.img, SIZES.COVER_BIG)} alt="" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
                     ))}
                 </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-[55%] flex items-start gap-3 pt-2">
-                <div className="flex gap-3 items-start" style={{ animation: 'mosaicRight 32s linear infinite', width: 'max-content' }}>
+                <div className="flex gap-3 items-start will-change-transform" style={{ animation: `mosaicRight ${isMobile ? '20s' : '32s'} linear infinite`, width: 'max-content' }}>
                     {[...row2Tiles, ...row2Tiles].map((tile, i) => (
-                        <img key={i} src={tile.img} alt="" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
+                        <img key={i} src={getIGDBImage(tile.img, SIZES.COVER_BIG)} alt="" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
                     ))}
                 </div>
             </div>
@@ -135,7 +141,7 @@ function HeroBanner({ games }) {
             <div className="absolute top-0 right-0 bottom-0 w-24 bg-gradient-to-l from-[#0a0a0f] to-transparent" />
         </div>
     )
-}
+})
 
 // ── Normalize IGDB search result (handles both field naming conventions) ──
 const normalizeGame = (g) => ({
@@ -230,23 +236,23 @@ function GameSearchBar() {
                     {results.length > 0 ? (
                         <>
                             {/* Scrollable list — 4 items × ~64px each */}
-                            <div style={{ maxHeight: '256px', overflowY: 'auto' }}>
-                                {results.map((game) => (
-                                    <div
-                                        key={game.id}
-                                        onClick={() => handleSelect(game)}
-                                        className="flex items-center gap-3 px-4 py-3
-                                                   hover:bg-[#1a1a25] cursor-pointer
-                                                   border-b border-[#2a2a35] last:border-b-0
-                                                   transition-colors group"
-                                    >
-                                        <div className="w-8 h-11 rounded bg-[#18181f] flex-shrink-0 overflow-hidden">
-                                            {game.cover ? (
-                                                <img src={game.cover} alt={game.title} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">🎮</div>
-                                            )}
-                                        </div>
+                                <div style={{ maxHeight: '256px', overflowY: 'auto' }} className="overscroll-contain">
+                                    {results.map((game) => (
+                                        <div
+                                            key={game.id}
+                                            onClick={() => handleSelect(game)}
+                                            className="flex items-center gap-3 px-4 py-3
+                                                       hover:bg-[#1a1a25] cursor-pointer
+                                                       border-b border-[#2a2a35] last:border-b-0
+                                                       transition-colors group"
+                                        >
+                                            <div className="w-8 h-11 rounded bg-[#18181f] flex-shrink-0 overflow-hidden">
+                                                {game.cover ? (
+                                                    <img src={getIGDBImage(game.cover, SIZES.THUMB)} alt={game.title} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">🎮</div>
+                                                )}
+                                            </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="text-white font-semibold text-sm truncate group-hover:text-[#c8ff57] transition-colors">
                                                 {game.title}
@@ -296,16 +302,18 @@ function Home() {
     const [toast, setToast] = useState(null)
     const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
 
-    const showToast = (message, type = 'success') => setToast({ message, type })
-    const handleAddGame = async (gameData) => {
+    const showToast = useCallback((message, type = 'success') => setToast({ message, type }), [])
+
+    const handleAddGame = useCallback(async (gameData) => {
+        // Optimistic UI closed immediately
+        setShowAddModal(false)
         const res = await addGame(gameData)
         if (res.success) {
             showToast(res.updated ? `"${res.game.title}" updated!` : `"${res.game.title}" added to deck!`)
-            setShowAddModal(false)
         } else {
             showToast(res.error || 'Failed to log game', 'error')
         }
-    }
+    }, [addGame, showToast])
 
     // ── Cached fetches — instant on return visits ──────────────────────────────
     const { data: homeData, loading } = useCachedFetch(

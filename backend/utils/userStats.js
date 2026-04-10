@@ -12,7 +12,7 @@ export const updateUserStats = async (userId, updates = {}) => {
         const user = await User.findByIdAndUpdate(
             userId,
             { $inc: updates },
-            { new: true }
+            { returnDocument: 'after' }
         )
 
         // Recalculate average rating if rating stats changed

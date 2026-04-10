@@ -3,6 +3,7 @@ import { LRUCache } from 'lru-cache'
 import { searchGames, getAccessToken } from '../utils/igdb.js'
 import Game from '../models/Game.js'
 import GameLike from '../models/GameLike.js'
+import logger from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -10,6 +11,9 @@ const igdbCache = new LRUCache({
     max: 500,
     ttl: 1000 * 60 * 60 * 12, // 12 hours
 })
+
+// 🚀 Request Pooling to prevent redundant external calls
+const inFlightRequests = new Map()
 
 // ── GET /api/igdb/search?q=query ──
 router.get('/search', async (req, res) => {
@@ -20,47 +24,49 @@ router.get('/search', async (req, res) => {
         const cacheKey = `search-${query}`
         if (igdbCache.has(cacheKey)) return res.json({ success: true, ...igdbCache.get(cacheKey) })
         
-        const raw = await searchGames(query)
-
-        const normCover = (c) => {
-            if (!c) return null
-            if (typeof c === 'string') return c.startsWith('http') ? c : ('https:' + c)
-            if (c.url) return c.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-            return null
+        // 🚀 Pooling check
+        if (inFlightRequests.has(cacheKey)) {
+            const data = await inFlightRequests.get(cacheKey)
+            return res.json({ success: true, games: data })
+        }
+        
+        const performSearch = async () => {
+            const raw = await searchGames(query)
+            const normCover = (c) => {
+                if (!c) return null
+                if (typeof c === 'string') return c.startsWith('http') ? c : ('https:' + c)
+                if (c.url) return c.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
+                return null
+            }
+            const results = (raw || []).map(g => {
+                const genreNames = g.genres
+                    ? (Array.isArray(g.genres)
+                        ? g.genres.map(x => typeof x === 'string' ? x : x.name).filter(Boolean)
+                        : [g.genres])
+                    : (g.genre ? [g.genre] : [])
+                return {
+                    id: g.igdbId || g.id,
+                    igdbId: g.igdbId || g.id,
+                    title: g.title || g.name || 'Unknown',
+                    cover: normCover(g.cover),
+                    genre: genreNames[0] || null,
+                    genres: genreNames,
+                    releaseYear: g.releaseYear || (g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null),
+                    rating: g.rating != null ? g.rating : (g.igdbRating != null ? g.igdbRating : null),
+                    platforms: g.platforms || [],
+                    summary: g.summary || g.description || '',
+                }
+            })
+            igdbCache.set(cacheKey, { games: results })
+            return results
         }
 
-        // Return ALL fields needed by both GameSearch.jsx (igdbId, genres[]) and GameSearchBar (id, genre)
-        const games = (raw || []).map(g => {
-            const genreNames = g.genres
-                ? (Array.isArray(g.genres)
-                    ? g.genres.map(x => typeof x === 'string' ? x : x.name).filter(Boolean)
-                    : [g.genres])
-                : (g.genre ? [g.genre] : [])
+        const fetchPromise = performSearch()
+        inFlightRequests.set(cacheKey, fetchPromise)
+        const finalGames = await fetchPromise
+        inFlightRequests.delete(cacheKey)
 
-            const title = g.title || g.name || 'Unknown'
-            const cover = normCover(g.cover)
-            const releaseYear = g.releaseYear || (g.first_release_date
-                ? new Date(g.first_release_date * 1000).getFullYear() : null)
-            const platforms = g.platforms || []
-            const summary = g.summary || g.description || ''
-            const rating = g.rating != null ? g.rating : (g.igdbRating != null ? g.igdbRating : null)
-
-            return {
-                id: g.igdbId || g.id,
-                igdbId: g.igdbId || g.id,
-                title,
-                cover,
-                genre: genreNames[0] || null,
-                genres: genreNames,
-                releaseYear,
-                rating,
-                platforms,
-                summary,
-            }
-        })
-
-        igdbCache.set(cacheKey, { games })
-        res.json({ success: true, games })
+        res.json({ success: true, games: finalGames })
     } catch (error) {
         res.status(500).json({ success: false, message: 'IGDB search failed', error: error.message })
     }
@@ -178,7 +184,7 @@ router.get('/discover', async (req, res) => {
             totalPages
         })
     } catch (error) {
-        console.error('Discover error:', error)
+        logger.error('Discover error:', error)
         res.status(500).json({ success: false, message: 'Failed to fetch games', error: error.message })
     }
 })
@@ -549,7 +555,7 @@ router.get('/home', async (req, res) => {
 
         res.json({ success: true, trending, topRated, comingSoon, gameStats })
     } catch (error) {
-        console.error('Home bundle error:', error)
+        logger.error('Home bundle error:', error)
         res.status(500).json({ success: false, message: 'Failed to fetch home data', error: error.message })
     }
 })

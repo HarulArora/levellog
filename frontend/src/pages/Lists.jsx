@@ -487,6 +487,8 @@ function Lists() {
             })
             showToast('Like removed')
             invalidateCache(`lists_${userId}`)
+            invalidateCache(`game_stats_v2_${igdbId}`)
+            invalidateCache(`game_like_${userId}_${igdbId}`)
         } catch { showToast('Failed', 'error') }
         finally { setDeleteConfirmGame(null) }
     }, [deleteConfirmGame, userId, data, showToast])
@@ -502,6 +504,8 @@ function Lists() {
             })
             showToast('Wishlist updated')
             invalidateCache(`lists_${userId}`)
+            invalidateCache(`game_stats_v2_${igdbId}`)
+            invalidateCache(`game_wish_${userId}_${igdbId}`)
         } catch { showToast('Failed', 'error') }
         finally { setDeleteConfirmGame(null) }
     }, [deleteConfirmGame, userId, data, showToast])

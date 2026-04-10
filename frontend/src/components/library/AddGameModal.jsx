@@ -26,7 +26,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
             if (p.includes('Xbox')) return 'Xbox'
 
-            if (p.includes('Nintendo Switch')) return 'SW'
+            if (p.includes('Nintendo Switch')) return 'Switch'
 
             if (p.includes('Mac')) return 'Mac'
 
@@ -52,7 +52,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
     const ratings = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-    const platformOptions = ['PC', 'PS', 'Xbox', 'SW', 'Mac', 'Mobile']
+    const platformOptions = ['PC', 'PS', 'Xbox', 'Switch', 'Mac', 'Mobile']
 
 
     const handleChange = (field, value) => {
@@ -97,7 +97,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
                 if (p.includes('Xbox')) return 'Xbox'
 
-                if (p.includes('Nintendo Switch')) return 'SW'
+                if (p.includes('Nintendo Switch')) return 'Switch'
 
                 if (p.includes('Mac')) return 'Mac'
 

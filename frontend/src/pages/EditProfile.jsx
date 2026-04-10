@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useGoogleLogin } from '@react-oauth/google'
 import api from '../api/axios'
 
 function EditProfile() {
@@ -21,7 +22,18 @@ function EditProfile() {
 
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
+    const [googleSuccess, setGoogleSuccess] = useState('')
+    const [passwordData, setPasswordData] = useState({
+        current: '',
+        new: '',
+        confirm: ''
+    })
+    const [passwordLoading, setPasswordLoading] = useState(false)
+    const [passwordSuccess, setPasswordSuccess] = useState('')
     const [error, setError] = useState('')
+    const [googleLoading, setGoogleLoading] = useState(false)
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+    const [confirmInput, setConfirmInput] = useState('')
 
     const fileInputRef = useRef(null)
 
@@ -111,9 +123,89 @@ function EditProfile() {
         setUsername(val)
     }
 
+    // ─── Google Linking ──────────────────────────────────────────────────
+    const { linkGoogle, unlinkGoogle } = useAuth()
+
+    const handleGoogleLink = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            setGoogleLoading(true)
+            setError('')
+            const res = await linkGoogle(tokenResponse.access_token)
+            setGoogleLoading(false)
+            if (res.success) {
+                setGoogleSuccess('Linked successfully!')
+                setTimeout(() => setGoogleSuccess(''), 3000)
+            } else {
+                setError(res.message)
+            }
+        },
+        onError: () => setError('Google Link Failed')
+    })
+
+    const handleGoogleUnlink = async () => {
+        setIsConfirmModalOpen(true)
+    }
+
+    const confirmGoogleUnlink = async () => {
+        if (confirmInput !== user.username) return
+        
+        setGoogleLoading(true)
+        const res = await unlinkGoogle()
+        setGoogleLoading(false)
+        setIsConfirmModalOpen(false)
+        setConfirmInput('')
+
+        if (res.success) {
+            setGoogleSuccess('Unlinked successfully!')
+            setTimeout(() => setGoogleSuccess(''), 3000)
+        } else {
+            setError(res.message)
+        }
+    }
+
+    // ─── Password Management ─────────────────────────────────────────────
+    const { setPassword, changePassword } = useAuth()
+
+    const handleSetPassword = async (e) => {
+        e.preventDefault()
+        if (passwordData.new.length < 6) return setError('Password must be at least 6 characters')
+        if (passwordData.new !== passwordData.confirm) return setError('Passwords do not match')
+
+        setPasswordLoading(true)
+        setError('')
+        const res = await setPassword(passwordData.new)
+        setPasswordLoading(false)
+        if (res.success) {
+            setPasswordSuccess('Password set successfully!')
+            setPasswordData({ current: '', new: '', confirm: '' })
+            setTimeout(() => setPasswordSuccess(''), 3000)
+        } else {
+            setError(res.message)
+        }
+    }
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault()
+        if (passwordData.new.length < 6) return setError('New password must be at least 6 characters')
+        if (passwordData.new !== passwordData.confirm) return setError('Passwords do not match')
+
+        setPasswordLoading(true)
+        setError('')
+        const res = await changePassword(passwordData.current, passwordData.new)
+        setPasswordLoading(false)
+        if (res.success) {
+            setPasswordSuccess('Password changed successfully!')
+            setPasswordData({ current: '', new: '', confirm: '' })
+            setTimeout(() => setPasswordSuccess(''), 3000)
+        } else {
+            setError(res.message)
+        }
+    }
+
     // ─── Save ─────────────────────────────────────────────────────────────────
 
-    const handleSave = async () => {
+    const handleSave = async (e) => {
+        if (e) e.preventDefault()
         setError('')
 
         // Guard: URL mode with broken image
@@ -150,6 +242,7 @@ function EditProfile() {
             setSaving(false)
         }
     }
+
 
     // ─── Derived ──────────────────────────────────────────────────────────────
 
@@ -335,6 +428,155 @@ function EditProfile() {
                         </div>
                     </div>
 
+                    {/* ── Connected Accounts ── */}
+                    <div className="pt-4 border-t border-[#2a2a35]">
+                        <label className="block font-mono text-xs uppercase tracking-wider
+                                          text-[#7a7a90] mb-4">
+                            Connected Accounts
+                        </label>
+                        
+                        <div className="flex items-center justify-between p-3 bg-[#18181f] border border-[#2a2a35] rounded">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white rounded-full">
+                                    <svg width="16" height="16" viewBox="0 0 18 18">
+                                        <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 002.38-5.88c0-.57-.05-.66-.15-1.18z" />
+                                        <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 01-7.18-2.54H1.83v2.07A8 8 0 008.98 17z" />
+                                        <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 010-3.04V5.41H1.83a8 8 0 000 7.18l2.67-2.07z" />
+                                        <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 001.83 5.4L4.5 7.49a4.77 4.77 0 014.48-3.31z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p className="text-white text-xs font-bold">Google</p>
+                                    <p className="text-[#7a7a90] text-[10px] font-mono">
+                                        {user?.googleId ? 'Connected' : 'Not linked'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {user?.googleId ? (
+                                <button
+                                    onClick={handleGoogleUnlink}
+                                    disabled={googleLoading}
+                                    className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider
+                                               border border-[#ff5c5c]/30 text-[#ff5c5c] rounded
+                                               hover:bg-[#ff5c5c]/10 transition-colors
+                                               disabled:opacity-50"
+                                >
+                                    Disconnect
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => handleGoogleLink()}
+                                    disabled={googleLoading}
+                                    className="px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider
+                                               border border-[#c8ff57]/30 text-[#c8ff57] rounded
+                                               hover:bg-[#c8ff57]/10 transition-colors
+                                               disabled:opacity-50"
+                                >
+                                    {googleLoading ? 'Linking...' : 'Connect'}
+                                </button>
+                            )}
+                        </div>
+
+                        {user?.googleId && !user?.hasPassword && (
+                            <p className="mt-3 text-[10px] text-[#ffaa57] font-mono leading-relaxed">
+                                ⚠ You must set a password below before you can disconnect Google.
+                            </p>
+                        )}
+                    </div>
+
+                    {/* ── Security / Password ── */}
+                    <div className="pt-4 border-t border-[#2a2a35]">
+                        <label className="block font-mono text-xs uppercase tracking-wider
+                                          text-[#7a7a90] mb-4">
+                            {user?.hasPassword ? 'Change Password' : 'Set Password'}
+                        </label>
+
+                        {!user?.hasPassword ? (
+                            <form onSubmit={handleSetPassword} className="space-y-3">
+                                {user?.googleId && (
+                                    <p className="text-[10px] text-[#7a7a90] font-mono mb-2 leading-relaxed">
+                                        You can log in via <b>{user?.email}</b> if you set a password and later choose to disconnect your Google account.
+                                    </p>
+                                )}
+                                <input
+                                    type="password"
+                                    placeholder="New Password"
+                                    value={passwordData.new}
+                                    onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
+                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Confirm New Password"
+                                    value={passwordData.confirm}
+                                    onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
+                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={passwordLoading || !passwordData.new}
+                                    className="w-full py-2 bg-[#c8ff57]/10 text-[#c8ff57] border border-[#c8ff57]/30 font-bold text-xs rounded hover:bg-[#c8ff57]/20 transition-all"
+                                >
+                                    {passwordLoading ? 'Setting...' : 'Set Password'}
+                                </button>
+                            </form>
+                        ) : (
+                            <form onSubmit={handleChangePassword} className="space-y-3">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-center px-1">
+                                        <label className="text-[9px] text-[#7a7a90] font-mono uppercase tracking-widest">Current Password</label>
+                                        <Link to="/forgot-password" 
+                                              className="text-[9px] text-[#c8ff57] font-mono hover:underline uppercase tracking-widest">
+                                            Forgot?
+                                        </Link>
+                                    </div>
+                                    <input
+                                        type="password"
+                                        placeholder="Enter your current password"
+                                        value={passwordData.current}
+                                        onChange={e => setPasswordData({ ...passwordData, current: e.target.value })}
+                                        className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                    />
+                                </div>
+                                <input
+                                    type="password"
+                                    placeholder="New Password"
+                                    value={passwordData.new}
+                                    onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
+                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                />
+                                <input
+                                    type="password"
+                                    placeholder="Confirm New Password"
+                                    value={passwordData.confirm}
+                                    onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
+                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57]"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={passwordLoading || !passwordData.new}
+                                    className="w-full py-2 bg-[#18181f] text-[#7a7a90] border border-[#2a2a35] font-bold text-xs rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all"
+                                >
+                                    {passwordLoading ? 'Updating...' : 'Change Password'}
+                                </button>
+                            </form>
+                        )}
+
+                        {passwordSuccess && (
+                            <p className="mt-2 text-[10px] text-[#c8ff57] font-mono">
+                                ✓ {passwordSuccess}
+                            </p>
+                        )}
+                    </div>
+
+                    {googleSuccess && (
+                        <div className="px-3 py-2 bg-[#c8ff57]/10 border border-[#c8ff57]/30
+                                        rounded font-mono text-xs text-[#c8ff57] animate-pulse">
+                            ✓ {googleSuccess}
+                        </div>
+                    )}
+                    
                     {/* ── Error ── */}
                     {error && (
                         <div className="px-3 py-2.5 bg-[#ff5c5c]/10 border border-[#ff5c5c]/30
@@ -356,10 +598,56 @@ function EditProfile() {
                         {saving ? 'Saving...' : saved ? '✓ Saved!' : 'Save Changes'}
                     </button>
 
+
                 </div>
             </div>
+
+            {/* ── Confirmation Modal ── */}
+            {isConfirmModalOpen && (
+                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-5">
+                    <div 
+                        className="bg-[#111118] border border-[#ff5c5c]/30 rounded-xl p-8 max-w-sm w-full shadow-[0_20px_60px_rgba(255,92,92,0.1)]"
+                        style={{ animation: 'fadeUp 0.3s ease-out' }}
+                    >
+                        <h3 className="font-black text-2xl text-white tracking-widest uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            Disconnect Google?
+                        </h3>
+                        <p className="text-[#7a7a90] font-mono text-[11px] mb-6 leading-relaxed">
+                            You will no longer be able to log in with this Google account. To confirm, please type your username <span className="text-white font-bold">"{user?.username}"</span> below.
+                        </p>
+
+                        <div className="space-y-4">
+                            <input 
+                                type="text"
+                                placeholder="Type your username"
+                                value={confirmInput}
+                                onChange={e => setConfirmInput(e.target.value)}
+                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-[#ff5c5c] transition-all"
+                            />
+
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => { setIsConfirmModalOpen(false); setConfirmInput('') }}
+                                    className="flex-1 py-3 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest rounded-lg hover:bg-white/5 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={confirmGoogleUnlink}
+                                    disabled={confirmInput !== user?.username || googleLoading}
+                                    className="flex-1 py-3 bg-[#ff5c5c] text-white font-mono text-[10px] uppercase tracking-widest rounded-lg 
+                                               hover:bg-[#ff4040] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    {googleLoading ? 'Disconnecting...' : 'Confirm'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
+
 
 export default EditProfile

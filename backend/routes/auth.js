@@ -1,6 +1,8 @@
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
+import axios from 'axios'
+import { z } from 'zod'
 
 import User from '../models/User.js'
 import Follow from '../models/Follow.js'
@@ -8,6 +10,16 @@ import Notification from '../models/Notification.js'
 import FollowRequest from '../models/FollowRequest.js'
 import protect from '../middleware/auth.js'
 import { awardXP, deductXP } from '../utils/xp.js'
+import { 
+    sendVerificationEmail, 
+    sendResetPasswordEmail, 
+    sendWelcomeEmail, 
+    sendPasswordResetSuccessEmail,
+    sendAccountLinkedEmail,
+    sendAccountUnlinkedEmail
+} from '../utils/email.js'
+import { optimizeAvatar } from '../utils/image.js'
+import logger from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -21,8 +33,30 @@ const isProfane = (str) => {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/
 
-const createToken = (userId) =>
-    jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' })
+const sendTokenResponse = (user, statusCode, res) => {
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+        expiresIn: '7d',
+    })
+
+    const cookieOptions = {
+        expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax', // or 'strict' depending on cross-site needs
+    }
+
+    res.status(statusCode)
+        .cookie('questdeck_token', token, cookieOptions)
+        .json({
+            success: true,
+            token, // still sending for mobile compatibility if needed
+            user: userPayload(user),
+        })
+}
+
+const generateVerificationCode = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString()
+}
 
 const userPayload = (user) => ({
     id: user._id,
@@ -35,6 +69,8 @@ const userPayload = (user) => ({
     xp: user.xp || 0,
     level: user.level || 1,
     badge: user.badge || '🎮',
+    googleId: user.googleId || null,
+    hasPassword: !!user.password,
 })
 
 // ── GET /api/auth/check-username ─────────────────────────────────────────────
@@ -80,10 +116,36 @@ router.post('/signup', async (req, res) => {
         if (usernameExists)
             return res.status(400).json({ success: false, message: 'Username already taken', field: 'username' })
 
-        const user = await User.create({ username: username.trim(), email: email.toLowerCase().trim(), password })
-        const token = createToken(user._id)
-        res.status(201).json({ success: true, message: 'Account created successfully!', token, user: userPayload(user) })
+        const verificationCode = generateVerificationCode()
+        const verificationExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+
+        const user = await User.create({
+            username: username.trim(),
+            email: email.toLowerCase().trim(),
+            password,
+            isEmailVerified: false,
+            emailVerifyToken: verificationCode,
+            emailVerifyExpires: verificationExpires
+        })
+
+        // Send verification email
+        const emailResult = await sendVerificationEmail(user.email, user.username, verificationCode)
+        
+        if (!emailResult.success) {
+            // If email fails, we might want to inform the user but the account is created.
+            // However, usually it's better to fail the request so they can try again.
+            await User.findByIdAndDelete(user._id)
+            return res.status(500).json({ success: false, message: 'Failed to send verification email. Please check your SMTP settings.' })
+        }
+
+        res.status(201).json({
+            success: true,
+            message: 'Account created! Please verify your email.',
+            email: user.email,
+            requiresVerification: true
+        })
     } catch (error) {
+        logger.error('Signup error:', error)
         res.status(500).json({ success: false, message: 'Signup failed. Please try again.' })
     }
 })
@@ -95,7 +157,7 @@ router.post('/login', async (req, res) => {
         if (!email || !password)
             return res.status(400).json({ success: false, message: 'Please provide email and password' })
 
-        const user = await User.findOne({ email: email.toLowerCase() })
+        const user = await User.findOne({ email: email.toLowerCase().trim() })
         if (!user)
             return res.status(401).json({ success: false, message: 'Invalid email or password' })
 
@@ -106,10 +168,144 @@ router.post('/login', async (req, res) => {
         if (!isPasswordCorrect)
             return res.status(401).json({ success: false, message: 'Invalid email or password' })
 
-        const token = createToken(user._id)
-        res.json({ success: true, message: 'Logged in successfully', token, user: userPayload(user) })
+        if (!user.isEmailVerified) {
+            return res.status(403).json({
+                success: false,
+                message: 'Please verify your email to log in.',
+                requiresVerification: true,
+                email: user.email
+            })
+        }
+
+        sendTokenResponse(user, 200, res)
     } catch (error) {
+        logger.error('Login error:', error)
         res.status(500).json({ success: false, message: 'Login failed. Please try again.' })
+    }
+})
+
+// ── POST /api/auth/verify-email ────────────────────────────────────────────────
+router.post('/verify-email', async (req, res) => {
+    try {
+        const { email, code } = req.body
+        if (!email || !code)
+            return res.status(400).json({ success: false, message: 'Email and code are required' })
+
+        const user = await User.findOne({
+            email: email.toLowerCase(),
+            emailVerifyToken: code,
+            emailVerifyExpires: { $gt: Date.now() }
+        })
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired verification code' })
+        }
+
+        user.isEmailVerified = true
+        user.emailVerifyToken = null
+        user.emailVerifyExpires = null
+        await user.save()
+
+        // Send Welcome email
+        await sendWelcomeEmail(user.email, user.username)
+
+        sendTokenResponse(user, 200, res)
+    } catch (error) {
+        logger.error('Verification error:', error)
+        res.status(500).json({ success: false, message: 'Verification failed' })
+    }
+})
+
+// ── POST /api/auth/resend-verification ─────────────────────────────────────────
+router.post('/resend-verification', async (req, res) => {
+    try {
+        const { email } = req.body
+        if (!email) return res.status(400).json({ success: false, message: 'Email is required' })
+
+        const user = await User.findOne({ email: email.toLowerCase() })
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' })
+
+        if (user.isEmailVerified)
+            return res.status(400).json({ success: false, message: 'Email is already verified' })
+
+        const verificationCode = generateVerificationCode()
+        user.emailVerifyToken = verificationCode
+        user.emailVerifyExpires = new Date(Date.now() + 10 * 60 * 1000)
+        await user.save()
+
+        const emailResult = await sendVerificationEmail(user.email, user.username, verificationCode)
+        if (!emailResult.success) {
+            return res.status(500).json({ success: false, message: 'Failed to send verification code. Please try again later.' })
+        }
+        res.json({ success: true, message: 'Verification code resent!' })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to resend code' })
+    }
+})
+
+// ── POST /api/auth/forgot-password ─────────────────────────────────────────────
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body
+        if (!email) return res.status(400).json({ success: false, message: 'Email is required' })
+
+        const user = await User.findOne({ email: email.toLowerCase() })
+        if (!user) return res.status(404).json({ success: false, message: 'No account found with this email' })
+
+        const resetCode = generateVerificationCode()
+        user.resetPasswordToken = resetCode
+        user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000)
+        await user.save()
+
+        const emailResult = await sendResetPasswordEmail(user.email, user.username, resetCode)
+        if (!emailResult.success) {
+            return res.status(500).json({ success: false, message: 'Failed to send reset code. Please try again later.' })
+        }
+        res.json({ success: true, message: 'Password reset code sent to your email' })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to process forgot password' })
+    }
+})
+
+// ── POST /api/auth/reset-password ──────────────────────────────────────────────
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { email, code, newPassword } = req.body
+        if (!email || !code || !newPassword)
+            return res.status(400).json({ success: false, message: 'All fields are required' })
+
+        if (newPassword.length < 6)
+            return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' })
+
+        const user = await User.findOne({
+            email: email.toLowerCase(),
+            resetPasswordToken: code,
+            resetPasswordExpires: { $gt: Date.now() }
+        })
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Invalid or expired reset code' })
+        }
+
+        // Check if new password is same as old
+        const isSamePassword = await user.comparePassword(newPassword)
+        if (isSamePassword) {
+            return res.status(400).json({ success: false, message: 'New password cannot be the same as the old password' })
+        }
+
+        user.password = newPassword
+        user.resetPasswordToken = null
+        user.resetPasswordExpires = null
+        // Also verify email if it wasn't
+        user.isEmailVerified = true 
+        await user.save()
+
+        // Send reset success email
+        await sendPasswordResetSuccessEmail(user.email, user.username)
+
+        res.json({ success: true, message: 'Password reset successfully! You can now log in.' })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to reset password' })
     }
 })
 
@@ -120,13 +316,11 @@ router.post('/google', async (req, res) => {
         if (!accessToken)
             return res.status(400).json({ success: false, message: 'No Google token provided' })
 
-        const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        const { data: googleData } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
             headers: { Authorization: `Bearer ${accessToken}` }
         })
-        if (!googleRes.ok)
-            return res.status(401).json({ success: false, message: 'Invalid Google token' })
-
-        const { sub: googleId, email, name, picture } = await googleRes.json()
+        
+        const { sub: googleId, email, name, picture } = googleData
         if (!email)
             return res.status(401).json({ success: false, message: 'Could not get email from Google' })
 
@@ -138,27 +332,135 @@ router.post('/google', async (req, res) => {
                 await user.save()
             }
         } else {
-            let baseUsername = (name || 'user').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 16)
+            let baseUsername = (name || 'user').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 12)
             if (!baseUsername) baseUsername = 'user'
             let username = baseUsername
             let counter = 1
             while (await User.findOne({ username })) username = `${baseUsername}${counter++}`
-            user = await User.create({ username, email: email.toLowerCase(), password: crypto.randomBytes(32).toString('hex'), googleId, avatar: picture || '' })
+            user = await User.create({ 
+                username, 
+                email: email.toLowerCase(), 
+                password: null, // No password set yet
+                googleId, 
+                avatar: picture || '',
+                isEmailVerified: true // Google accounts are pre-verified
+            })
         }
 
-        const token = createToken(user._id)
-        res.json({ success: true, message: 'Logged in with Google', token, user: userPayload(user) })
+        sendTokenResponse(user, 200, res)
     } catch (error) {
+        logger.error('Google login error:', error)
         res.status(500).json({ success: false, message: 'Google sign-in failed', error: error.message })
     }
 })
 
-// ── GET /api/auth/me ──────────────────────────────────────────────────────────
+// ── POST /api/auth/link-google ──────────────────────────────────────────────
+router.post('/link-google', protect, async (req, res) => {
+    try {
+        const { accessToken } = req.body
+        if (!accessToken) return res.status(400).json({ success: false, message: 'No Google token provided' })
+
+        const { data: googleData } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        })
+
+        const { sub: googleId, email, picture } = googleData
+        
+        // 1. Check if this google account is already linked to SOME OTHER user
+        const alreadyLinked = await User.findOne({ googleId })
+        if (alreadyLinked) {
+            if (alreadyLinked._id.toString() === req.user._id.toString()) {
+                return res.status(400).json({ success: false, message: 'Google account already linked to this profile' })
+            }
+            return res.status(400).json({ success: false, message: 'This Google account is already linked to another user' })
+        }
+
+        const user = await User.findById(req.user._id)
+        user.googleId = googleId
+        if (!user.avatar && picture) user.avatar = picture
+        await user.save()
+
+        // Send confirmation email
+        sendAccountLinkedEmail(user.email, user.username, 'Google').catch(err => logger.error('Email error:', err))
+
+        res.json({ success: true, message: 'Google account linked successfully', user: userPayload(user) })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to link Google account' })
+    }
+})
+
+// ── POST /api/auth/unlink-google ──────────────────────────────────────────────
+router.post('/unlink-google', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+        
+        if (!user.password) {
+            return res.status(400).json({ success: false, message: 'Cannot unlink Google account without a set password. Please set a password first.' })
+        }
+
+        user.googleId = null
+        await user.save()
+
+        // Send confirmation email
+        sendAccountUnlinkedEmail(user.email, user.username, 'Google').catch(err => logger.error('Email error:', err))
+
+        res.json({ success: true, message: 'Google account unlinked successfully', user: userPayload(user) })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to unlink Google account' })
+    }
+})
+
 router.get('/me', protect, async (req, res) => {
     try {
-        const user = await User.findById(req.user._id).select('-password')
+        const user = await User.findById(req.user._id)
         if (!user) return res.status(404).json({ success: false, message: 'User not found' })
-        res.json({ success: true, user })
+        res.json({ success: true, user: userPayload(user) })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
+// ── PATCH /api/auth/set-password ──────────────────────────────────────────────
+router.patch('/set-password', protect, async (req, res) => {
+    try {
+        const { password } = req.body
+        if (!password || password.length < 6) 
+            return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' })
+        
+        const user = await User.findById(req.user._id)
+        if (user.password) 
+            return res.status(400).json({ success: false, message: 'Password already exists. Use change password instead.' })
+        
+        user.password = password
+        await user.save()
+        
+        res.json({ success: true, message: 'Password set successfully!', user: userPayload(user) })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
+// ── PATCH /api/auth/change-password ──────────────────────────────────────────
+router.patch('/change-password', protect, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body
+        if (!currentPassword || !newPassword || newPassword.length < 6)
+            return res.status(400).json({ success: false, message: 'Invalid inputs' })
+
+        const user = await User.findById(req.user._id)
+        const isMatch = await user.comparePassword(currentPassword)
+        if (!isMatch) return res.status(400).json({ success: false, message: 'Incorrect current password' })
+
+        if (currentPassword === newPassword)
+            return res.status(400).json({ success: false, message: 'New password cannot be same as current' })
+
+        user.password = newPassword
+        await user.save()
+
+        // Send confirmation email
+        sendPasswordResetSuccessEmail(user.email, user.username).catch(err => logger.error('Email error:', err))
+
+        res.json({ success: true, message: 'Password updated successfully!' })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
@@ -180,15 +482,14 @@ router.get('/profile/:username', async (req, res) => {
         let isFollowedByMe = false
         let isRequestedByMe = false
         let followsMe = false
-        const authHeader = req.headers.authorization
-        if (authHeader?.startsWith('Bearer ')) {
+        const token = req.cookies?.questdeck_token || req.headers.authorization?.split(' ')[1]
+        if (token) {
             try {
-                const token = authHeader.split(' ')[1]
                 const decoded = jwt.verify(token, process.env.JWT_SECRET)
                 const [followDoc, requestDoc, followsMeDoc] = await Promise.all([
                     Follow.findOne({ followerId: decoded.userId, followingId: user._id }),
                     FollowRequest.findOne({ sender: decoded.userId, recipient: user._id, status: 'pending' }),
-                    Follow.findOne({ followerId: user._id, followingId: decoded.userId })
+                    Follow.findOne({ followerId: user._id, followingId: req.user?._id || decoded.userId })
                 ])
                 isFollowedByMe = !!followDoc
                 isRequestedByMe = !!requestDoc
@@ -402,17 +703,15 @@ router.put('/profile', protect, async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Bio max 150 characters' })
             updates.bio = bio.trim()
         }
-        if (avatar !== undefined) updates.avatar = avatar
+        if (avatar !== undefined) {
+            // High-performance image processing using Sharp
+            updates.avatar = await optimizeAvatar(avatar)
+        }
 
         const updatedUser = await User.findByIdAndUpdate(req.user._id, { $set: updates }, { returnDocument: 'after' })
         res.json({
             success: true,
-            user: {
-                _id: updatedUser._id, username: updatedUser.username,
-                email: updatedUser.email, bio: updatedUser.bio,
-                avatar: updatedUser.avatar, isPrivate: updatedUser.isPrivate,
-                xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge,
-            }
+            user: userPayload(updatedUser)
         })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })

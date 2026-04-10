@@ -22,7 +22,7 @@ export const updateGlobalStats = async (igdbId, updates = {}) => {
         const stats = await GlobalStats.findOneAndUpdate(
             { igdbId: Number(igdbId) },
             { $inc: inc },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
+            { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
         )
 
         // Recalculate average if rating changed

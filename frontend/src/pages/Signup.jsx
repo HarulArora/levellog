@@ -99,11 +99,15 @@ function Signup() {
         }
 
         setLoading(true)
-        const result = await signup(trimmedUsername, formData.email, formData.password)
+        const result = await signup(formData.username, formData.email, formData.password)
         setLoading(false)
 
         if (result.success) {
-            navigate('/library')
+            if (result.requiresVerification) {
+                navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`)
+            } else {
+                navigate('/library')
+            }
         } else {
             if (result.field) {
                 setFieldError(prev => ({ ...prev, [result.field]: result.message }))
@@ -135,11 +139,19 @@ function Signup() {
     return (
         <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
-                <button onClick={() => navigate(-1)}
-                    className="flex items-center gap-2 font-mono text-xs text-[#7a7a90]
-                               hover:text-[#c8ff57] transition-colors mb-6">
-                    ← BACK
-                </button>
+                <div className="flex items-center justify-between mb-6">
+                    <button onClick={() => navigate(-1)}
+                        className="flex items-center gap-2 font-mono text-xs text-[#7a7a90]
+                                   hover:text-[#c8ff57] transition-colors">
+                        ← BACK
+                    </button>
+                    <button onClick={() => navigate('/')}
+                        className="flex items-center gap-2 font-mono text-xs text-[#7a7a90]
+                                   hover:text-[#c8ff57] transition-colors">
+                        <HomeIcon />
+                        HOME
+                    </button>
+                </div>
 
                 <div className="text-center mb-8">
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
@@ -149,7 +161,7 @@ function Signup() {
                     <p className="text-[#7a7a90] font-mono text-xs">Start your gaming odyssey today</p>
                 </div>
 
-                <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
+                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
 
                     <h2 className="font-black text-xl tracking-widest uppercase mb-6 text-white text-center hover:text-[#c8ff57] transition-colors cursor-default"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
@@ -158,6 +170,7 @@ function Signup() {
 
                     {/* Google button */}
                     <button
+                        type="button"
                         onClick={() => googleLogin()}
                         disabled={googleLoading || loading}
                         className="w-full flex items-center justify-center gap-3 py-2.5 mb-4
@@ -191,13 +204,16 @@ function Signup() {
                     {/* Username */}
                     <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
-                            <label className="font-mono text-xs uppercase tracking-wider text-[#7a7a90]">Username</label>
+                            <label className="font-mono text-xs uppercase tracking-wider text-[#7a7a90]" htmlFor="username">Username</label>
                             <span className={`font-mono text-[10px] tabular-nums ${formData.username.length >= 20 ? 'text-[#ff5c5c]' : formData.username.length >= 16 ? 'text-[#ffaa57]' : 'text-[#3a3a50]'}`}>
                                 {formData.username.length}/20
                             </span>
                         </div>
                         <input
+                            id="username"
+                            name="username"
                             type="text"
+                            autoComplete="username"
                             placeholder="Letters, numbers, underscore"
                             value={formData.username}
                             onChange={e => handleChange('username', e.target.value)}
@@ -233,9 +249,12 @@ function Signup() {
                     {/* Email */}
                     <div className="mb-4">
                         <label className="block font-mono text-xs uppercase tracking-wider
-                                          text-[#7a7a90] mb-2">Email</label>
+                                          text-[#7a7a90] mb-2" htmlFor="email">Email</label>
                         <input
+                            id="email"
+                            name="email"
                             type="email"
+                            autoComplete="email"
                             placeholder="you@email.com"
                             value={formData.email}
                             onChange={e => handleChange('email', e.target.value)}
@@ -263,10 +282,13 @@ function Signup() {
                     {/* Password */}
                     <div className="mb-4">
                         <label className="block font-mono text-xs uppercase tracking-wider
-                                          text-[#7a7a90] mb-2">Password</label>
+                                          text-[#7a7a90] mb-2" htmlFor="password">Password</label>
                         <div className="relative">
                             <input
+                                id="password"
+                                name="password"
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
                                 placeholder="Min 6 characters"
                                 value={formData.password}
                                 onChange={e => handleChange('password', e.target.value)}
@@ -298,10 +320,13 @@ function Signup() {
                     {/* Confirm Password */}
                     <div className="mb-6">
                         <label className="block font-mono text-xs uppercase tracking-wider
-                                          text-[#7a7a90] mb-2">Re-enter Password</label>
+                                          text-[#7a7a90] mb-2" htmlFor="confirmPassword">Re-enter Password</label>
                         <div className="relative">
                             <input
+                                id="confirmPassword"
+                                name="confirmPassword"
                                 type={showConfirmPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
                                 placeholder="Repeat your password"
                                 value={formData.confirmPassword}
                                 onChange={e => handleChange('confirmPassword', e.target.value)}
@@ -339,7 +364,7 @@ function Signup() {
                     </div>
 
                     <button
-                        onClick={handleSubmit}
+                        type="submit"
                         disabled={loading || googleLoading}
                         className="w-full py-3 bg-[#c8ff57] text-black font-bold text-sm
                                    rounded hover:bg-[#d4ff6e] transition-all
@@ -347,8 +372,9 @@ function Signup() {
                     >
                         {loading ? 'Creating account...' : 'Create Account'}
                     </button>
-
-                    <p className="text-center text-[#7a7a90] font-mono text-xs mt-4">
+                </form>
+                <div className="mt-4">
+                    <p className="text-center text-[#7a7a90] font-mono text-xs">
                         Already have an account?{' '}
                         <Link to="/login" className="text-[#c8ff57] hover:underline">Login</Link>
                     </p>
@@ -383,6 +409,15 @@ function EyeOffIcon() {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
             <line x1="1" y1="1" x2="23" y2="23" />
+        </svg>
+    )
+}
+
+function HomeIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
     )
 }

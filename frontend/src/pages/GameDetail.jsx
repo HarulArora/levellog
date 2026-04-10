@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
@@ -8,9 +9,10 @@ import { invalidateCache } from '../utils/cache'
 import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play } from 'lucide-react'
 import AddGameModal from '../components/library/AddGameModal'
 import Skeleton from '../components/ui/Skeleton'
+import { getIGDBImage, SIZES } from '../utils/igdb'
 
 // ── Single comment + replies ──
-function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) {
+const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) => {
     const navigate = useNavigate()
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [replyText, setReplyText] = useState('')
@@ -261,7 +263,7 @@ function CommentItem({ comment, currentUser, igdbId, onRefresh, onXpToast, depth
             </div>
         </div>
     )
-}
+})
 
 // ── Main GameDetail ──
 function GameDetail() {
@@ -299,8 +301,28 @@ function GameDetail() {
     const { data: statsData, refetch: refetchStats } = useCachedFetch(
         `game_stats_v2_${igdbId}`,
         `/games/stats/${igdbId}`,
-        { ttl: 5 * 60 * 1000, deps: [igdbId] }
+        { enabled: !!igdbId, ttl: 5 * 60 * 1000 }
     )
+
+    const { data: likeData, refetch: refetchLike } = useCachedFetch(
+        user ? `game_like_${user.id || user._id}_${igdbId}` : null,
+        `/lists/like/${igdbId}`,
+        { enabled: !!igdbId && !!user, ttl: 0 }
+    )
+
+    const { data: wishData, refetch: refetchWish } = useCachedFetch(
+        user ? `game_wish_${user.id || user._id}_${igdbId}` : null,
+        `/lists/wishlist/${igdbId}`,
+        { enabled: !!igdbId && !!user, ttl: 0 }
+    )
+
+    useEffect(() => {
+        if (likeData) setLiked(likeData.liked)
+    }, [likeData])
+
+    useEffect(() => {
+        if (wishData) setWishlisted(wishData.wishlisted)
+    }, [wishData])
 
     const { data: commentsData, refetch: refetchComments } = useCachedFetch(
         `game_comments_${igdbId}`,
@@ -311,7 +333,7 @@ function GameDetail() {
     const game = gameData?.game
     const loading = loadingGame
     const error = gameError
-    const platformStats = statsData?.stats
+    const stats = statsData?.stats // Renamed from platformStats to avoid conflict
     const comments = commentsData?.comments || []
 
     const [similarStats, setSimilarStats] = useState({})
@@ -324,11 +346,15 @@ function GameDetail() {
         }
     }, [game])
 
-    const showXpToast = (msg, type = 'gain') => {
+    const showXpToast = useCallback((msg, type = 'gain') => {
         setXpToast({ msg, type })
         setTimeout(() => setXpToast(null), 3000)
-    }
-    const showListToast = (msg, type = 'success') => { setListToast({ msg, type }); setTimeout(() => setListToast(null), 3000) }
+    }, [])
+
+    const showListToast = useCallback((msg, type = 'success') => { 
+        setListToast({ msg, type })
+        setTimeout(() => setListToast(null), 3000) 
+    }, [])
 
     const myGame = userGames.find(g =>
         g.igdbId === parseInt(igdbId) || g.title?.toLowerCase() === game?.title?.toLowerCase()
@@ -338,20 +364,6 @@ function GameDetail() {
     const fetchComments = refetchComments
 
 
-    useEffect(() => {
-        if (!game || !user) return
-        const fetchSocial = async () => {
-            try {
-                const [likeRes, wishRes] = await Promise.all([
-                    api.get(`/lists/like/${igdbId}`),
-                    api.get(`/lists/wishlist/${igdbId}`)
-                ])
-                setLiked(likeRes.data.liked)
-                setWishlisted(wishRes.data.wishlisted)
-            } catch (err) { }
-        }
-        fetchSocial()
-    }, [game, user])
 
     useEffect(() => {
         const handler = (e) => {
@@ -374,7 +386,12 @@ function GameDetail() {
     const handleLike = async () => {
         if (!user) { navigate('/login'); return }
         if (liking) return
+        
+        // Optimistic Update
+        const wasLiked = liked
+        setLiked(!wasLiked)
         setLiking(true)
+        
         try {
             const res = await api.post('/lists/like', {
                 igdbId: parseInt(igdbId), gameTitle: game.title, gameCover: game.cover, genre: game.genre
@@ -384,14 +401,23 @@ function GameDetail() {
             else showXpToast('💔 Unliked · -1 XP', 'loss')
             invalidateCache(`lists_${user.id || user._id}`)
             invalidateCache(`game_stats_v2_${igdbId}`)
+            invalidateCache(`game_like_${user.id || user._id}_${igdbId}`)
             await fetchPlatformStats()
-        } catch (err) { } finally { setLiking(false) }
+            if (typeof refetchLike === 'function') await refetchLike()
+        } catch (err) {
+            setLiked(wasLiked) // Revert on failure
+        } finally { setLiking(false) }
     }
 
     const handleWishlist = async () => {
         if (!user) { navigate('/login'); return }
         if (wishing) return
+
+        // Optimistic Update
+        const wasWishlisted = wishlisted
+        setWishlisted(!wasWishlisted)
         setWishing(true)
+
         try {
             const res = await api.post('/lists/wishlist', {
                 igdbId: parseInt(igdbId), gameTitle: game.title,
@@ -401,8 +427,12 @@ function GameDetail() {
             if (res.data.wishlisted) showXpToast('🎯 Wishlisted!', 'gain')
             invalidateCache(`lists_${user.id || user._id}`)
             invalidateCache(`game_stats_v2_${igdbId}`)
+            invalidateCache(`game_wish_${user.id || user._id}_${igdbId}`)
             await fetchPlatformStats()
-        } catch (err) { } finally { setWishing(false) }
+            if (typeof refetchWish === 'function') await refetchWish()
+        } catch (err) {
+            setWishlisted(wasWishlisted) // Revert on failure
+        } finally { setWishing(false) }
     }
 
     const handleOpenListModal = async () => {
@@ -498,11 +528,19 @@ function GameDetail() {
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: '⏸ Paused' },
     }
 
-    const getLargeScreenshot = (url) => url.replace('t_screenshot_big', 't_screenshot_huge')
+    const getLargeScreenshot = (url) => getIGDBImage(url, SIZES.HD)
     const totalComments = comments.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0)
 
     return (
         <div className="min-h-screen">
+            <Helmet>
+                <title>{game.title || game.name} | QuestDeck</title>
+                <meta name="description" content={game.summary?.slice(0, 160) || `View community stats and reviews for ${game.title} on QuestDeck.`} />
+                <meta property="og:title" content={`${game.title} - QuestDeck Community`} />
+                <meta property="og:description" content={game.summary?.slice(0, 200)} />
+                {game.cover && <meta property="og:image" content={game.cover} />}
+                <meta name="twitter:card" content="summary_large_image" />
+            </Helmet>
 
             {/* Lightbox */}
             {lightboxIndex !== null && game.screenshots?.length > 0 && (
@@ -571,7 +609,7 @@ function GameDetail() {
                     <div className="flex flex-col md:flex-row gap-8 items-start">
                         {game.cover && (
                             <div className="flex-shrink-0 drop-shadow-2xl">
-                                <img src={game.cover} alt={game.title}
+                                <img src={getIGDBImage(game.cover, SIZES.COVER_BIG)} alt={game.title}
                                     className="w-36 md:w-48 rounded-lg shadow-2xl ring-1 ring-white/10" />
                             </div>
                         )}
@@ -611,11 +649,11 @@ function GameDetail() {
                                 <div>
                                     <div className="font-black text-4xl text-[#5c9fff] leading-none"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                        {platformStats?.avgRating ?? '—'}
-                                        {platformStats?.avgRating && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>}
+                                        {stats?.avgRating ?? '—'}
+                                        {stats?.avgRating && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>}
                                     </div>
                                     <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
-                                        Avg Rating {platformStats?.ratingCount > 0 && <span className="ml-1 text-[#7a7a90]">({platformStats.ratingCount})</span>}
+                                        Avg Rating {stats?.ratingCount > 0 && <span className="ml-1 text-[#7a7a90]">({stats.ratingCount})</span>}
                                     </div>
                                 </div>
                                 {user && myGame?.rating > 0 && (
@@ -629,17 +667,17 @@ function GameDetail() {
                                 )}
                                 <div>
                                     <div className="font-black text-4xl text-[#ff9f5c] leading-none"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{platformStats?.loggedCount ?? '—'}</div>
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.loggedCount ?? '—'}</div>
                                     <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Decked</div>
                                 </div>
                                 <div>
                                     <div className="font-black text-4xl text-[#ff5c5c] leading-none"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{platformStats?.likeCount ?? '—'}</div>
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.likeCount ?? '—'}</div>
                                     <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Likes</div>
                                 </div>
                                 <div>
                                     <div className="font-black text-4xl text-[#5c9fff] leading-none"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{platformStats?.wishlistCount ?? '—'}</div>
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.wishlistCount ?? '—'}</div>
                                     <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Wishlists</div>
                                 </div>
                             </div>

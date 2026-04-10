@@ -7,6 +7,7 @@ import { invalidateCache } from '../utils/cache'
 import { useFollow } from '../context/FollowContext'
 import FollowListModal from '../components/profile/FollowListModal'
 import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List } from 'lucide-react'
+import { getIGDBImage, SIZES } from '../utils/igdb'
 
 function Profile() {
     const { username } = useParams()
@@ -424,11 +425,7 @@ function Profile() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                             {recentGames.map(game => {
                                 const sc = statusConfig[game.status] || statusConfig.planned
-                                const imageUrl = game.cover
-                                    ? game.cover
-                                    : game.steamId
-                                        ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
-                                        : null
+                                const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_BIG)
                                 return (
                                     <Link
                                         key={game._id}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, memo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
@@ -6,6 +6,7 @@ import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { Search } from 'lucide-react'
 import { GameCardSkeleton } from '../components/ui/Skeleton'
+import { getIGDBImage, SIZES } from '../utils/igdb'
 
 const GENRE_CARDS = [
     { label: 'Action RPG', igdb: 'Role-playing (RPG)', emoji: '⚔️' },
@@ -71,7 +72,7 @@ const STATUS_COLORS = {
     Planned: { color: '#ff9f5c', label: 'Planned' },   // ← ADD THIS
 }
 
-function PlatBadge({ name }) {
+const PlatBadge = memo(({ name }) => {
     const s = PLAT_COLORS[name] || { bg: 'rgba(255,255,255,0.06)', color: '#888', border: 'rgba(255,255,255,0.1)' }
     const short = name === 'Xbox Series' ? 'X|S' : name === 'Xbox One' ? 'XOne' : name
     return (
@@ -88,9 +89,9 @@ function PlatBadge({ name }) {
             letterSpacing: '0.02em',
         }}>{short}</span>
     )
-}
+})
 
-function StatusPill({ status }) {
+const StatusPill = memo(({ status }) => {
     const s = STATUS_COLORS[status]
     if (!s) return null
     return (
@@ -107,11 +108,11 @@ function StatusPill({ status }) {
             display: 'inline-block',
         }}>{status}</span>
     )
-}
+})
 
 
 
-function GameCard({ game, entry, onClick }) {
+const GameCard = memo(({ game, entry, onClick }) => {
     const status = entry?.status
     const userRating = entry?.rating
     const statusStyle = status ? STATUS_COLORS[status] : null
@@ -147,7 +148,7 @@ function GameCard({ game, entry, onClick }) {
             <div style={{ height: 110, position: 'relative', overflow: 'hidden', background: '#18181f' }}>
                 {game.cover ? (
                     <img
-                        src={game.cover}
+                        src={getIGDBImage(game.cover, SIZES.COVER_BIG)}
                         alt={game.title}
                         loading="lazy"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
@@ -257,12 +258,11 @@ function GameCard({ game, entry, onClick }) {
                             {game.genre}
                         </span>
                     )}
-
                 </div>
             </div>
         </div>
     )
-}
+})
 
 export default function Discover() {
     const { user } = useAuth()

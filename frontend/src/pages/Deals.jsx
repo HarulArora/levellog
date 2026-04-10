@@ -98,17 +98,19 @@ function DealCard({ deal }) {
 
     return (
         <a href={url} target="_blank" rel="noopener noreferrer"
-            style={{ display: 'flex', textDecoration: 'none', color: 'inherit', background: '#111118', border: `1px solid ${isFree ? 'rgba(200,255,87,0.25)' : '#2a2a35'}`, borderRadius: 8, overflow: 'hidden', transition: 'all 0.18s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#c8ff57'; e.currentTarget.style.transform = 'translateX(3px)'; e.currentTarget.style.background = '#13131c' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = isFree ? 'rgba(200,255,87,0.25)' : '#2a2a35'; e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.background = '#111118' }}
+            className="group flex no-underline color-inherit bg-[#111118] border border-[#2a2a35] 
+                       rounded-lg overflow-hidden transition-all duration-200 
+                       hover:border-[#c8ff57] active:scale-[0.98] active:bg-[#13131c]"
+            style={{ border: isFree ? '1px solid rgba(200,255,87,0.25)' : undefined }}
         >
-            <div style={{ width: 100, flexShrink: 0, background: '#18181f', position: 'relative', overflow: 'hidden' }}>
+            <div className="w-[85px] sm:w-[100px] flex-shrink-0 bg-[#18181f] relative overflow-hidden">
                 {deal.thumb
-                    ? <img src={deal.thumb} alt={deal.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, color: '#2a2a35' }}>🎮</div>
+                    ? <img src={deal.thumb} alt={deal.title} className="w-full h-full object-cover block transition-transform group-hover:scale-110" />
+                    : <div className="w-full h-full flex items-center justify-center text-2xl text-[#2a2a35]">🎮</div>
                 }
                 {(hasDiscount || isFree) && (
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: isFree ? '#c8ff57' : 'rgba(255,50,50,0.93)', color: isFree ? '#000' : '#fff', fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 11, textAlign: 'center', padding: '3px 0' }}>
+                    <div className={`absolute bottom-0 left-0 right-0 font-mono font-bold text-[10px] 
+                                    text-center py-0.5 ${isFree ? 'bg-[#c8ff57] text-black' : 'bg-[#ff3232]/95 text-white'}`}>
                         {isFree ? 'FREE' : `-${savings}%`}
                     </div>
                 )}
@@ -221,7 +223,18 @@ export default function Deals() {
         .deals-grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
         @media (min-width: 640px)  { .deals-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
         @media (min-width: 1024px) { .deals-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
-        .filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .filter-row { display: flex; gap: 8px; align-items: center; }
+        @media (max-width: 640px) { 
+            .filter-row { 
+                overflow-x: auto; 
+                padding-bottom: 8px; 
+                margin-bottom: -8px;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+            .filter-row::-webkit-scrollbar { display: none; }
+            .filter-row > button { white-space: nowrap; flex-shrink: 0; }
+        }
         .sec-title { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 3px; margin: 0; color: #e8e8f0; }
         .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #2a2a35; flex-wrap: wrap; }
         .pill { padding: 5px 13px; border-radius: 4px; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 11px; transition: all 0.15s; background: transparent; line-height: 1.4; }
