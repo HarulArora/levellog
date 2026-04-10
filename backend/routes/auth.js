@@ -369,7 +369,15 @@ router.post('/google', async (req, res) => {
             if (!baseUsername) baseUsername = 'user'
             let username = baseUsername
             let counter = 1
-            while (await User.findOne({ username })) username = `${baseUsername}${counter++}`
+            
+            // Loop until we find a unique username that is <= 12 characters
+            while (await User.findOne({ username })) {
+                // If adding the counter makes it too long, trim the base further
+                let suffix = counter.toString()
+                let availableSpace = 12 - suffix.length
+                username = baseUsername.slice(0, availableSpace) + suffix
+                counter++
+            }
             user = await User.create({ 
                 username, 
                 email: email.toLowerCase(), 
