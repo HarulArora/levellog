@@ -218,7 +218,7 @@ function Profile() {
                         </div>
 
                         {/* XP + Level */}
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
                             <span className="text-base flex items-center justify-center relative -top-[1px]">{user.badge || <Gamepad2 size={16} strokeWidth={2.5} className="text-[#c8ff57]" />}</span>
                             {isOwnProfile ? (
                                 <Link to="/stats?tab=xp" className="flex items-center gap-2 leading-none hover:opacity-80 transition-opacity cursor-pointer group">
@@ -320,7 +320,7 @@ function Profile() {
                                         ? 'Unfollow'
                                         : requestSent
                                             ? 'Cancel Request'
-                                            : 'Follow'}
+                                            : user.isPrivate ? 'Request' : 'Follow'}
                             </button>
                         )}
 

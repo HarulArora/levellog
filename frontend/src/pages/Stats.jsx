@@ -153,10 +153,10 @@ function Stats() {
                         ← BACK
                     </button>
 
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-center justify-between gap-8">
 
                         {/* Left — avatar + name */}
-                        <div className="flex items-center gap-5">
+                        <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
                             {user.avatar ? (
                                 <img src={user.avatar} alt={user.username}
                                     className="w-20 h-20 rounded-full object-cover flex-shrink-0
@@ -176,7 +176,7 @@ function Stats() {
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                     {user.username}
                                 </div>
-                                <div className="flex items-center gap-2 mt-1">
+                                <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
                                     <span className="text-sm">{currentLevel.badge || '🎮'}</span>
                                     <span className="font-mono text-xs text-[#c8ff57] uppercase tracking-wider">
                                         Level {currentLevel.level || 1}
@@ -193,14 +193,14 @@ function Stats() {
                         </div>
 
                         {/* Right — header stats */}
-                        <div className="flex gap-8 sm:gap-10">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-8 gap-y-4">
                             {[
                                 { value: totalGames, label: 'Games' },
                                 { value: `${totalHours}h`, label: 'Hours' },
                                 { value: avgRating, label: 'Avg Score' },
                                 { value: `${completionRate}%`, label: 'Completion' },
                             ].map(stat => (
-                                <div key={stat.label} className="text-center sm:text-right">
+                                <div key={stat.label} className="text-center">
                                     <div className="font-black text-3xl text-[#c8ff57] leading-none"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                         {stat.value}
