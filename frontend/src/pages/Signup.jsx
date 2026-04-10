@@ -211,8 +211,8 @@ function Signup() {
                     <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
                             <label className="font-mono text-xs uppercase tracking-wider text-[#7a7a90]" htmlFor="username">Username</label>
-                            <span className={`font-mono text-[10px] tabular-nums ${formData.username.length >= 20 ? 'text-[#ff5c5c]' : formData.username.length >= 16 ? 'text-[#ffaa57]' : 'text-[#3a3a50]'}`}>
-                                {formData.username.length}/20
+                            <span className={`font-mono text-[10px] tabular-nums ${formData.username.length >= 12 ? 'text-[#ff5c5c]' : formData.username.length >= 10 ? 'text-[#ffaa57]' : 'text-[#3a3a50]'}`}>
+                                {formData.username.length}/12
                             </span>
                         </div>
                         <input
