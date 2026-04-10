@@ -245,9 +245,16 @@ function Signup() {
                                 </span>
                             )}
                             {!checkingUsername && !fieldError.username && usernameStatus && (
-                                <span className={`font-mono text-[10px] ${usernameStatus.available ? 'text-[#c8ff57]' : 'text-[#ff5c5c]'}`}>
-                                    {usernameStatus.available ? '✓' : '✕'} {usernameStatus.message}
-                                </span>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className={`font-mono text-[10px] ${usernameStatus.available ? 'text-[#c8ff57]' : 'text-[#ff5c5c]'}`}>
+                                        {usernameStatus.available ? '✓' : '✕'} {usernameStatus.message}
+                                    </span>
+                                    {usernameStatus.message?.includes('Reserved') && (
+                                        <span className="font-mono text-[9px] text-[#c8ff57] animate-pulse">
+                                            💡 It will be available to you if the code expires!
+                                        </span>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
