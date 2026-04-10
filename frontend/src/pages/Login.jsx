@@ -132,7 +132,7 @@ function Login() {
                         <input
                             id="email"
                             name="email"
-                            type="email"
+                            type="text"
                             autoComplete="off"
                             placeholder="you@email.com or username"
                             value={formData.email}
