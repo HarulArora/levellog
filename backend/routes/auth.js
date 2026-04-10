@@ -122,7 +122,8 @@ router.post('/signup', async (req, res) => {
 
         const emailExists = await User.findOne({ email: email.toLowerCase().trim() })
         if (emailExists) {
-            if (!emailExists.isEmailVerified && emailExists.emailVerifyExpires < Date.now()) {
+            // Allow re-signup if the account is not verified (resets the record)
+            if (!emailExists.isEmailVerified) {
                 await User.findByIdAndDelete(emailExists._id)
             } else {
                 return res.status(400).json({ success: false, message: 'An account with this email already exists.', field: 'email' })
@@ -131,7 +132,8 @@ router.post('/signup', async (req, res) => {
 
         const usernameExists = await User.findOne({ username: username.trim() })
         if (usernameExists) {
-            if (!usernameExists.isEmailVerified && usernameExists.emailVerifyExpires < Date.now()) {
+            // Allow taking the name if the current holder is unverified
+            if (!usernameExists.isEmailVerified) {
                 await User.findByIdAndDelete(usernameExists._id)
             } else {
                 return res.status(400).json({ success: false, message: 'Username already taken', field: 'username' })
@@ -283,7 +285,20 @@ router.post('/forgot-password', async (req, res) => {
         if (!email) return res.status(400).json({ success: false, message: 'Email is required' })
 
         const user = await User.findOne({ email: email.toLowerCase() })
-        if (!user) return res.status(404).json({ success: false, message: 'No account found with this email' })
+        
+        // Loophole fix: Always say code sent (if account exists)
+        if (!user) {
+            return res.json({ success: true, message: 'If an account exists, a reset code has been sent.' })
+        }
+
+        if (!user.isEmailVerified) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Your account is not verified yet. Please verify your email first.',
+                requiresVerification: true,
+                email: user.email
+            })
+        }
 
         const resetCode = generateVerificationCode()
         user.resetPasswordToken = resetCode

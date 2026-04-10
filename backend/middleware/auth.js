@@ -22,6 +22,15 @@ const protect = async (req, res, next) => {
             })
         }
 
+        if (!user.isEmailVerified) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is not verified yet. Please verify your email.',
+                requiresVerification: true,
+                email: user.email
+            })
+        }
+
         req.user = user
         next()
 

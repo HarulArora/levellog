@@ -27,7 +27,14 @@ function ForgotPassword() {
                 navigate(`/reset-password?email=${encodeURIComponent(email)}`)
             }, 2000)
         } else {
-            setError(result.message)
+            if (result.requiresVerification) {
+                setError(result.message)
+                setTimeout(() => {
+                    navigate(`/verify-email?email=${encodeURIComponent(result.email || email)}`)
+                }, 2000)
+            } else {
+                setError(result.message)
+            }
         }
     }
 
