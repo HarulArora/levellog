@@ -77,6 +77,7 @@ function App() {
                             <Route path="/edit-profile" element={<EditProfile />} />
                             <Route path="/discover" element={<Discover />} />
                             <Route path="/deals" element={<Deals />} />
+                        </Route>
                         <Route path="*" element={<><Navbar /><NotFound /></>} />
                     </Routes>
                 </Suspense>
