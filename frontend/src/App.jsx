@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
-import { HashRouter, Routes, Route, Outlet } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
 import Navbar from './components/Navbar'
 
 const Home = lazy(() => import('./pages/Home'))
@@ -52,7 +52,7 @@ function NotFound() {
 
 function App() {
     return (
-        <HashRouter>
+        <BrowserRouter>
             <ScrollToTop />
             <div className="bg-[#0a0a0f] min-h-screen">
                 <Suspense fallback={<PageLoader />}>
@@ -82,7 +82,7 @@ function App() {
                     </Routes>
                 </Suspense>
             </div>
-        </HashRouter>
+        </BrowserRouter>
     )
 }
 
