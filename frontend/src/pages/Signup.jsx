@@ -251,7 +251,7 @@ function Signup() {
                                     </span>
                                     {usernameStatus.message?.includes('Reserved') && (
                                         <span className="font-mono text-[9px] text-[#c8ff57] animate-pulse">
-                                            💡 It will be available to you if the code expires!
+                                            💡 On hold for verification. If they don't finish, it's all yours!
                                         </span>
                                     )}
                                 </div>
