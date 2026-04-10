@@ -92,13 +92,19 @@ function VerifyEmail() {
                         <input
                             type="email"
                             value={email}
-                            onChange={e => setEmail(e.target.value)}
-                            placeholder="you@email.com"
-                            className="w-full bg-[#18181f] border border-[#2a2a35] rounded
-                                       px-3 py-2 text-sm text-white
-                                       focus:outline-none focus:border-[#c8ff57]
-                                       placeholder:text-[#7a7a90] transition-colors"
+                            readOnly
+                            className="w-full bg-[#0a0a0f] border border-[#2a2a35] rounded
+                                       px-3 py-2 text-sm text-[#7a7a90] cursor-not-allowed
+                                       focus:outline-none transition-colors"
                         />
+                        <div className="flex justify-start mt-2">
+                            <button 
+                                onClick={() => navigate('/signup', { state: { email, username: queryParams.get('username') } })}
+                                className="font-mono text-[10px] uppercase tracking-wider text-[#c8ff57] hover:underline"
+                            >
+                                Change Email?
+                            </button>
+                        </div>
                     </div>
 
                     <div className="mb-6">

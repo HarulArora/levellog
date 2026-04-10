@@ -87,9 +87,21 @@ router.get('/check-username', async (req, res) => {
             return res.json({ available: false, message: 'Username is not allowed' })
 
         const existing = await User.findOne({ username: username.trim() })
-        return res.json(existing
-            ? { available: false, message: 'Username already taken' }
-            : { available: true, message: 'Username is available' })
+        
+        if (existing) {
+            // Unverified and Expired = Available for recapture
+            if (!existing.isEmailVerified && existing.emailVerifyExpires < Date.now()) {
+                 return res.json({ available: true, message: 'Available (old record expired)' })
+            }
+            // Unverified but NOT expired = Temporarily blocked
+            if (!existing.isEmailVerified) {
+                return res.json({ available: false, message: 'Reserved for 10 min for verification' })
+            }
+            // Fully verified = Taken
+            return res.json({ available: false, message: 'Username already taken' })
+        }
+        
+        return res.json({ available: true, message: 'Username is available' })
     } catch {
         res.status(500).json({ available: false, message: 'Check failed' })
     }
@@ -109,12 +121,22 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Username contains restricted words', field: 'username' })
 
         const emailExists = await User.findOne({ email: email.toLowerCase().trim() })
-        if (emailExists)
-            return res.status(400).json({ success: false, message: 'An account with this email already exists.', field: 'email' })
+        if (emailExists) {
+            if (!emailExists.isEmailVerified && emailExists.emailVerifyExpires < Date.now()) {
+                await User.findByIdAndDelete(emailExists._id)
+            } else {
+                return res.status(400).json({ success: false, message: 'An account with this email already exists.', field: 'email' })
+            }
+        }
 
         const usernameExists = await User.findOne({ username: username.trim() })
-        if (usernameExists)
-            return res.status(400).json({ success: false, message: 'Username already taken', field: 'username' })
+        if (usernameExists) {
+            if (!usernameExists.isEmailVerified && usernameExists.emailVerifyExpires < Date.now()) {
+                await User.findByIdAndDelete(usernameExists._id)
+            } else {
+                return res.status(400).json({ success: false, message: 'Username already taken', field: 'username' })
+            }
+        }
 
         const verificationCode = generateVerificationCode()
         const verificationExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
