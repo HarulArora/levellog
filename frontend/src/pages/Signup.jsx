@@ -245,7 +245,7 @@ function Signup() {
                                 </span>
                             )}
                             {!checkingUsername && !fieldError.username && usernameStatus && (
-                                <div className="flex flex-col gap-0.5">
+                                <div className="mt-2 flex flex-col gap-1">
                                     <span className={`font-mono text-[10px] ${usernameStatus.available ? 'text-[#c8ff57]' : 'text-[#ff5c5c]'}`}>
                                         {usernameStatus.available ? '✓' : '✕'} {usernameStatus.message}
                                     </span>
