@@ -12,11 +12,26 @@ function Search() {
     const { getFollowStatus, handleFollowToggle, loadingMap } = useFollow()
 
     // ── CACHED FETCHES ──
-    const { data: suggestionsData, loading: loadingSuggestions } = useCachedFetch(
+    const { data: suggestionsData, loading: loadingSuggestions, refetch: refetchSuggestions } = useCachedFetch(
         currentUser ? 'friend_suggestions' : null,
         '/auth/suggestions',
         { enabled: !!currentUser, ttl: 10 * 60 * 1000 }
     )
+
+    const [localSuggestions, setLocalSuggestions] = useState([])
+
+    useEffect(() => {
+        if (suggestionsData?.users) {
+            setLocalSuggestions(suggestionsData.users)
+        }
+    }, [suggestionsData])
+
+    // If we've followed everyone on the local list, get more!
+    useEffect(() => {
+        if (currentUser && localSuggestions.length === 0 && !loadingSuggestions) {
+            refetchSuggestions()
+        }
+    }, [localSuggestions, loadingSuggestions, currentUser, refetchSuggestions])
 
     const searchKey = query.trim().length >= 2 ? `user_search_${query.trim().toLowerCase()}` : null
     const { data: searchData, loading: loadingSearch } = useCachedFetch(
@@ -25,7 +40,7 @@ function Search() {
         { enabled: !!searchKey, ttl: 5 * 60 * 1000 }
     )
 
-    const suggestions = suggestionsData?.users || []
+    const suggestions = localSuggestions
     const results     = (searchData?.users || []).filter(u => u.username !== currentUser?.username)
     const loading     = loadingSearch
 
@@ -219,15 +234,19 @@ function Search() {
                                             </div>
 
                                             <button
-                                                onClick={() => handleFollowToggle(u)}
+                                                onClick={async () => {
+                                                    await handleFollowToggle(u)
+                                                    // Immediately remove from local suggestions
+                                                    setLocalSuggestions(prev => prev.filter(item => item._id !== u._id))
+                                                }}
                                                 disabled={isBtnLoading}
                                                 className={`w-full py-3 text-xs font-bold rounded-lg transition-all mt-auto
                                                            ${state === 'following'
                                                                 ? 'border border-[#2a2a35] bg-transparent text-[#7a7a90] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'
-                                                                : state === 'requested'
-                                                                    ? 'border border-[#ff9f5c]/50 bg-transparent text-[#ff9f5c] hover:bg-[#ff9f5c]/10'
-                                                                    : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e] hover:shadow-[0_0_15px_rgba(200,255,87,0.3)]'}
-                                                            disabled:opacity-50`}
+                                                                 : state === 'requested'
+                                                                     ? 'border border-[#ff9f5c]/50 bg-transparent text-[#ff9f5c] hover:bg-[#ff9f5c]/10'
+                                                                     : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e] hover:shadow-[0_0_15px_rgba(200,255,87,0.3)]'}
+                                                             disabled:opacity-50`}
                                             >
                                                 {isBtnLoading ? '...' : 
                                                  state === 'following' ? 'Unfollow' : 

@@ -805,30 +805,35 @@ router.get('/suggestions', protect, async (req, res) => {
 
         suggestedIds = suggestedIds.slice(0, 20)
 
+        // Bulk fetch all relevant users
         const users = await User.find({ _id: { $in: suggestedIds } })
-            .select('username avatar bio level badge isPrivate followerCount followingCount')
+            .select('username avatar bio level badge isPrivate followerCount')
 
-        const enriched = await Promise.all(users.map(async u => {
+        // Bulk fetch all relationships for the current user and these suggested IDs
+        const [myFollows, myRequests, whoFollowsMe] = await Promise.all([
+            Follow.find({ followerId: req.user._id, followingId: { $in: suggestedIds } }).select('followingId'),
+            FollowRequest.find({ sender: req.user._id, recipient: { $in: suggestedIds }, status: 'pending' }).select('recipient'),
+            Follow.find({ followerId: { $in: suggestedIds }, followingId: req.user._id }).select('followerId')
+        ])
+
+        const myFollowSet = new Set(myFollows.map(f => f.followingId.toString()))
+        const myRequestSet = new Set(myRequests.map(r => r.recipient.toString()))
+        const focusedSet = new Set(whoFollowsMe.map(f => f.followerId.toString()))
+
+        const enriched = users.map(u => {
             const uObj = u.toObject()
             const idStr = u._id.toString()
             uObj.mutualCount = mutualCounts[idStr] || 0
-
-            const [follow, sentReq, followsMe] = await Promise.all([
-                Follow.findOne({ followerId: req.user._id, followingId: u._id }),
-                FollowRequest.findOne({ sender: req.user._id, recipient: u._id, status: 'pending' }),
-                Follow.findOne({ followerId: u._id, followingId: req.user._id })
-            ])
-
-            uObj.isFollowedByMe = !!follow
-            uObj.isRequestedByMe = !!sentReq
-            uObj.followsMe = !!followsMe
-            
+            uObj.isFollowedByMe = myFollowSet.has(idStr)
+            uObj.isRequestedByMe = myRequestSet.has(idStr)
+            uObj.followsMe = focusedSet.has(idStr)
             return uObj
-        }))
+        })
 
-        // Sort by mutual first, then global follower count
+        // Sort: Mutual Count (High to low), then followsMe (true first), then followerCount (High to low)
         enriched.sort((a, b) => {
             if (b.mutualCount !== a.mutualCount) return b.mutualCount - a.mutualCount
+            if (b.followsMe !== a.followsMe) return b.followsMe ? 1 : -1
             return (b.followerCount || 0) - (a.followerCount || 0)
         })
 
