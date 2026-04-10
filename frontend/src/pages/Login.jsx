@@ -10,7 +10,7 @@ function isValidEmail(email) {
 function Login() {
     const { login, loginWithGoogle } = useAuth()
     const navigate = useNavigate()
-    const [formData, setFormData] = useState({ email: '', password: '' })
+    const [formData, setFormData] = useState({ identifier: '', password: '' })
     const [error, setError] = useState('')
     const [fieldError, setFieldError] = useState({})
     const [loading, setLoading] = useState(false)
@@ -24,19 +24,19 @@ function Login() {
     }
 
     const handleSubmit = async () => {
-        if (!formData.email || !formData.password) {
+        if (!formData.identifier || !formData.password) {
             setError('Please fill in all fields')
             return
         }
 
         // Simple format validation: if it contains '@', it must be a valid email
-        if (formData.email.includes('@') && !isValidEmail(formData.email)) {
-            setFieldError(prev => ({ ...prev, email: 'Please enter a valid email address' }))
+        if (formData.identifier.includes('@') && !isValidEmail(formData.identifier)) {
+            setFieldError(prev => ({ ...prev, identifier: 'Please enter a valid email address' }))
             return
         }
 
         setLoading(true)
-        const result = await login(formData.email, formData.password)
+        const result = await login(formData.identifier, formData.password)
         setLoading(false)
         if (result.success) {
             navigate('/library')
@@ -90,7 +90,7 @@ function Login() {
                         QUEST<span className="text-white">DECK</span>
                     </div>
                 </div>
-                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
+                <form noValidate onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
                     <h2 className="font-black text-xl tracking-widest uppercase mb-6 text-white text-center hover:text-[#c8ff57] transition-colors cursor-default"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         Login
@@ -128,27 +128,27 @@ function Login() {
                     {/* Email */}
                     <div className="mb-4">
                         <label className="block font-mono text-xs uppercase tracking-wider
-                                          text-[#7a7a90] mb-2" htmlFor="email">Email or Username</label>
+                                          text-[#7a7a90] mb-2" htmlFor="identifier">Email or Username</label>
                         <input
-                            id="email"
-                            name="email"
+                            id="identifier"
+                            name="identifier"
                             type="text"
                             autoComplete="off"
                             placeholder="you@email.com or username"
-                            value={formData.email}
-                            onChange={e => handleChange('email', e.target.value)}
+                            value={formData.identifier}
+                            onChange={e => handleChange('identifier', e.target.value)}
                             className={`w-full bg-[#18181f] border rounded
                                        px-3 py-2 text-sm text-white
                                        focus:outline-none transition-colors
                                        placeholder:text-[#7a7a90]
-                                       ${fieldError.email
+                                       ${fieldError.identifier
                                     ? 'border-[#ff5c5c] focus:border-[#ff5c5c]'
                                     : 'border-[#2a2a35] focus:border-[#c8ff57]'
                                 }`}
                         />
-                        {fieldError.email && (
+                        {fieldError.identifier && (
                             <div className="mt-1 font-mono text-[10px] text-[#ff5c5c]">
-                                ✕ {fieldError.email}
+                                ✕ {fieldError.identifier}
                             </div>
                         )}
                     </div>
