@@ -36,19 +36,11 @@ if (process.env.SENTRY_DSN) {
 }
 
 app.use(cors({
-    origin: (origin, callback) => {
-        const allowedOrigins = [
-            'http://localhost:5173',
-            'https://levellog-frontend.onrender.com',
-            process.env.FRONTEND_URL?.replace(/\/$/, '')
-        ].filter(Boolean)
-        
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true)
-        } else {
-            callback(new Error('Not allowed by CORS'))
-        }
-    },
+    origin: [
+        'http://localhost:5173',
+        'https://levellog-frontend.onrender.com',
+        process.env.FRONTEND_URL?.replace(/\/$/, '')
+    ].filter(Boolean),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Cookie']
@@ -72,7 +64,7 @@ app.use(mongoSanitize())
 app.use(helmet({ 
     crossOriginResourcePolicy: false,
     crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false
+    contentSecurityPolicy: false // 🔓 Disabled to fix Firefox Production CORS blocks
 }))
 
 const authLimiter = rateLimit({
