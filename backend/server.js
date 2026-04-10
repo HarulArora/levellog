@@ -38,7 +38,7 @@ if (process.env.SENTRY_DSN) {
 app.use(cors({
     origin: [
         'http://localhost:5173',
-        'https://levellog-frontend.onrender.com',
+        'https://questdeck.onrender.com',
         process.env.FRONTEND_URL?.replace(/\/$/, '')
     ].filter(Boolean),
     credentials: true,
