@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 import api from '../api/axios'
@@ -21,7 +21,13 @@ function Signup() {
     const { signup, loginWithGoogle } = useAuth()
     const navigate = useNavigate()
 
-    const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' })
+    const location = useLocation()
+    const [formData, setFormData] = useState({ 
+        username: location.state?.username || '', 
+        email: location.state?.email || '', 
+        password: '', 
+        confirmPassword: '' 
+    })
     const [error, setError] = useState('')
     const [fieldError, setFieldError] = useState({})
     const [loading, setLoading] = useState(false)
@@ -104,7 +110,7 @@ function Signup() {
 
         if (result.success) {
             if (result.requiresVerification) {
-                navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`)
+                navigate(`/verify-email?email=${encodeURIComponent(formData.email)}&username=${encodeURIComponent(formData.username)}`)
             } else {
                 navigate('/library')
             }
