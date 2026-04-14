@@ -65,20 +65,74 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
 
     const handleLike = async () => {
         if (!currentUser) { navigate('/login'); return }
+
+        // Optimistic State
+        const prevLiked = liked
+        const prevDisliked = disliked
+        const prevLikes = likes
+        const prevDislikes = dislikes
+
+        let newLiked = !prevLiked
+        let newDisliked = false
+        let newLikes = prevLiked ? prevLikes - 1 : prevLikes + 1
+        let newDislikes = prevDisliked ? prevDislikes - 1 : prevDislikes
+
+        setLiked(newLiked)
+        setDisliked(newDisliked)
+        setLikes(newLikes)
+        setDislikes(newDislikes)
+
         try {
             const res = await api.post(`/comments/${comment._id}/like`)
-            setLikes(res.data.likes); setDislikes(res.data.dislikes)
-            setLiked(res.data.liked); setDisliked(res.data.disliked)
-        } catch (err) { console.error('Like error:', err) }
+            // Sync with server if needed (server returns absolute counts)
+            setLikes(res.data.likes)
+            setDislikes(res.data.dislikes)
+            setLiked(res.data.liked)
+            setDisliked(res.data.disliked)
+        } catch (err) {
+            // Revert on error
+            setLiked(prevLiked)
+            setDisliked(prevDisliked)
+            setLikes(prevLikes)
+            setDislikes(prevDislikes)
+            console.error('Like error:', err)
+        }
     }
 
     const handleDislike = async () => {
         if (!currentUser) { navigate('/login'); return }
+
+        // Optimistic State
+        const prevLiked = liked
+        const prevDisliked = disliked
+        const prevLikes = likes
+        const prevDislikes = dislikes
+
+        let newDisliked = !prevDisliked
+        let newLiked = false
+        let newDislikes = prevDisliked ? prevDislikes - 1 : prevDislikes + 1
+        let newLikes = prevLiked ? prevLikes - 1 : prevLikes
+
+        setLiked(newLiked)
+        setDisliked(newDisliked)
+        setLikes(newLikes)
+        setDislikes(newDislikes)
+
         try {
             const res = await api.post(`/comments/${comment._id}/dislike`)
-            setLikes(res.data.likes); setDislikes(res.data.dislikes)
-            setLiked(res.data.liked); setDisliked(res.data.disliked)
-        } catch (err) { console.error('Dislike error:', err) }
+            // Sync with server
+            setLikes(res.data.likes)
+            setDislikes(res.data.dislikes)
+            setLiked(res.data.liked)
+            setDisliked(res.data.disliked)
+        } catch (err) {
+            // Revert on error
+            setLiked(prevLiked)
+            setDisliked(prevDisliked)
+            setLikes(prevLikes)
+            setDislikes(prevDislikes)
+            console.error('Dislike error:', err)
+        }
     }
 
     const handleDelete = async () => {
