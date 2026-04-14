@@ -10,19 +10,23 @@ const globalStatsSchema = new mongoose.Schema(
         },
         loggedCount: {
             type: Number,
-            default: 0
+            default: 0,
+            min: 0
         },
         wishlistCount: {
             type: Number,
-            default: 0
+            default: 0,
+            min: 0
         },
         likeCount: {
             type: Number,
-            default: 0
+            default: 0,
+            min: 0
         },
         ratingCount: {
             type: Number,
-            default: 0
+            default: 0,
+            min: 0
         },
         totalRatingSum: {
             type: Number,
@@ -30,7 +34,8 @@ const globalStatsSchema = new mongoose.Schema(
         },
         avgRating: {
             type: Number,
-            default: 0
+            default: 0,
+            min: 0
         }
     },
     { timestamps: true }

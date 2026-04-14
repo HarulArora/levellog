@@ -22,18 +22,38 @@ export const updateGlobalStats = async (igdbId, updates = {}) => {
         const stats = await GlobalStats.findOneAndUpdate(
             { igdbId: Number(igdbId) },
             { $inc: inc },
-            { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+            { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true, runValidators: true }
         )
 
         // Recalculate average if rating changed
         if (updates.ratingCount || updates.ratingValue) {
             const newAvg = stats.ratingCount > 0 
                 ? parseFloat((stats.totalRatingSum / stats.ratingCount).toFixed(1))
-                : 0
+                : null
             
-            await GlobalStats.updateOne({ igdbId }, { avgRating: newAvg })
+            // Also ensure totalRatingSum doesn't get messed up (failsafe)
+            const finalRatingSum = Math.max(0, stats.totalRatingSum)
+            
+            await GlobalStats.updateOne(
+                { igdbId }, 
+                { 
+                    avgRating: newAvg,
+                    totalRatingSum: finalRatingSum 
+                }
+            )
         }
     } catch (err) {
+        // If we hit a min: 0 constraint error, it means a count tried to go negative.
+        // We'll catch it and "fix" the stat to 0.
+        if (err.name === 'ValidationError') {
+            const repair = {}
+            if (updates.loggedCount) repair.loggedCount = 0
+            if (updates.wishlistCount) repair.wishlistCount = 0
+            if (updates.likeCount) repair.likeCount = 0
+            if (updates.ratingCount) repair.ratingCount = 0
+            
+            await GlobalStats.updateOne({ igdbId: Number(igdbId) }, { $set: repair })
+        }
         console.error(`[Stats] Error updating global stats for ${igdbId}:`, err)
     }
 }

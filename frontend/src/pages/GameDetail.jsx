@@ -649,8 +649,8 @@ function GameDetail() {
                                 <div>
                                     <div className="font-black text-4xl text-[#5c9fff] leading-none"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                        {stats?.avgRating ?? '—'}
-                                        {stats?.avgRating && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>}
+                                        {stats?.avgRating > 0 ? stats.avgRating : '—'}
+                                        {stats?.avgRating > 0 && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>}
                                     </div>
                                     <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
                                         Avg Rating {stats?.ratingCount > 0 && <span className="ml-1 text-[#7a7a90]">({stats.ratingCount})</span>}
