@@ -35,7 +35,7 @@ export default function useCachedFetch(cacheKey, url, options = {}) {
         if (fetchingRef.current) return
         fetchingRef.current = true
 
-        if (!silent) setLoading(true)
+        if (!silent && !data) setLoading(true)
 
         try {
             const res = await api.get(url)
@@ -77,5 +77,5 @@ export default function useCachedFetch(cacheKey, url, options = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enabled, cacheKey, ...deps])
 
-    return { data, loading, error, refetch: (silent = false) => fetchFn(silent) }
+    return { data, loading, error, refetch: (silent = false) => fetchFn(silent), setData }
 }

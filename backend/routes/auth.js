@@ -156,31 +156,18 @@ router.post('/signup', async (req, res) => {
             emailVerifyExpires: verificationExpires
         })
 
-        // Send verification email
-        try {
-            const emailResult = await sendVerificationEmail(user.email, user.username, verificationCode)
-            
-            if (!emailResult.success) {
-                logger.warn(`Verification email failed for ${user.email}, but account was created.`)
-                return res.status(201).json({
-                    success: true,
-                    message: 'Account created, but we had trouble sending the verification email. You can try resending the code from the login or verification page.',
-                    email: user.email,
-                    requiresVerification: true
-                })
-            }
-        } catch (emailErr) {
-            logger.error('SMTP Timeout or error during signup:', emailErr)
-            // Still respond with success if user was created; they can resend code later.
-            return res.status(201).json({
-                success: true,
-                message: 'Account created! (Note: Email delivery might be delayed).',
-                email: user.email,
-                requiresVerification: true
+        // Send verification email asynchronously so it doesn't block signup
+        sendVerificationEmail(user.email, user.username, verificationCode)
+            .then(emailResult => {
+                if (!emailResult.success) {
+                    logger.warn(`Verification email failed for ${user.email}, but account was created.`)
+                }
             })
-        }
+            .catch(emailErr => {
+                logger.error('SMTP Timeout or error during signup:', emailErr)
+            })
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: 'Account created! Please verify your email.',
             email: user.email,
@@ -300,25 +287,21 @@ router.post('/resend-verification', async (req, res) => {
         user.emailVerifyExpires = new Date(Date.now() + 10 * 60 * 1000)
         await user.save()
 
-        // Send verification email
-        try {
-            const emailResult = await sendVerificationEmail(user.email, user.username, verificationCode)
-            if (!emailResult.success) {
-                logger.warn(`Verification email resend failed for ${user.email}`)
-                return res.status(200).json({ 
-                    success: true, 
-                    message: 'Verification code generated! However, email delivery might be delayed. Please try again or check your spam.' 
-                })
-            }
-        } catch (emailErr) {
-            logger.error('SMTP Timeout during resend-verification:', emailErr)
-            return res.status(200).json({ 
-                success: true, 
-                message: 'Verification code generated! (Note: Email delivery might be delayed).' 
+        // Send verification email asynchronously
+        sendVerificationEmail(user.email, user.username, verificationCode)
+            .then(emailResult => {
+                if (!emailResult.success) {
+                    logger.warn(`Verification email resend failed for ${user.email}`)
+                }
             })
-        }
+            .catch(emailErr => {
+                logger.error('SMTP Timeout during resend-verification:', emailErr)
+            })
 
-        res.status(200).json({ success: true, message: 'Verification code sent to your email.' })
+        return res.status(200).json({ 
+            success: true, 
+            message: 'Verification code generated and sent to your email.' 
+        })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to resend code' })
     }
@@ -425,7 +408,8 @@ router.post('/google', async (req, res) => {
             return res.status(400).json({ success: false, message: 'No Google token provided' })
 
         const { data: googleData } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${accessToken}` }
+            headers: { Authorization: `Bearer ${accessToken}` },
+            timeout: 5000 // Add a timeout to prevent hanging
         })
         
         const { sub: googleId, email, name, picture } = googleData

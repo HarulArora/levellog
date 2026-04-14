@@ -235,7 +235,7 @@ function Signup() {
                                         : 'border-[#2a2a35] focus:border-[#c8ff57]'
                                 }`}
                         />
-                        <div className="mt-1 h-4 flex items-center">
+                        <div className="mt-1 min-h-[1.5rem] flex flex-col justify-start">
                             {checkingUsername && (
                                 <span className="font-mono text-[10px] text-[#7a7a90]">Checking...</span>
                             )}
@@ -245,12 +245,12 @@ function Signup() {
                                 </span>
                             )}
                             {!checkingUsername && !fieldError.username && usernameStatus && (
-                                <div className="mt-2 flex flex-col gap-1">
+                                <div className="mt-1 flex flex-col gap-1">
                                     <span className={`font-mono text-[10px] ${usernameStatus.available ? 'text-[#c8ff57]' : 'text-[#ff5c5c]'}`}>
                                         {usernameStatus.available ? '✓' : '✕'} {usernameStatus.message}
                                     </span>
                                     {usernameStatus.message?.includes('Reserved') && (
-                                        <span className="font-mono text-[9px] text-[#c8ff57] animate-pulse">
+                                        <span className="font-mono text-[9px] text-[#c8ff57] animate-pulse leading-snug">
                                             💡 On hold for verification. If they don't finish, it's all yours!
                                         </span>
                                     )}
