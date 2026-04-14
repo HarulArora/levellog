@@ -366,7 +366,7 @@ function GameDetail() {
 
     const game = contextData?.game
     const stats = contextData?.stats
-    const loading = loadingContext
+    const loading = loadingContext && !game
     const error = contextError
     const comments = commentsData?.comments || []
 
@@ -433,11 +433,13 @@ function GameDetail() {
             setLiked(res.data.liked)
             if (res.data.liked) showXpToast('❤️ Liked! +1 XP', 'gain')
             else showXpToast('💔 Unliked · -1 XP', 'loss')
+            
+            // Invalidate context cache for this game & user
+            invalidateCache(`game_context_${user?.id || user?._id}_${igdbId}`)
             invalidateCache(`lists_${user.id || user._id}`)
-            invalidateCache(`game_stats_v2_${igdbId}`)
-            invalidateCache(`game_like_${user.id || user._id}_${igdbId}`)
-            await fetchPlatformStats()
-            if (typeof refetchLike === 'function') await refetchLike()
+            
+            // Silent refetch to sync stats (counts etc) in background
+            await refetchContext(true) 
         } catch (err) {
             setLiked(wasLiked) // Revert on failure
         } finally { setLiking(false) }
@@ -446,7 +448,7 @@ function GameDetail() {
     const handleWishlist = async () => {
         if (!user) { navigate('/login'); return }
         if (wishing) return
-
+ 
         // Optimistic Update
         const wasWishlisted = wishlisted
         setWishlisted(!wasWishlisted)
@@ -459,11 +461,11 @@ function GameDetail() {
             })
             setWishlisted(res.data.wishlisted)
             if (res.data.wishlisted) showXpToast('🎯 Wishlisted!', 'gain')
+            
+            invalidateCache(`game_context_${user?.id || user?._id}_${igdbId}`)
             invalidateCache(`lists_${user.id || user._id}`)
-            invalidateCache(`game_stats_v2_${igdbId}`)
-            invalidateCache(`game_wish_${user.id || user._id}_${igdbId}`)
-            await fetchPlatformStats()
-            if (typeof refetchWish === 'function') await refetchWish()
+            
+            await refetchContext(true)
         } catch (err) {
             setWishlisted(wasWishlisted) // Revert on failure
         } finally { setWishing(false) }
