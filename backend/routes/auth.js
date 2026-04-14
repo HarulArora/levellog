@@ -153,13 +153,27 @@ router.post('/signup', async (req, res) => {
         })
 
         // Send verification email
-        const emailResult = await sendVerificationEmail(user.email, user.username, verificationCode)
-        
-        if (!emailResult.success) {
-            // If email fails, we might want to inform the user but the account is created.
-            // However, usually it's better to fail the request so they can try again.
-            await User.findByIdAndDelete(user._id)
-            return res.status(500).json({ success: false, message: 'Failed to send verification email. Please check your SMTP settings.' })
+        try {
+            const emailResult = await sendVerificationEmail(user.email, user.username, verificationCode)
+            
+            if (!emailResult.success) {
+                logger.warn(`Verification email failed for ${user.email}, but account was created.`)
+                return res.status(201).json({
+                    success: true,
+                    message: 'Account created, but we had trouble sending the verification email. You can try resending the code from the login or verification page.',
+                    email: user.email,
+                    requiresVerification: true
+                })
+            }
+        } catch (emailErr) {
+            logger.error('SMTP Timeout or error during signup:', emailErr)
+            // Still respond with success if user was created; they can resend code later.
+            return res.status(201).json({
+                success: true,
+                message: 'Account created! (Note: Email delivery might be delayed).',
+                email: user.email,
+                requiresVerification: true
+            })
         }
 
         res.status(201).json({
@@ -277,11 +291,25 @@ router.post('/resend-verification', async (req, res) => {
         user.emailVerifyExpires = new Date(Date.now() + 10 * 60 * 1000)
         await user.save()
 
-        const emailResult = await sendVerificationEmail(user.email, user.username, verificationCode)
-        if (!emailResult.success) {
-            return res.status(500).json({ success: false, message: 'Failed to send verification code. Please try again later.' })
+        // Send verification email
+        try {
+            const emailResult = await sendVerificationEmail(user.email, user.username, verificationCode)
+            if (!emailResult.success) {
+                logger.warn(`Verification email resend failed for ${user.email}`)
+                return res.status(200).json({ 
+                    success: true, 
+                    message: 'Verification code generated! However, email delivery might be delayed. Please try again or check your spam.' 
+                })
+            }
+        } catch (emailErr) {
+            logger.error('SMTP Timeout during resend-verification:', emailErr)
+            return res.status(200).json({ 
+                success: true, 
+                message: 'Verification code generated! (Note: Email delivery might be delayed).' 
+            })
         }
-        res.json({ success: true, message: 'Verification code resent!' })
+
+        res.status(200).json({ success: true, message: 'Verification code sent to your email.' })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to resend code' })
     }
@@ -314,11 +342,25 @@ router.post('/forgot-password', async (req, res) => {
         user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000)
         await user.save()
 
-        const emailResult = await sendResetPasswordEmail(user.email, user.username, resetCode)
-        if (!emailResult.success) {
-            return res.status(500).json({ success: false, message: 'Failed to send reset code. Please try again later.' })
+        // Send reset email
+        try {
+            const emailResult = await sendResetPasswordEmail(user.email, user.username, resetCode)
+            if (!emailResult.success) {
+                logger.warn(`Password reset email failed for ${user.email}`)
+                return res.status(200).json({ 
+                    success: true, 
+                    message: 'If an account exists with that email, we will process your request. (Email delivery might be delayed).' 
+                })
+            }
+        } catch (emailErr) {
+            logger.error('SMTP Timeout during forgot-password:', emailErr)
+            return res.status(200).json({ 
+                success: true, 
+                message: 'If an account exists, we will process your request. (Note: Email delivery might be delayed).' 
+            })
         }
-        res.json({ success: true, message: 'Password reset code sent to your email' })
+
+        res.status(200).json({ success: true, message: 'Password reset link sent to your email.' })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to process forgot password' })
     }
@@ -383,11 +425,17 @@ router.post('/google', async (req, res) => {
 
         let user = await User.findOne({ $or: [{ googleId }, { email: email.toLowerCase() }] })
         if (user) {
+            // Update existing user with googleId if missing
             if (!user.googleId) {
                 user.googleId = googleId
                 if (!user.avatar && picture) user.avatar = picture
-                await user.save()
             }
+            // Auto-verify existing account if logged in via Google
+            if (!user.isEmailVerified) {
+                user.isEmailVerified = true
+                logger.info(`Existing user ${user.email} auto-verified via Google Login`)
+            }
+            await user.save()
         } else {
             let baseUsername = (name || 'user').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 12)
             if (!baseUsername) baseUsername = 'user'

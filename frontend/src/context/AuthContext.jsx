@@ -36,8 +36,8 @@ export function AuthProvider({ children }) {
                 const res = await api.get('/auth/me')
                 setUser(buildUser(res.data.user))
             } catch (err) {
-                // Only clear if we actually failed an authorized request
-                if (err.response?.status === 401) {
+                // Clear if unauthorized (401) or forbidden/unverified (403)
+                if (err.response?.status === 401 || err.response?.status === 403) {
                     localStorage.removeItem('questdeck_token')
                     delete api.defaults.headers.common['Authorization']
                 }

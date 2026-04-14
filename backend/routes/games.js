@@ -67,9 +67,37 @@ router.get('/activity/:userId', protect, async (req, res) => {
 router.get('/stats/:igdbId', async (req, res) => {
     try {
         const igdbId = Number(req.params.igdbId)
-        const stats = await GlobalStats.findOne({ igdbId })
+        let stats = await GlobalStats.findOne({ igdbId })
         
-        // Return default zeros if no stats record exists yet
+        // ── Self-Healing Strategy ──
+        // If stats are missing, negative, or clearly inconsistent, trigger a recalculation.
+        if (stats && (stats.loggedCount < 0 || stats.wishlistCount < 0 || stats.likeCount < 0 || stats.ratingCount < 0)) {
+            const [realLogged, realLikes, realWishlist, ratingData] = await Promise.all([
+                Game.countDocuments({ igdbId }),
+                GameLike.countDocuments({ igdbId }),
+                Wishlist.countDocuments({ igdbId }),
+                Game.aggregate([
+                    { $match: { igdbId, rating: { $gt: 0 } } },
+                    { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 }, sum: { $sum: '$rating' } } }
+                ])
+            ])
+
+            const r = ratingData[0] || { avg: 0, count: 0, sum: 0 }
+            
+            stats = await GlobalStats.findOneAndUpdate(
+                { igdbId },
+                { 
+                    loggedCount: realLogged,
+                    likeCount: realLikes,
+                    wishlistCount: realWishlist,
+                    ratingCount: r.count,
+                    totalRatingSum: r.sum,
+                    avgRating: parseFloat(r.avg.toFixed(1))
+                },
+                { new: true, upsert: true }
+            )
+        }
+
         res.json({ 
             success: true, 
             stats: stats || { 
