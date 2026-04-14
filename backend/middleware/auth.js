@@ -13,7 +13,8 @@ const protect = async (req, res, next) => {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
-        const user = await User.findById(decoded.userId).select('-password')
+        // 🚀 Optimization: Only fetch essential fields for validation
+        const user = await User.findById(decoded.userId).select('username isEmailVerified email badge level xp')
 
         if (!user) {
             return res.status(401).json({
@@ -43,5 +44,25 @@ const protect = async (req, res, next) => {
     }
 }
 
-export { protect }
+const protectOptional = async (req, res, next) => {
+    try {
+        let token = req.cookies?.questdeck_token || req.headers.authorization?.split(' ')[1]
+        if (!token) {
+            return next()
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        const user = await User.findById(decoded.userId).select('username isEmailVerified email badge level xp')
+        
+        if (user && user.isEmailVerified) {
+            req.user = user
+        }
+        next()
+    } catch (error) {
+        // Just proceed without user if token is invalid
+        next()
+    }
+}
+
+export { protect, protectOptional }
 export default protect
