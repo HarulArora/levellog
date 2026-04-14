@@ -191,7 +191,8 @@ router.get('/discover', async (req, res) => {
 
 // ── INTERNAL HELPER ──
 export const fetchGameDetailById = async (gameId) => {
-    const cacheKey = `game-detail-${gameId}`
+    try {
+        const cacheKey = `game-detail-${gameId}`
 
     if (igdbCache.has(cacheKey)) {
         return igdbCache.get(cacheKey)
