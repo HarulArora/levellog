@@ -17,9 +17,10 @@ const transporter = process.env.SMTP_HOST ? nodemailer.createTransport({
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
     },
-    pool: true, // Use pooling for better performance/reliability on Render
+    pool: true, 
     maxConnections: 5,
     maxMessages: 100,
+    family: 4, // 🚀 FORCE IPv4 ONLY! (Fixes ENETUNREACH on Render/Cloud)
     tls: {
         rejectUnauthorized: false
     }

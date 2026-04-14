@@ -22,6 +22,9 @@ dotenv.config()
 
 const app = express()
 
+// 🛡️ Trust proxy for Render's load balancer (Fixes rate-limit warnings)
+app.set('trust proxy', 1)
+
 // ── Sentry Initialization ──────────────────────────────────────────────
 if (process.env.SENTRY_DSN) {
     Sentry.init({
