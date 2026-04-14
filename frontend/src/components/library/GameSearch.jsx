@@ -18,36 +18,34 @@ function GameSearch({ onSelect }) {
   const timerRef = useRef(null)
 
 
-  useEffect(() => {
-    // Don't search if query is too short
-    if (query.length < 2) {
-      setResults([])
+  const handleQueryChange = (e) => {
+    const val = e.target.value
+    setQuery(val)
+    if (val.length >= 2) {
+      setShowResults(true)
+      setLoading(true) // Immediate feedback
+    } else {
       setShowResults(false)
-      return
+      setLoading(false)
+      setResults([])
     }
+  }
 
-    // ── DEBOUNCING ──
-    // Don't search on every single keystroke
-    // Wait 400ms after user stops typing then search
-    // This prevents too many API calls
-    // Example: user types "elden ring"
-    // Without debounce → 9 API calls
-    // With debounce    → 1 API call
+  useEffect(() => {
+    if (query.length < 2) return
+
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(async () => {
-      setLoading(true)
       try {
         const res = await api.get(`/igdb/search?q=${query}`)
         setResults(res.data.games)
-        setShowResults(true)
       } catch (err) {
         console.error('Search error:', err)
       } finally {
         setLoading(false)
       }
-    }, 400)
+    }, 250) // Reduced from 400ms to 250ms for snappy response
 
-    // Cleanup timer on unmount
     return () => clearTimeout(timerRef.current)
   }, [query])
 
@@ -70,8 +68,8 @@ function GameSearch({ onSelect }) {
         type="text"
         placeholder="Search for a game..."
         value={query}
-        onChange={e => setQuery(e.target.value)}
-        onFocus={() => results.length > 0 && setShowResults(true)}
+        onChange={handleQueryChange}
+        onFocus={() => { if (query.length >= 2) setShowResults(true) }}
         className="w-full bg-[#18181f] border border-[#c8ff57]/50 rounded
                    px-3 py-2 pr-28 text-sm text-white
                    focus:outline-none focus:border-[#c8ff57]
