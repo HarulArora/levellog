@@ -343,49 +343,31 @@ function GameDetail() {
     const [lightboxIndex, setLightboxIndex] = useState(null)
     const [shareCopied, setShareCopied] = useState(false)
 
-    // ── CACHED FETCHES ──
-    const { data: gameData, loading: loadingGame, error: gameError } = useCachedFetch(
-        `game_${igdbId}`,
-        `/igdb/game/${igdbId}`,
-        { ttl: 30 * 60 * 1000, deps: [igdbId] } // Cache game info for 30m
-    )
-
-    const { data: statsData, refetch: refetchStats } = useCachedFetch(
-        `game_stats_v2_${igdbId}`,
-        `/games/stats/${igdbId}`,
-        { enabled: !!igdbId, ttl: 5 * 60 * 1000 }
-    )
-
-    const { data: likeData, refetch: refetchLike } = useCachedFetch(
-        user ? `game_like_${user.id || user._id}_${igdbId}` : null,
-        `/lists/like/${igdbId}`,
-        { enabled: !!igdbId && !!user, ttl: 0 }
-    )
-
-    const { data: wishData, refetch: refetchWish } = useCachedFetch(
-        user ? `game_wish_${user.id || user._id}_${igdbId}` : null,
-        `/lists/wishlist/${igdbId}`,
-        { enabled: !!igdbId && !!user, ttl: 0 }
+    // ── CACHED CONTEXT FETCH (Optimized) ──
+    // Combines: Game Info + Global Stats + User Like/Wishlist status in ONE request
+    const { data: contextData, loading: loadingContext, error: contextError, refetch: refetchContext } = useCachedFetch(
+        `game_context_${user?.id || user?._id || 'anon'}_${igdbId}`,
+        `/games/context/${igdbId}`,
+        { deps: [igdbId, user?.id || user?._id], ttl: 5 * 60 * 1000 }
     )
 
     useEffect(() => {
-        if (likeData) setLiked(likeData.liked)
-    }, [likeData])
-
-    useEffect(() => {
-        if (wishData) setWishlisted(wishData.wishlisted)
-    }, [wishData])
+        if (contextData?.userStatus) {
+            setLiked(contextData.userStatus.liked)
+            setWishlisted(contextData.userStatus.wishlisted)
+        }
+    }, [contextData])
 
     const { data: commentsData, refetch: refetchComments } = useCachedFetch(
         `game_comments_${igdbId}`,
         `/comments/${igdbId}`,
-        { ttl: 1 * 60 * 1000, deps: [igdbId] } // Comments cache shorter
+        { ttl: 1 * 60 * 1000, deps: [igdbId] } 
     )
 
-    const game = gameData?.game
-    const loading = loadingGame
-    const error = gameError
-    const stats = statsData?.stats // Renamed from platformStats to avoid conflict
+    const game = contextData?.game
+    const stats = contextData?.stats
+    const loading = loadingContext
+    const error = contextError
     const comments = commentsData?.comments || []
 
     const [similarStats, setSimilarStats] = useState({})
@@ -412,7 +394,7 @@ function GameDetail() {
         g.igdbId === parseInt(igdbId) || g.title?.toLowerCase() === game?.title?.toLowerCase()
     )
 
-    const fetchPlatformStats = refetchStats
+    const fetchPlatformStats = refetchContext
     const fetchComments = refetchComments
 
 

@@ -192,125 +192,147 @@ router.get('/discover', async (req, res) => {
 // ── GET /api/igdb/game/:id ──
 router.get('/game/:id', async (req, res) => {
     try {
-        const token = await getAccessToken()
+        const gameId = req.params.id
+        const cacheKey = `game-detail-${gameId}`
 
-        const response = await fetch('https://api.igdb.com/v4/games', {
-            method: 'POST',
-            headers: {
-                'Client-ID': process.env.IGDB_CLIENT_ID,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'text/plain'
-            },
-            body: `
-        fields name, cover.url, summary, genres.name,
-               platforms.name, first_release_date,
-               rating, rating_count, aggregated_rating,
-               involved_companies.company.name,
-               involved_companies.developer,
-               involved_companies.publisher,
-               game_engines.name,
-               game_modes.name,
-               age_ratings.rating, age_ratings.category,
-               keywords.name,
-               similar_games.name, similar_games.cover.url,
-               similar_games.rating,
-               screenshots.url,
-               videos.video_id,
-               storyline,
-               themes.name;
-        where id = ${req.params.id};
-        limit 1;
-      `
-        })
-
-        const data = await response.json()
-        if (!data || data.length === 0) {
-            return res.status(404).json({ success: false, message: 'Game not found' })
+        // 1. Check Cache
+        if (igdbCache.has(cacheKey)) {
+            return res.json({ success: true, game: igdbCache.get(cacheKey) })
         }
 
-        const g = data[0]
-
-        const developer = g.involved_companies?.find(c => c.developer)?.company?.name || null
-        const publisher = g.involved_companies?.find(c => c.publisher)?.company?.name || null
-
-        const ageRatingMap = {
-            1: 'RP', 2: 'EC', 3: 'E', 4: 'E10+',
-            5: 'T', 6: 'M', 7: 'AO',
-            8: '3', 9: '7', 10: '12', 11: '16', 12: '18'
-        }
-        const ageRating = g.age_ratings?.[0]
-            ? ageRatingMap[g.age_ratings[0].rating] || null
-            : null
-
-        const cover = g.cover?.url
-            ? g.cover.url.replace('t_thumb', 't_cover_big_2x').replace('//', 'https://')
-            : null
-
-        const screenshots = g.screenshots?.map(s =>
-            s.url.replace('t_thumb', 't_screenshot_big').replace('//', 'https://')
-        ) || []
-
-        const similarGames = g.similar_games?.slice(0, 6).map(sg => ({
-            id: sg.id,
-            title: sg.name,
-            cover: sg.cover?.url
-                ? sg.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-                : null,
-            rating: sg.rating ? (sg.rating / 10).toFixed(1) : null
-        })) || []
-
-        const platforms = g.platforms?.map(p => {
-            const name = p.name
-            if (name.includes('PC')) return 'PC'
-            if (name.includes('PlayStation 5')) return 'PS5'
-            if (name.includes('PlayStation 4')) return 'PS4'
-            if (name.includes('PlayStation')) return 'PS'
-            if (name.includes('Xbox Series')) return 'Xbox Series'
-            if (name.includes('Xbox One')) return 'Xbox One'
-            if (name.includes('Xbox')) return 'Xbox'
-            if (name.includes('Nintendo Switch')) return 'Switch'
-            if (name.includes('iOS') || name.includes('Android')) return 'Mobile'
-            return p.name
-        }) || []
-
-        // ── Community Stats Fetching ──
-        const [wishlistCount, likeCount, loggedCount] = await Promise.all([
-            import('../models/Wishlist.js').then(m => m.default.countDocuments({ igdbId: parseInt(req.params.id) })),
-            import('../models/GameLike.js').then(m => m.default.countDocuments({ igdbId: parseInt(req.params.id) })),
-            import('../models/Game.js').then(m => m.default.countDocuments({ igdbId: parseInt(req.params.id) }))
-        ])
-
-        const game = {
-            id: g.id,
-            title: g.name,
-            cover,
-            summary: g.summary || '',
-            storyline: g.storyline || '',
-            genre: g.genres?.[0]?.name || 'Unknown',
-            genres: g.genres?.map(x => x.name) || [],
-            platforms,
-            releaseYear: g.first_release_date
-                ? new Date(g.first_release_date * 1000).getFullYear()
-                : null,
-            criticScore: g.aggregated_rating ? Math.round(g.aggregated_rating) : null,
-            userScore: g.rating ? (g.rating / 10).toFixed(1) : null,
-            ratingCount: g.rating_count || 0,
-            developer,
-            publisher,
-            engine: g.game_engines?.[0]?.name || null,
-            modes: g.game_modes?.map(m => m.name).join(', ') || null,
-            ageRating,
-            keywords: g.keywords?.slice(0, 10).map(k => k.name) || [],
-            themes: g.themes?.map(t => t.name) || [],
-            similarGames,
-            screenshots,
-            videoId: g.videos?.[0]?.video_id || null,
-            communityWishlist: wishlistCount,
-            communityLikes: likeCount,
-            communityLogged: loggedCount
+        // 2. Check In-Flight
+        if (inFlightRequests.has(cacheKey)) {
+            const data = await inFlightRequests.get(cacheKey)
+            return res.json({ success: true, game: data })
         }
 
-        res.json({ success: true, game })
+        const performFetch = async () => {
+            const token = await getAccessToken()
+            const response = await fetch('https://api.igdb.com/v4/games', {
+                method: 'POST',
+                headers: {
+                    'Client-ID': process.env.IGDB_CLIENT_ID,
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'text/plain'
+                },
+                body: `
+            fields name, cover.url, summary, genres.name,
+                   platforms.name, first_release_date,
+                   rating, rating_count, aggregated_rating,
+                   involved_companies.company.name,
+                   involved_companies.developer,
+                   involved_companies.publisher,
+                   game_engines.name,
+                   game_modes.name,
+                   age_ratings.rating, age_ratings.category,
+                   keywords.name,
+                   similar_games.name, similar_games.cover.url,
+                   similar_games.rating,
+                   screenshots.url,
+                   videos.video_id,
+                   storyline,
+                   themes.name;
+            where id = ${gameId};
+            limit 1;
+          `
+            })
+
+            const data = await response.json()
+            if (!data || data.length === 0) return null
+
+            const g = data[0]
+
+            const developer = g.involved_companies?.find(c => c.developer)?.company?.name || null
+            const publisher = g.involved_companies?.find(c => c.publisher)?.company?.name || null
+
+            const ageRatingMap = {
+                1: 'RP', 2: 'EC', 3: 'E', 4: 'E10+',
+                5: 'T', 6: 'M', 7: 'AO',
+                8: '3', 9: '7', 10: '12', 11: '16', 12: '18'
+            }
+            const ageRating = g.age_ratings?.[0]
+                ? ageRatingMap[g.age_ratings[0].rating] || null
+                : null
+
+            const cover = g.cover?.url
+                ? g.cover.url.replace('t_thumb', 't_cover_big_2x').replace('//', 'https://')
+                : null
+
+            const screenshots = g.screenshots?.map(s =>
+                s.url.replace('t_thumb', 't_screenshot_big').replace('//', 'https://')
+            ) || []
+
+            const similarGames = g.similar_games?.slice(0, 6).map(sg => ({
+                id: sg.id,
+                title: sg.name,
+                cover: sg.cover?.url
+                    ? sg.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
+                    : null,
+                rating: sg.rating ? (sg.rating / 10).toFixed(1) : null
+            })) || []
+
+            const platforms = g.platforms?.map(p => {
+                const name = p.name
+                if (name.includes('PC')) return 'PC'
+                if (name.includes('PlayStation 5')) return 'PS5'
+                if (name.includes('PlayStation 4')) return 'PS4'
+                if (name.includes('PlayStation')) return 'PS'
+                if (name.includes('Xbox Series')) return 'Xbox Series'
+                if (name.includes('Xbox One')) return 'Xbox One'
+                if (name.includes('Xbox')) return 'Xbox'
+                if (name.includes('Nintendo Switch')) return 'Switch'
+                if (name.includes('iOS') || name.includes('Android')) return 'Mobile'
+                return p.name
+            }) || []
+
+            // ── Community Stats Fetching ──
+            const [wishlistCount, likeCount, loggedCount] = await Promise.all([
+                import('../models/Wishlist.js').then(m => m.default.countDocuments({ igdbId: parseInt(gameId) })),
+                import('../models/GameLike.js').then(m => m.default.countDocuments({ igdbId: parseInt(gameId) })),
+                import('../models/Game.js').then(m => m.default.countDocuments({ igdbId: parseInt(gameId) }))
+            ])
+
+            const game = {
+                id: g.id,
+                title: g.name,
+                cover,
+                summary: g.summary || '',
+                storyline: g.storyline || '',
+                genre: g.genres?.[0]?.name || 'Unknown',
+                genres: g.genres?.map(x => x.name) || [],
+                platforms,
+                releaseYear: g.first_release_date
+                    ? new Date(g.first_release_date * 1000).getFullYear()
+                    : null,
+                criticScore: g.aggregated_rating ? Math.round(g.aggregated_rating) : null,
+                userScore: g.rating ? (g.rating / 10).toFixed(1) : null,
+                ratingCount: g.rating_count || 0,
+                developer,
+                publisher,
+                engine: g.game_engines?.[0]?.name || null,
+                modes: g.game_modes?.map(m => m.name).join(', ') || null,
+                ageRating,
+                keywords: g.keywords?.slice(0, 10).map(k => k.name) || [],
+                themes: g.themes?.map(t => t.name) || [],
+                similarGames,
+                screenshots,
+                videoId: g.videos?.[0]?.video_id || null,
+                communityWishlist: wishlistCount,
+                communityLikes: likeCount,
+                communityLogged: loggedCount
+            }
+
+            igdbCache.set(cacheKey, game)
+            return game
+        }
+
+        const fetchPromise = performFetch()
+        inFlightRequests.set(cacheKey, fetchPromise)
+        const finalGame = await fetchPromise
+        inFlightRequests.delete(cacheKey)
+
+        if (!finalGame) return res.status(404).json({ success: false, message: 'Game not found' })
+        res.json({ success: true, game: finalGame })
 
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch game details', error: error.message })
