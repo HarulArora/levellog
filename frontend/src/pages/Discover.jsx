@@ -647,7 +647,7 @@ export default function Discover() {
 
                 {/* Games Grid — 6 cols */}
                 <div className="discover-grid">
-                    {(searchQuery.trim().length >= 2 ? isSearching : loading)
+                    {(searchQuery.trim().length >= 2 ? (isSearching && searchResults.length === 0) : (loading && games.length === 0))
                         ? Array.from({ length: LIMIT }).map((_, i) => <GameCardSkeleton key={i} />)
                         : (searchQuery.trim().length >= 2 ? searchResults : games).map(game => (
                             <GameCard

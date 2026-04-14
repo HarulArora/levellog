@@ -183,7 +183,7 @@ function Activity() {
         )
     }
 
-    if (loading) {
+    if (loading && activity.length === 0 && feed.length === 0) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-[#7a7a90] font-mono text-sm">Loading...</div>

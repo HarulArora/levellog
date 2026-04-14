@@ -426,9 +426,11 @@ function Lists() {
     const [localData, setLocalData] = useState(null)
     const effectiveData = localData ?? data
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (silent = true) => {
+        // Only clear local storage cache, but don't set global loading=true 
+        // unless explicitly requested (silent=false)
         invalidateCache(userId ? `lists_${userId}` : '')
-        await refetchLists()
+        await refetchLists(silent)
         setLocalData(null)
     }, [userId, refetchLists])
 

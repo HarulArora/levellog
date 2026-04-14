@@ -81,7 +81,7 @@ function Profile() {
             invalidateCache(`profile_games_${user._id}`)
             invalidateCache(`profile_lists_${user._id}`)
         }
-        refetchProfile()
+        refetchProfile(true) // 🚀 Silent refetch (background)
     }, [username, user?._id, refetchProfile])
 
     // ── STATS ──

@@ -77,5 +77,5 @@ export default function useCachedFetch(cacheKey, url, options = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [enabled, cacheKey, ...deps])
 
-    return { data, loading, error, refetch: () => fetchFn(false) }
+    return { data, loading, error, refetch: (silent = false) => fetchFn(silent) }
 }
