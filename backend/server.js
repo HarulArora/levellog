@@ -29,7 +29,7 @@ if (process.env.SENTRY_DSN) {
         integrations: [
             ...Sentry.autoDiscoverNodeJSIntegrations(),
         ],
-        tracesSampleRate: 1.0,
+        tracesSampleRate: 0.1,
     })
     app.use(Sentry.Handlers.requestHandler())
     app.use(Sentry.Handlers.tracingHandler())

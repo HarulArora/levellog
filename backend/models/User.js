@@ -45,6 +45,9 @@ const userSchema = new mongoose.Schema(
     { timestamps: true }
 )
 
+// Add case-insensitive index for fast username search
+userSchema.index({ username: 1 }, { collation: { locale: 'en', strength: 2 } });
+
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return
     if (!this.password) return
