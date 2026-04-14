@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useState, useEffect, useCallback, memo, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import api from '../api/axios'
@@ -34,19 +34,24 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     const [liked, setLiked] = useState(false)
     const [disliked, setDisliked] = useState(false)
 
+    const hasInteracted = useRef(false)
+
     useEffect(() => {
         if (!currentUser) return
         const fetchLikeState = async () => {
             try {
                 const res = await api.get(`/comments/${comment._id}/like-status`)
-                setLiked(res.data.liked || false)
-                setDisliked(res.data.disliked || false)
+                // Only sync if the user hasn't interacted yet to avoid race conditions
+                if (!hasInteracted.current) {
+                    setLiked(res.data.liked || false)
+                    setDisliked(res.data.disliked || false)
+                }
             } catch {
-                if (comment.likes) {
+                if (!hasInteracted.current && comment.likes) {
                     const uid = currentUser.id || currentUser._id
                     setLiked(comment.likes.some(id => id === uid || id?._id === uid || id?.toString() === uid?.toString()))
                 }
-                if (comment.dislikes) {
+                if (!hasInteracted.current && comment.dislikes) {
                     const uid = currentUser.id || currentUser._id
                     setDisliked(comment.dislikes.some(id => id === uid || id?._id === uid || id?.toString() === uid?.toString()))
                 }
@@ -65,26 +70,23 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
 
     const handleLike = async () => {
         if (!currentUser) { navigate('/login'); return }
+        hasInteracted.current = true
 
-        // Optimistic State
+        // Capture current state for potential revert
         const prevLiked = liked
         const prevDisliked = disliked
         const prevLikes = likes
         const prevDislikes = dislikes
 
-        let newLiked = !prevLiked
-        let newDisliked = false
-        let newLikes = prevLiked ? prevLikes - 1 : prevLikes + 1
-        let newDislikes = prevDisliked ? prevDislikes - 1 : prevDislikes
-
-        setLiked(newLiked)
-        setDisliked(newDisliked)
-        setLikes(newLikes)
-        setDislikes(newDislikes)
+        // Use functional updates to ensure we are using the most recent state in case of rapid clicks
+        setLiked(prev => !prev)
+        setDisliked(false)
+        setLikes(prev => liked ? prev - 1 : prev + 1)
+        if (disliked) setDislikes(prev => prev - 1)
 
         try {
             const res = await api.post(`/comments/${comment._id}/like`)
-            // Sync with server if needed (server returns absolute counts)
+            // Sync with final server state
             setLikes(res.data.likes)
             setDislikes(res.data.dislikes)
             setLiked(res.data.liked)
@@ -101,26 +103,22 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
 
     const handleDislike = async () => {
         if (!currentUser) { navigate('/login'); return }
+        hasInteracted.current = true
 
-        // Optimistic State
+        // Capture current state for potential revert
         const prevLiked = liked
         const prevDisliked = disliked
         const prevLikes = likes
         const prevDislikes = dislikes
 
-        let newDisliked = !prevDisliked
-        let newLiked = false
-        let newDislikes = prevDisliked ? prevDislikes - 1 : prevDislikes + 1
-        let newLikes = prevLiked ? prevLikes - 1 : prevLikes
-
-        setLiked(newLiked)
-        setDisliked(newDisliked)
-        setLikes(newLikes)
-        setDislikes(newDislikes)
+        setDisliked(prev => !prev)
+        setLiked(false)
+        setDislikes(prev => disliked ? prev - 1 : prev + 1)
+        if (liked) setLikes(prev => prev - 1)
 
         try {
             const res = await api.post(`/comments/${comment._id}/dislike`)
-            // Sync with server
+            // Sync with final server state
             setLikes(res.data.likes)
             setDislikes(res.data.dislikes)
             setLiked(res.data.liked)
