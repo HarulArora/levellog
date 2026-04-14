@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs'
 
 const userSchema = new mongoose.Schema(
     {
-        username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 12 },
+        username: { type: String, required: true, trim: true, minlength: 3, maxlength: 12 },
         email: { type: String, required: true, unique: true, trim: true, lowercase: true },
         password: { type: String, minlength: 6 },
         bio: { type: String, default: '', maxlength: 150 },
@@ -45,8 +45,8 @@ const userSchema = new mongoose.Schema(
     { timestamps: true }
 )
 
-// Add case-insensitive index for fast username search
-userSchema.index({ username: 1 }, { collation: { locale: 'en', strength: 2 } });
+// Add case-insensitive unique index for fast username search
+userSchema.index({ username: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
 
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return
