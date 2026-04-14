@@ -338,25 +338,20 @@ router.post('/forgot-password', async (req, res) => {
         user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000)
         await user.save()
 
-        // Send reset email
-        try {
-            const emailResult = await sendResetPasswordEmail(user.email, user.username, resetCode)
-            if (!emailResult.success) {
-                logger.warn(`Password reset email failed for ${user.email}`)
-                return res.status(200).json({ 
-                    success: true, 
-                    message: 'If an account exists with that email, we will process your request. (Email delivery might be delayed).' 
+        // Send reset email entirely outside the response thread
+        setTimeout(() => {
+            sendResetPasswordEmail(user.email, user.username, resetCode)
+                .then(emailResult => {
+                    if (!emailResult.success) {
+                        logger.warn(`Password reset email failed for ${user.email}`)
+                    }
                 })
-            }
-        } catch (emailErr) {
-            logger.error('SMTP Timeout during forgot-password:', emailErr)
-            return res.status(200).json({ 
-                success: true, 
-                message: 'If an account exists, we will process your request. (Note: Email delivery might be delayed).' 
-            })
-        }
+                .catch(emailErr => {
+                    logger.error('SMTP Timeout during forgot-password:', emailErr)
+                })
+        }, 0)
 
-        res.status(200).json({ success: true, message: 'Password reset link sent to your email.' })
+        res.status(200).json({ success: true, message: 'Password reset code sent to your email.' })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to process forgot password' })
     }
@@ -395,8 +390,11 @@ router.post('/reset-password', async (req, res) => {
         user.isEmailVerified = true 
         await user.save()
 
-        // Send reset success email
-        await sendPasswordResetSuccessEmail(user.email, user.username)
+        // Send reset success email in background
+        setTimeout(() => {
+            sendPasswordResetSuccessEmail(user.email, user.username)
+                .catch(err => logger.error('Failed to send reset success email:', err))
+        }, 0)
 
         res.json({ success: true, message: 'Password reset successfully! You can now log in.' })
     } catch (error) {
