@@ -26,7 +26,7 @@ if (transporter) {
 
 export const sendEmail = async ({ to, subject, html }) => {
     try {
-        const fromEmail = process.env.EMAIL_FROM || 'QuestDeck <support@questdeck.com>'
+        const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || 'QuestDeck <support@questdeck.com>'
         
         if (!transporter) {
             throw new Error('SMTP transporter not initialized')
