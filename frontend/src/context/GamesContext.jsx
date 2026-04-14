@@ -139,22 +139,30 @@ export function GamesProvider({ children }) {
 
     const deleteGame = useCallback(async (id) => {
         const token = localStorage.getItem('questdeck_token')
+        const previousGames = [...games] // Backup for rollback
         try {
-            await api.delete(`/games/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
+            // Optimistic update
             const next = games.filter(g => g._id !== id)
             setGames(next)
-            setCache(CACHE_KEY, next, CACHE_TTL)
 
-            // Invalidate community stats caches (ensures avg ratings sync)
-            invalidateCache('home_data')
-            invalidatePrefix('discover_')
-            invalidatePrefix('game_stats_')
+            // Asynchronous backend call
+            api.delete(`/games/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }).then(() => {
+                setCache(CACHE_KEY, next, CACHE_TTL)
+                // Invalidate community stats caches
+                invalidateCache('home_data')
+                invalidatePrefix('discover_')
+                invalidatePrefix('game_stats_')
+            }).catch(err => {
+                console.error('[GamesContext] lazy delete error:', err)
+                setGames(previousGames) // Rollback on failure
+            })
 
             return { success: true }
         } catch (err) {
             console.error('[GamesContext] deleteGame error:', err)
+            setGames(previousGames) // Rollback on error
             return { success: false, error: err.message }
         }
     }, [games])
