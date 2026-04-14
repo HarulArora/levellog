@@ -156,16 +156,18 @@ router.post('/signup', async (req, res) => {
             emailVerifyExpires: verificationExpires
         })
 
-        // Send verification email asynchronously so it doesn't block signup
-        sendVerificationEmail(user.email, user.username, verificationCode)
-            .then(emailResult => {
-                if (!emailResult.success) {
-                    logger.warn(`Verification email failed for ${user.email}, but account was created.`)
-                }
-            })
-            .catch(emailErr => {
-                logger.error('SMTP Timeout or error during signup:', emailErr)
-            })
+        // Send verification email entirely outside the response thread
+        setTimeout(() => {
+            sendVerificationEmail(user.email, user.username, verificationCode)
+                .then(emailResult => {
+                    if (!emailResult.success) {
+                        logger.warn(`Verification email failed for ${user.email}, but account was created.`)
+                    }
+                })
+                .catch(emailErr => {
+                    logger.error('SMTP Timeout or error during signup:', emailErr)
+                })
+        }, 0)
 
         return res.status(201).json({
             success: true,
@@ -287,16 +289,18 @@ router.post('/resend-verification', async (req, res) => {
         user.emailVerifyExpires = new Date(Date.now() + 10 * 60 * 1000)
         await user.save()
 
-        // Send verification email asynchronously
-        sendVerificationEmail(user.email, user.username, verificationCode)
-            .then(emailResult => {
-                if (!emailResult.success) {
-                    logger.warn(`Verification email resend failed for ${user.email}`)
-                }
-            })
-            .catch(emailErr => {
-                logger.error('SMTP Timeout during resend-verification:', emailErr)
-            })
+        // Send verification email entirely outside the response thread
+        setTimeout(() => {
+            sendVerificationEmail(user.email, user.username, verificationCode)
+                .then(emailResult => {
+                    if (!emailResult.success) {
+                        logger.warn(`Verification email resend failed for ${user.email}`)
+                    }
+                })
+                .catch(emailErr => {
+                    logger.error('SMTP Timeout during resend-verification:', emailErr)
+                })
+        }, 0)
 
         return res.status(200).json({ 
             success: true, 
