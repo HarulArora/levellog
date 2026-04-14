@@ -5,14 +5,21 @@ import logger from './logger.js'
 dotenv.config()
 
 // Create SMTP Transporter (for Gmail, Brevo, etc.)
+// Create SMTP Transporter (Optimized for Gmail and Cloud Deployments)
 const transporter = process.env.SMTP_HOST ? nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_PORT === '465', 
+    // If using Gmail, use the built-in 'service' config which is more resilient on Render
+    ...(process.env.SMTP_HOST.includes('gmail') ? { service: 'gmail' } : {
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_PORT === '465',
+    }),
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
     },
+    pool: true, // Use pooling for better performance/reliability on Render
+    maxConnections: 5,
+    maxMessages: 100,
     tls: {
         rejectUnauthorized: false
     }
