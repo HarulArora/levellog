@@ -129,38 +129,44 @@ router.delete('/:id', protect, async (req, res) => {
 // ── POST /api/comments/:id/like ───────────────────────────────────────────────
 router.post('/:id/like', protect, async (req, res) => {
     try {
-        const comment = await Comment.findById(req.params.id)
-        if (!comment) return res.status(404).json({ success: false, message: 'Comment not found' })
+        const commentId = req.params.id
+        const userId = req.user._id
 
-        const existing = await CommentLike.findOne({ commentId: req.params.id, userId: req.user._id })
+        const existing = await CommentLike.findOne({ commentId, userId })
+
+        let likeDiff = 0
+        let dislikeDiff = 0
+        let finalStatus = { liked: false, disliked: false }
 
         if (existing?.type === 'like') {
-            // toggle off
+            // Un-like
             await existing.deleteOne()
-            await Comment.findByIdAndUpdate(req.params.id, { $inc: { likeCount: -1 } })
-            return res.json({
-                success: true, liked: false, disliked: false,
-                likes: comment.likeCount - 1, dislikes: comment.dislikeCount
-            })
-        }
-
-        if (existing?.type === 'dislike') {
-            // switch dislike → like
+            likeDiff = -1
+        } else if (existing?.type === 'dislike') {
+            // Dislike -> Like
             existing.type = 'like'
             await existing.save()
-            await Comment.findByIdAndUpdate(req.params.id, { $inc: { likeCount: 1, dislikeCount: -1 } })
-            return res.json({
-                success: true, liked: true, disliked: false,
-                likes: comment.likeCount + 1, dislikes: comment.dislikeCount - 1
-            })
+            likeDiff = 1
+            dislikeDiff = -1
+            finalStatus.liked = true
+        } else {
+            // New Like
+            await CommentLike.create({ commentId, userId, type: 'like' })
+            likeDiff = 1
+            finalStatus.liked = true
         }
 
-        // new like
-        await CommentLike.create({ commentId: req.params.id, userId: req.user._id, type: 'like' })
-        await Comment.findByIdAndUpdate(req.params.id, { $inc: { likeCount: 1 } })
+        const updatedComment = await Comment.findByIdAndUpdate(
+            commentId,
+            { $inc: { likeCount: likeDiff, dislikeCount: dislikeDiff } },
+            { new: true }
+        )
+
         res.json({
-            success: true, liked: true, disliked: false,
-            likes: comment.likeCount + 1, dislikes: comment.dislikeCount
+            success: true,
+            ...finalStatus,
+            likes: updatedComment.likeCount,
+            dislikes: updatedComment.dislikeCount
         })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
@@ -170,35 +176,44 @@ router.post('/:id/like', protect, async (req, res) => {
 // ── POST /api/comments/:id/dislike ───────────────────────────────────────────
 router.post('/:id/dislike', protect, async (req, res) => {
     try {
-        const comment = await Comment.findById(req.params.id)
-        if (!comment) return res.status(404).json({ success: false, message: 'Comment not found' })
+        const commentId = req.params.id
+        const userId = req.user._id
 
-        const existing = await CommentLike.findOne({ commentId: req.params.id, userId: req.user._id })
+        const existing = await CommentLike.findOne({ commentId, userId })
+
+        let likeDiff = 0
+        let dislikeDiff = 0
+        let finalStatus = { liked: false, disliked: false }
 
         if (existing?.type === 'dislike') {
+            // Un-dislike
             await existing.deleteOne()
-            await Comment.findByIdAndUpdate(req.params.id, { $inc: { dislikeCount: -1 } })
-            return res.json({
-                success: true, liked: false, disliked: false,
-                likes: comment.likeCount, dislikes: comment.dislikeCount - 1
-            })
-        }
-
-        if (existing?.type === 'like') {
+            dislikeDiff = -1
+        } else if (existing?.type === 'like') {
+            // Like -> Dislike
             existing.type = 'dislike'
             await existing.save()
-            await Comment.findByIdAndUpdate(req.params.id, { $inc: { likeCount: -1, dislikeCount: 1 } })
-            return res.json({
-                success: true, liked: false, disliked: true,
-                likes: comment.likeCount - 1, dislikes: comment.dislikeCount + 1
-            })
+            likeDiff = -1
+            dislikeDiff = 1
+            finalStatus.disliked = true
+        } else {
+            // New Dislike
+            await CommentLike.create({ commentId, userId, type: 'dislike' })
+            dislikeDiff = 1
+            finalStatus.disliked = true
         }
 
-        await CommentLike.create({ commentId: req.params.id, userId: req.user._id, type: 'dislike' })
-        await Comment.findByIdAndUpdate(req.params.id, { $inc: { dislikeCount: 1 } })
+        const updatedComment = await Comment.findByIdAndUpdate(
+            commentId,
+            { $inc: { likeCount: likeDiff, dislikeCount: dislikeDiff } },
+            { new: true }
+        )
+
         res.json({
-            success: true, liked: false, disliked: true,
-            likes: comment.likeCount, dislikes: comment.dislikeCount + 1
+            success: true,
+            ...finalStatus,
+            likes: updatedComment.likeCount,
+            dislikes: updatedComment.dislikeCount
         })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
