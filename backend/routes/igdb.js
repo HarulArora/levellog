@@ -189,25 +189,20 @@ router.get('/discover', async (req, res) => {
     }
 })
 
-// ── GET /api/igdb/game/:id ──
-router.get('/game/:id', async (req, res) => {
-    try {
-        const gameId = req.params.id
-        const cacheKey = `game-detail-${gameId}`
+// ── INTERNAL HELPER ──
+export const fetchGameDetailById = async (gameId) => {
+    const cacheKey = `game-detail-${gameId}`
 
-        // 1. Check Cache
-        if (igdbCache.has(cacheKey)) {
-            return res.json({ success: true, game: igdbCache.get(cacheKey) })
-        }
+    if (igdbCache.has(cacheKey)) {
+        return igdbCache.get(cacheKey)
+    }
 
-        // 2. Check In-Flight
-        if (inFlightRequests.has(cacheKey)) {
-            const data = await inFlightRequests.get(cacheKey)
-            return res.json({ success: true, game: data })
-        }
+    if (inFlightRequests.has(cacheKey)) {
+        return await inFlightRequests.get(cacheKey)
+    }
 
-        const performFetch = async () => {
-            const token = await getAccessToken()
+    const performFetch = async () => {
+        const token = await getAccessToken()
             const response = await fetch('https://api.igdb.com/v4/games', {
                 method: 'POST',
                 headers: {
@@ -330,10 +325,19 @@ router.get('/game/:id', async (req, res) => {
         inFlightRequests.set(cacheKey, fetchPromise)
         const finalGame = await fetchPromise
         inFlightRequests.delete(cacheKey)
+        return finalGame
+    } catch (error) {
+        logger.error('Failed internal game fetch:', error)
+        throw error
+    }
+}
 
+// ── GET /api/igdb/game/:id ──
+router.get('/game/:id', async (req, res) => {
+    try {
+        const finalGame = await fetchGameDetailById(req.params.id)
         if (!finalGame) return res.status(404).json({ success: false, message: 'Game not found' })
         res.json({ success: true, game: finalGame })
-
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch game details', error: error.message })
     }

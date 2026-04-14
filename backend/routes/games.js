@@ -7,6 +7,7 @@ import { awardXP, deductXP } from '../utils/xp.js'
 import { updateGlobalStats } from '../utils/stats.js'
 import { updateUserStats } from '../utils/userStats.js'
 import GlobalStats from '../models/GlobalStats.js'
+import { fetchGameDetailById } from './igdb.js'
 
 const router = express.Router()
 
@@ -121,25 +122,25 @@ router.get('/context/:igdbId', protectOptional, async (req, res) => {
         const userId = req.user?._id // Populated by 'protectOptional' if token is valid
 
         // 1. Fire all lookups in parallel
-        const [stats, gameRes, like, wish] = await Promise.all([
+        const [stats, game, like, wish] = await Promise.all([
             GlobalStats.findOne({ igdbId }),
-            // Fetch game data through the internal IGDB route or utility
-            fetch(`${process.env.BACKEND_URL || 'http://localhost:5000'}/api/igdb/game/${igdbId}`).then(r => r.json()),
+            // Fetch game data directly to bypass HTTP latency
+            fetchGameDetailById(igdbId),
             userId ? GameLike.findOne({ userId, igdbId }) : null,
             userId ? Wishlist.findOne({ userId, igdbId }) : null
         ])
 
-        const game = gameRes?.success ? gameRes.game : null
+        const cleanAvgRating = stats?.avgRating && stats.avgRating > 0 ? stats.avgRating : null;
 
         res.json({
             success: true,
             game,
-            stats: stats || { 
-                loggedCount: 0, 
-                avgRating: null, 
-                ratingCount: 0, 
-                likeCount: 0, 
-                wishlistCount: 0 
+            stats: { 
+                loggedCount: Math.max(0, stats?.loggedCount || 0), 
+                avgRating: cleanAvgRating, 
+                ratingCount: Math.max(0, stats?.ratingCount || 0), 
+                likeCount: Math.max(0, stats?.likeCount || 0), 
+                wishlistCount: Math.max(0, stats?.wishlistCount || 0) 
             },
             userStatus: {
                 liked: !!like,
