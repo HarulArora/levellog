@@ -137,7 +137,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         try {
             const res = await api.delete(`/comments/${comment._id}`)
             onXpToast(res.data.message || '🗑 Comment deleted · -1 XP', 'loss')
-            onRefresh()
+            onRefresh(true)
         } catch (err) { console.error('Delete error:', err) }
         finally { setShowDeleteConfirm(false) }
     }
@@ -148,7 +148,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         try {
             await api.put(`/comments/${comment._id}`, { text: editingText })
             setIsEditing(false); setIsEdited(true)
-            onRefresh()
+            onRefresh(true)
         } catch (err) { console.error('Edit error:', err) }
         finally { setSubmittingEdit(false) }
     }
@@ -164,7 +164,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
             })
             onXpToast(res.data.message || '💬 Reply posted · +1 XP', 'gain')
             setReplyText(''); setShowReplyBox(false); setRepliesVisible(true)
-            onRefresh()
+            onRefresh(true)
         } catch (err) { console.error('Reply error:', err) }
         finally { setSubmittingReply(false) }
     }
@@ -345,7 +345,7 @@ function GameDetail() {
 
     // ── CACHED CONTEXT FETCH (Optimized) ──
     // Combines: Game Info + Global Stats + User Like/Wishlist status in ONE request
-    const { data: contextData, loading: loadingContext, error: contextError, refetch: refetchContext } = useCachedFetch(
+    const { data: contextData, loading: loadingContext, error: contextError, refetch: refetchContext, setData: setContextData } = useCachedFetch(
         `game_context_${user?.id || user?._id || 'anon'}_${igdbId}`,
         `/games/context/${igdbId}`,
         { deps: [igdbId, user?.id || user?._id], ttl: 5 * 60 * 1000 }
@@ -423,8 +423,20 @@ function GameDetail() {
         
         // Optimistic Update
         const wasLiked = liked
+        const oldData = contextData
         setLiked(!wasLiked)
         setLiking(true)
+
+        // Optimistically update counts if data exists
+        if (oldData?.stats) {
+            setContextData({
+                ...oldData,
+                stats: {
+                    ...oldData.stats,
+                    likeCount: Math.max(0, (oldData.stats.likeCount || 0) + (wasLiked ? -1 : 1))
+                }
+            })
+        }
         
         try {
             const res = await api.post('/lists/like', {
@@ -434,14 +446,11 @@ function GameDetail() {
             if (res.data.liked) showXpToast('❤️ Liked! +1 XP', 'gain')
             else showXpToast('💔 Unliked · -1 XP', 'loss')
             
-            // Invalidate context cache for this game & user
-            invalidateCache(`game_context_${user?.id || user?._id}_${igdbId}`)
-            invalidateCache(`lists_${user.id || user._id}`)
-            
             // Silent refetch to sync stats (counts etc) in background
             await refetchContext(true) 
         } catch (err) {
             setLiked(wasLiked) // Revert on failure
+            if (oldData) setContextData(oldData)
         } finally { setLiking(false) }
     }
 
@@ -451,8 +460,20 @@ function GameDetail() {
  
         // Optimistic Update
         const wasWishlisted = wishlisted
+        const oldData = contextData
         setWishlisted(!wasWishlisted)
         setWishing(true)
+
+        // Optimistically update counts
+        if (oldData?.stats) {
+            setContextData({
+                ...oldData,
+                stats: {
+                    ...oldData.stats,
+                    wishlistCount: Math.max(0, (oldData.stats.wishlistCount || 0) + (wasWishlisted ? -1 : 1))
+                }
+            })
+        }
 
         try {
             const res = await api.post('/lists/wishlist', {
@@ -462,12 +483,10 @@ function GameDetail() {
             setWishlisted(res.data.wishlisted)
             if (res.data.wishlisted) showXpToast('🎯 Wishlisted!', 'gain')
             
-            invalidateCache(`game_context_${user?.id || user?._id}_${igdbId}`)
-            invalidateCache(`lists_${user.id || user._id}`)
-            
             await refetchContext(true)
         } catch (err) {
             setWishlisted(wasWishlisted) // Revert on failure
+            if (oldData) setContextData(oldData)
         } finally { setWishing(false) }
     }
 
@@ -502,8 +521,7 @@ function GameDetail() {
             })
             showXpToast(res.data.message || '💬 Comment posted · +1 XP', 'gain')
             setCommentText('')
-            invalidateCache(`game_comments_${igdbId}`)
-            await fetchComments()
+            await fetchComments(true)
         } catch (err) { console.error('Comment error:', err) }
         finally { setSubmittingComment(false) }
     }
@@ -1057,7 +1075,7 @@ function GameDetail() {
                             if (myGame) { await updateGame(myGame._id, formData) }
                             else { await addGame(formData) }
                             setShowAddModal(false)
-                            await fetchPlatformStats()
+                            await fetchPlatformStats(true) // Silent reload to update counts
                             return { success: true }
                         } catch (err) { return { success: false } }
                     }}
