@@ -111,7 +111,7 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                 </div>
 
                 {/* Bottom row — genre left, rating right */}
-                <div className="flex justify-between items-center">
+                <div className="mt-auto flex justify-between items-end pb-2">
                     <span className="text-[#7a7a90] font-mono text-[10px] uppercase tracking-wider">
                         {game.genre}
                     </span>
@@ -131,8 +131,8 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                     )}
                 </div>
 
-                {/* Hours tracked — mt-auto pushes everything below it to the bottom */}
-                <div className="mt-auto pt-2 border-t border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] mt-2">
+                {/* Hours tracked */}
+                <div className="pt-2 border-t border-[#2a2a35] text-[#7a7a90] font-mono text-[10px]">
                     {game.hours > 0 ? `⏱ ${game.hours}h tracked` : String.fromCharCode(160)}
                 </div>
 

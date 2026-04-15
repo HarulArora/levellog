@@ -14,7 +14,10 @@ const router = express.Router()
 // ── GET /api/games ──
 router.get('/', protect, async (req, res) => {
     try {
-        const games = await Game.find({ userId: req.user._id }).sort({ createdAt: -1 })
+        const games = await Game.find({ userId: req.user._id })
+            .select('title cover status genre rating hours platforms igdbId steamId createdAt updatedAt')
+            .sort({ createdAt: -1 })
+            .lean()
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch games', error: error.message })
@@ -24,7 +27,10 @@ router.get('/', protect, async (req, res) => {
 // ── GET /api/games/user/:userId ──
 router.get('/user/:userId', async (req, res) => {
     try {
-        const games = await Game.find({ userId: req.params.userId }).sort({ createdAt: -1 })
+        const games = await Game.find({ userId: req.params.userId })
+            .select('title cover status genre rating hours platforms igdbId createdAt updatedAt')
+            .sort({ createdAt: -1 })
+            .lean()
         res.json({ success: true, games })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch games', error: error.message })
@@ -34,7 +40,11 @@ router.get('/user/:userId', async (req, res) => {
 // ── GET /api/games/activity/:userId ──
 router.get('/activity/:userId', protect, async (req, res) => {
     try {
-        const games = await Game.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(20)
+        const games = await Game.find({ userId: req.params.userId })
+            .select('title cover status rating hours igdbId createdAt updatedAt')
+            .sort({ updatedAt: -1 })
+            .limit(20)
+            .lean()
         const activity = []
 
         games.forEach(game => {

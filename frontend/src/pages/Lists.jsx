@@ -416,25 +416,18 @@ function Lists() {
     }, [])
 
     const userId = user?.id || user?._id
-    const { data, loading, refetch: refetchLists } = useCachedFetch(
+    const { data: listBundle, loading, refetch: refetchLists, setData: setListBundle } = useCachedFetch(
         userId ? `lists_${userId}` : null,
         userId ? '/lists/me' : null,
-        { enabled: !!userId, ttl: 60 * 1000 } // 1 min — lists change frequently
+        { enabled: !!userId, ttl: 60 * 1000 } 
     )
 
-    // After mutations, sync selected list from fresh data
-    const [localData, setLocalData] = useState(null)
-    const effectiveData = localData ?? data
-
     const fetchData = useCallback(async (silent = true) => {
-        // Only clear local storage cache, but don't set global loading=true 
-        // unless explicitly requested (silent=false)
         invalidateCache(userId ? `lists_${userId}` : '')
         await refetchLists(silent)
-        setLocalData(null)
     }, [userId, refetchLists])
 
-    const { customLists = [], likes = [], wishlist = [], user: userData } = effectiveData || {}
+    const { customLists = [], likes = [], wishlist = [], user: userData } = listBundle || {}
 
     const selectedList = useMemo(() => 
         selectedListId ? customLists.find(l => l._id === selectedListId) : null
@@ -481,36 +474,40 @@ function Lists() {
     const handleRemoveLike = useCallback(async () => {
         if (!deleteConfirmGame) return
         const { igdbId } = deleteConfirmGame
+        const previousLikes = likes
+        
         try {
+            // OPTIMISTIC REMOVE
+            setListBundle({ ...listBundle, likes: likes.filter(g => g.igdbId !== igdbId) })
+            
             await api.post('/lists/like', { igdbId })
-            setLocalData(prev => {
-                const base = prev ?? data
-                return { ...base, likes: (base?.likes || []).filter(g => g.igdbId !== igdbId) }
-            })
             showToast('Like removed')
-            invalidateCache(`lists_${userId}`)
             invalidateCache(`game_stats_v2_${igdbId}`)
-            invalidateCache(`game_like_${userId}_${igdbId}`)
-        } catch { showToast('Failed', 'error') }
+        } catch { 
+            setListBundle({ ...listBundle, likes: previousLikes })
+            showToast('Failed to remove like', 'error') 
+        }
         finally { setDeleteConfirmGame(null) }
-    }, [deleteConfirmGame, userId, data, showToast])
+    }, [deleteConfirmGame, listBundle, likes, setListBundle, showToast])
 
     const handleRemoveWishlist = useCallback(async () => {
         if (!deleteConfirmGame) return
         const { igdbId } = deleteConfirmGame
+        const previousWishlist = wishlist
+        
         try {
+            // OPTIMISTIC REMOVE
+            setListBundle({ ...listBundle, wishlist: wishlist.filter(g => g.igdbId !== igdbId) })
+
             await api.post('/lists/wishlist', { igdbId })
-            setLocalData(prev => {
-                const base = prev ?? data
-                return { ...base, wishlist: (base?.wishlist || []).filter(g => g.igdbId !== igdbId) }
-            })
             showToast('Wishlist updated')
-            invalidateCache(`lists_${userId}`)
             invalidateCache(`game_stats_v2_${igdbId}`)
-            invalidateCache(`game_wish_${userId}_${igdbId}`)
-        } catch { showToast('Failed', 'error') }
+        } catch { 
+            setListBundle({ ...listBundle, wishlist: previousWishlist })
+            showToast('Failed to update wishlist', 'error') 
+        }
         finally { setDeleteConfirmGame(null) }
-    }, [deleteConfirmGame, userId, data, showToast])
+    }, [deleteConfirmGame, listBundle, wishlist, setListBundle, showToast])
 
     const handleRemoveGameFromCustom = useCallback(async () => {
         if (!deleteConfirmGame || !selectedListId) return
@@ -540,7 +537,7 @@ function Lists() {
         </div>
     )
 
-    if (loading && !effectiveData) return (
+    if (loading && !listBundle) return (
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-[#7a7a90] font-mono text-sm">Loading...</div>
         </div>

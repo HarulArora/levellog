@@ -15,13 +15,15 @@ router.get('/:igdbId', async (req, res) => {
         const [topLevel, replies] = await Promise.all([
             Comment.find({ igdbId, parentId: null })
                 .populate('userId', 'username avatar badge level')
-                .sort({ createdAt: -1 }),
+                .sort({ createdAt: -1 })
+                .lean(),
             Comment.find({ igdbId, parentId: { $ne: null } })
                 .populate('userId', 'username avatar badge level')
-                .sort({ createdAt: 1 }),
+                .sort({ createdAt: 1 })
+                .lean(),
         ])
         const comments = topLevel.map(comment => ({
-            ...comment.toObject(),
+            ...comment,
             replies: replies.filter(r => r.parentId?.toString() === comment._id.toString())
         }))
         res.json({ success: true, comments })
@@ -227,7 +229,7 @@ router.get('/:id/like-status', protect, async (req, res) => {
         const existing = await CommentLike.findOne({
             commentId: req.params.id,
             userId: req.user._id
-        })
+        }).lean()
         res.json({
             success: true,
             liked: existing?.type === 'like',

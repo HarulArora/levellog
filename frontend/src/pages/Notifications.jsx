@@ -186,7 +186,7 @@ function Notifications() {
                     )}
                 </>
             ),
-            getLink: (n) => n.meta?.igdbId ? `/game/${n.meta.igdbId}` : null,
+            getLink: (n) => n.meta?.igdbId ? `/game/${n.meta.igdbId}?tab=comments` : null,
         },
     }
 

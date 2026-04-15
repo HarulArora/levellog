@@ -86,7 +86,10 @@ router.get('/check-username', async (req, res) => {
         if (isProfane(username))
             return res.json({ available: false, message: 'Username is not allowed' })
 
-        const existing = await User.findOne({ username: username.trim() })
+        const usernameRegex = username.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+        const existing = await User.findOne({ 
+            username: { $regex: new RegExp(`^${usernameRegex}$`, 'i') } 
+        })
         
         if (existing) {
             // Unverified and Expired = Available for recapture
@@ -123,9 +126,12 @@ router.post('/signup', async (req, res) => {
         // Optimize: Check for both email and username in one parallel query or single $or if preferred.
         // But separate checks with indexes are actually very fast. 
         // Let's optimize by checking both concurrently.
+        const usernameRegex = username.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
         const [emailExists, usernameExists] = await Promise.all([
             User.findOne({ email: email.toLowerCase().trim() }),
-            User.findOne({ username: username.trim() })
+            User.findOne({ 
+                username: { $regex: new RegExp(`^${usernameRegex}$`, 'i') } 
+            })
         ])
 
         if (emailExists) {
@@ -577,8 +583,11 @@ router.patch('/change-password', protect, async (req, res) => {
 // ── GET /api/auth/profile/:username ──────────────────────────────────────────
 router.get('/profile/:username', async (req, res) => {
     try {
-        const user = await User.findOne({ username: req.params.username })
+        const user = await User.findOne({ 
+            username: { $regex: new RegExp(`^${req.params.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') } 
+        })
             .select('-password -email -emailVerifyToken -resetPasswordToken')
+            .lean()
         if (!user) return res.status(404).json({ success: false, message: 'User not found' })
 
         const [followerCount, followingCount] = await Promise.all([
@@ -605,7 +614,7 @@ router.get('/profile/:username', async (req, res) => {
             } catch { /* not logged in or bad token */ }
         }
 
-        const userObj = user.toObject()
+        const userObj = { ...user }
         userObj.followerCount = followerCount
         userObj.followingCount = followingCount
         userObj.isFollowedByMe = isFollowedByMe
@@ -708,7 +717,9 @@ router.patch('/privacy', protect, async (req, res) => {
 // ── GET /api/auth/feed ────────────────────────────────────────────────────────
 router.get('/feed', protect, async (req, res) => {
     try {
-        const following = await Follow.find({ followerId: req.user._id }).select('followingId')
+        const following = await Follow.find({ followerId: req.user._id })
+            .select('followingId')
+            .lean()
         const followingIds = following.map(f => f.followingId)
 
         if (followingIds.length === 0)
@@ -716,7 +727,11 @@ router.get('/feed', protect, async (req, res) => {
 
         const Game = (await import('../models/Game.js')).default
         const games = await Game.find({ userId: { $in: followingIds } })
-            .sort({ createdAt: -1 }).limit(20).populate('userId', 'username')
+            .sort({ createdAt: -1 })
+            .limit(20)
+            .populate('userId', 'username avatar badge level')
+            .select('title cover status rating igdbId createdAt userId')
+            .lean()
 
         res.json({ success: true, games })
     } catch (error) {
@@ -731,7 +746,7 @@ router.get('/search', async (req, res) => {
         if (!query || query.trim().length < 2) return res.json({ success: true, users: [] })
         const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
         const users = await User.find({ username: { $regex: escapedQuery, $options: 'i' } })
-            .select('-password -email').limit(10)
+            .select('-password -email').limit(10).lean()
 
         // check followsMe for each user if logged in
         let loggedInId = null
@@ -745,12 +760,12 @@ router.get('/search', async (req, res) => {
         }
 
         const enriched = await Promise.all(users.map(async u => {
-            const uObj = u.toObject()
+            const uObj = u
             if (loggedInId) {
                 const [follow, sentReq, followedBy] = await Promise.all([
-                    Follow.findOne({ followerId: loggedInId, followingId: u._id }),
-                    FollowRequest.findOne({ sender: loggedInId, recipient: u._id, status: 'pending' }),
-                    Follow.findOne({ followerId: u._id, followingId: loggedInId })
+                    Follow.findOne({ followerId: loggedInId, followingId: u._id }).lean(),
+                    FollowRequest.findOne({ sender: loggedInId, recipient: u._id, status: 'pending' }).lean(),
+                    Follow.findOne({ followerId: u._id, followingId: loggedInId }).lean()
                 ])
                 uObj.isFollowedByMe = !!follow
                 uObj.isRequestedByMe = !!sentReq
@@ -774,6 +789,7 @@ router.get('/followers/:userId', async (req, res) => {
     try {
         const follows = await Follow.find({ followingId: req.params.userId })
             .populate('followerId', 'username avatar bio isPrivate followerCount badge level')
+            .lean()
         res.json({ success: true, users: follows.map(f => f.followerId) })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch followers', error: error.message })
@@ -785,6 +801,7 @@ router.get('/following/:userId', async (req, res) => {
     try {
         const follows = await Follow.find({ followerId: req.params.userId })
             .populate('followingId', 'username avatar bio isPrivate followerCount badge level')
+            .lean()
         res.json({ success: true, users: follows.map(f => f.followingId) })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch following', error: error.message })
@@ -801,7 +818,10 @@ router.put('/profile', protect, async (req, res) => {
             const trimmed = username.trim()
             if (trimmed.length < 3 || trimmed.length > 12)
                 return res.status(400).json({ success: false, message: 'Username must be 3–12 characters' })
-            const existing = await User.findOne({ username: trimmed, _id: { $ne: req.user._id } })
+            const existing = await User.findOne({ 
+                username: { $regex: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }, 
+                _id: { $ne: req.user._id } 
+            }).lean()
             if (existing)
                 return res.status(400).json({ success: false, message: 'Username already taken' })
             updates.username = trimmed
@@ -829,7 +849,9 @@ router.put('/profile', protect, async (req, res) => {
 // ── GET /api/auth/suggestions ─────────────────────────────────────────────────
 router.get('/suggestions', protect, async (req, res) => {
     try {
-        const following = await Follow.find({ followerId: req.user._id }).select('followingId')
+        const following = await Follow.find({ followerId: req.user._id })
+            .select('followingId')
+            .lean()
         const myFollowingIds = following.map(f => f.followingId)
         const excludeIds = [req.user._id, ...myFollowingIds]
 
@@ -837,7 +859,7 @@ router.get('/suggestions', protect, async (req, res) => {
         const mutualFollows = await Follow.find({
             followerId: { $in: myFollowingIds },
             followingId: { $nin: excludeIds }
-        })
+        }).lean()
 
         const mutualCounts = {}
         mutualFollows.forEach(f => {
@@ -852,6 +874,7 @@ router.get('/suggestions', protect, async (req, res) => {
             const randomUsers = await User.find({ _id: { $nin: [...excludeIds, ...suggestedIds] } })
                 .limit(20 - suggestedIds.length)
                 .select('_id')
+                .lean()
             randomUsers.forEach(u => suggestedIds.push(u._id.toString()))
         }
 
@@ -860,12 +883,13 @@ router.get('/suggestions', protect, async (req, res) => {
         // Bulk fetch all relevant users
         const users = await User.find({ _id: { $in: suggestedIds } })
             .select('username avatar bio level badge isPrivate followerCount')
+            .lean()
 
         // Bulk fetch all relationships for the current user and these suggested IDs
         const [myFollows, myRequests, whoFollowsMe] = await Promise.all([
-            Follow.find({ followerId: req.user._id, followingId: { $in: suggestedIds } }).select('followingId'),
-            FollowRequest.find({ sender: req.user._id, recipient: { $in: suggestedIds }, status: 'pending' }).select('recipient'),
-            Follow.find({ followerId: { $in: suggestedIds }, followingId: req.user._id }).select('followerId')
+            Follow.find({ followerId: req.user._id, followingId: { $in: suggestedIds } }).select('followingId').lean(),
+            FollowRequest.find({ sender: req.user._id, recipient: { $in: suggestedIds }, status: 'pending' }).select('recipient').lean(),
+            Follow.find({ followerId: { $in: suggestedIds }, followingId: req.user._id }).select('followerId').lean()
         ])
 
         const myFollowSet = new Set(myFollows.map(f => f.followingId.toString()))
@@ -873,7 +897,7 @@ router.get('/suggestions', protect, async (req, res) => {
         const focusedSet = new Set(whoFollowsMe.map(f => f.followerId.toString()))
 
         const enriched = users.map(u => {
-            const uObj = u.toObject()
+            const uObj = u
             const idStr = u._id.toString()
             uObj.mutualCount = mutualCounts[idStr] || 0
             uObj.isFollowedByMe = myFollowSet.has(idStr)
