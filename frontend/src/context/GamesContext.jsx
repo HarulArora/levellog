@@ -73,9 +73,13 @@ export function GamesProvider({ children }) {
     const addGame = useCallback(async (gameData) => {
         const token = localStorage.getItem('questdeck_token')
         try {
-            const existing = games.find(
-                g => g.title.toLowerCase() === gameData.title.toLowerCase()
-            )
+            const existing = games.find(g => {
+                const searchId = Number(gameData.igdbId)
+                const entryId = Number(g.igdbId)
+                if (searchId && entryId) return searchId === entryId
+                if (searchId || entryId) return false // One has ID, other doesn't -> different games
+                return g.title?.toLowerCase() === gameData.title?.toLowerCase()
+            })
             if (existing) {
                 // Delegate to updateGame path
                 const res = await api.put(`/games/${existing._id}`, gameData, {

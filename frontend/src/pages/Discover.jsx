@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, memo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
@@ -269,12 +269,19 @@ export default function Discover() {
     const navigate = useNavigate()
     const { games: userLibrary } = useGamesContext()
 
-    const [activeGenre, setActiveGenre] = useState(null)
-    const [page, setPage] = useState(1)
+    const [searchParams, setSearchParams] = useSearchParams()
+    
+    const genreParam = searchParams.get('genre')
+    const initialGenre = genreParam ? [...GENRE_CARDS, ...MORE_GENRES].find(g => g.label === genreParam) : null
+    const [activeGenre, setActiveGenre] = useState(initialGenre)
+    
+    const pageParam = parseInt(searchParams.get('page'))
+    const [page, setPage] = useState(pageParam || 1)
     const [showMore, setShowMore] = useState(false)
 
+
     // Search Mode State
-    const [searchQuery, setSearchQuery] = useState('')
+    const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
     const [searchResults, setSearchResults] = useState([])
     const [isSearching, setIsSearching] = useState(false)
     const abortControllerRef = useRef(null)
@@ -314,6 +321,31 @@ export default function Discover() {
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: 'smooth' })
     }, [page, genreKey])
+
+    // Sync URL with all filters
+    useEffect(() => {
+        const newParams = new URLSearchParams(searchParams)
+        
+        if (searchQuery.trim()) {
+            newParams.set('q', searchQuery)
+        } else {
+            newParams.delete('q')
+        }
+
+        if (activeGenre) {
+            newParams.set('genre', activeGenre.label)
+        } else {
+            newParams.delete('genre')
+        }
+
+        if (page > 1) {
+            newParams.set('page', page)
+        } else {
+            newParams.delete('page')
+        }
+
+        setSearchParams(newParams, { replace: true })
+    }, [searchQuery, activeGenre, page])
 
     useEffect(() => {
         const q = searchQuery.trim()
