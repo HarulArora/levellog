@@ -304,7 +304,7 @@ export default function Discover() {
     const genreKey = activeGenre?.label || 'all'
     const { data: discoverData, loading } = useCachedFetch(
         `discover_${genreKey}_${page}`,
-        `/igdb/discover?page=${page}&limit=${LIMIT}${activeGenre ? `&genre=${activeGenre.igdb}` : ''}`,
+        `/igdb/discover?page=${page}&limit=${LIMIT}${activeGenre ? `&genre=${encodeURIComponent(activeGenre.igdb)}` : ''}`,
         { ttl: 15 * 60 * 1000, deps: [genreKey, page] }
     )
 
