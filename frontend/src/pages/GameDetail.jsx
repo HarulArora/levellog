@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, memo, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
@@ -348,6 +348,16 @@ function GameDetail() {
     const [xpToast, setXpToast] = useState(null)
     const [lightboxIndex, setLightboxIndex] = useState(null)
     const [shareCopied, setShareCopied] = useState(false)
+    const location = useLocation()
+
+    // ── Deep Linking for Tabs ──
+    useEffect(() => {
+        const params = new URLSearchParams(location.search)
+        const tab = params.get('tab')
+        if (tab === 'comments' || tab === 'overview') {
+            setActiveTab(tab)
+        }
+    }, [location.search])
 
     // ── CACHED CONTEXT FETCH (Optimized) ──
     // Combines: Game Info + Global Stats + User Like/Wishlist status in ONE request

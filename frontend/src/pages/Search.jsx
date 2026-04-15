@@ -9,7 +9,15 @@ function Search() {
     const { user: currentUser } = useAuth()
     const navigate = useNavigate()
     const [query, setQuery] = useState('')
+    const [debouncedQuery, setDebouncedQuery] = useState('')
     const { getFollowStatus, handleFollowToggle, loadingMap } = useFollow()
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedQuery(query)
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [query])
 
     // ── CACHED FETCHES ──
     const { data: suggestionsData, loading: loadingSuggestions, refetch: refetchSuggestions } = useCachedFetch(
@@ -33,10 +41,11 @@ function Search() {
         }
     }, [localSuggestions, loadingSuggestions, currentUser, refetchSuggestions])
 
-    const searchKey = query.trim().length >= 2 ? `user_search_${query.trim().toLowerCase()}` : null
+    const trimmed = debouncedQuery.trim()
+    const searchKey = trimmed.length >= 2 ? `user_search_${trimmed.toLowerCase()}` : null
     const { data: searchData, loading: loadingSearch } = useCachedFetch(
         searchKey,
-        searchKey ? `/auth/search?q=${encodeURIComponent(query.trim())}` : null,
+        searchKey ? `/auth/search?q=${encodeURIComponent(trimmed)}` : null,
         { enabled: !!searchKey, ttl: 5 * 60 * 1000 }
     )
 
@@ -71,8 +80,8 @@ function Search() {
                                transition-colors placeholder:text-[#7a7a90]"
                 />
                 {loading && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7a7a90] font-mono text-xs">
-                        searching...
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#c8ff57] font-mono text-[9px] uppercase tracking-widest animate-pulse">
+                        Searching...
                     </span>
                 )}
             </div>

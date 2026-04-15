@@ -15,18 +15,18 @@ const router = express.Router()
 router.get('/me', protect, async (req, res) => {
     try {
         const [customLists, likes, wishlist, reviews, user] = await Promise.all([
-            GameList.find({ userId: req.user._id }).sort({ createdAt: -1 }),
-            GameLike.find({ userId: req.user._id }).sort({ createdAt: -1 }),
-            Wishlist.find({ userId: req.user._id }).sort({ createdAt: -1 }),
-            GameReview.find({ userId: req.user._id }).sort({ createdAt: -1 }),
-            User.findById(req.user._id).select('xp level badge username'),
+            GameList.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean(),
+            GameLike.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean(),
+            Wishlist.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean(),
+            GameReview.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean(),
+            User.findById(req.user._id).select('xp level badge username').lean(),
         ])
 
         // attach entries to each list
         const listIds = customLists.map(l => l._id)
-        const allEntries = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 })
+        const allEntries = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 }).lean()
         const listsWithGames = customLists.map(list => ({
-            ...list.toObject(),
+            ...list,
             games: allEntries.filter(e => e.listId.toString() === list._id.toString())
         }))
 
@@ -39,11 +39,11 @@ router.get('/me', protect, async (req, res) => {
 // ── GET /api/lists/user/:userId ────────────────────────────────────────────────
 router.get('/user/:userId', async (req, res) => {
     try {
-        const lists = await GameList.find({ userId: req.params.userId }).sort({ createdAt: -1 })
+        const lists = await GameList.find({ userId: req.params.userId }).sort({ createdAt: -1 }).lean()
         const listIds = lists.map(l => l._id)
-        const allEntries = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 })
+        const allEntries = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 }).lean()
         const listsWithGames = lists.map(list => ({
-            ...list.toObject(),
+            ...list,
             games: allEntries.filter(e => e.listId.toString() === list._id.toString())
         }))
         res.json({ success: true, lists: listsWithGames })
@@ -55,7 +55,7 @@ router.get('/user/:userId', async (req, res) => {
 // ── POST /api/lists/custom ────────────────────────────────────────────────────
 router.post('/custom', protect, async (req, res) => {
     try {
-        const user = await User.findById(req.user._id)
+        const user = await User.findById(req.user._id).lean()
         if (user.level < 2)
             return res.status(403).json({ success: false, message: 'You need Level 2 to create a custom list', locked: true })
 
@@ -101,11 +101,11 @@ router.put('/custom/:id', protect, async (req, res) => {
 // ── PUT /api/lists/custom/:id/game ── add or remove a game ────────────────────
 router.put('/custom/:id/game', protect, async (req, res) => {
     try {
-        const user = await User.findById(req.user._id)
+        const user = await User.findById(req.user._id).lean()
         if (user.level < 2)
             return res.status(403).json({ success: false, message: 'Reach Level 2 to use custom lists.', locked: true })
 
-        const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id })
+        const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id }).lean()
         if (!list) return res.status(404).json({ success: false, message: 'List not found' })
 
         const { igdbId, gameTitle, gameCover, genre, action } = req.body
@@ -124,9 +124,9 @@ router.put('/custom/:id/game', protect, async (req, res) => {
             if (deleted) await GameList.findByIdAndUpdate(list._id, { $inc: { gameCount: -1 } })
         }
 
-        const entries = await GameListEntry.find({ listId: list._id }).sort({ createdAt: -1 })
-        const updatedList = await GameList.findById(list._id)
-        res.json({ success: true, list: { ...updatedList.toObject(), games: entries } })
+        const entries = await GameListEntry.find({ listId: list._id }).sort({ createdAt: -1 }).lean()
+        const updatedList = await GameList.findById(list._id).lean()
+        res.json({ success: true, list: { ...updatedList, games: entries } })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
