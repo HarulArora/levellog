@@ -4,6 +4,9 @@ import { searchGames, getAccessToken } from '../utils/igdb.js'
 import Game from '../models/Game.js'
 import GameLike from '../models/GameLike.js'
 import logger from '../utils/logger.js'
+import { shortPlatform, normalizeCover } from '../utils/helpers.js'
+import GlobalList from '../models/GlobalList.js'
+import { syncIGDBLists } from '../tasks/igdbSync.js'
 
 const router = express.Router()
 
@@ -32,12 +35,7 @@ router.get('/search', async (req, res) => {
         
         const performSearch = async () => {
             const raw = await searchGames(query)
-            const normCover = (c) => {
-                if (!c) return null
-                if (typeof c === 'string') return c.startsWith('http') ? c : ('https:' + c)
-                if (c.url) return c.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-                return null
-            }
+            const normCover = (c) => normalizeCover(c)
             const results = (raw || []).map(g => {
                 const genreNames = g.genres
                     ? (Array.isArray(g.genres)
@@ -116,19 +114,7 @@ router.get('/discover', async (req, res) => {
 
         const [gamesData, countData] = await Promise.all([gamesRes.json(), countRes.json()])
 
-        const shortPlatform = (name) => {
-            if (name.includes('PC') || name === 'Windows' || name === 'Linux' || name === 'Mac') return 'PC'
-            if (name.includes('PlayStation 5')) return 'PS5'
-            if (name.includes('PlayStation 4')) return 'PS4'
-            if (name.includes('PlayStation 3')) return 'PS3'
-            if (name.includes('PlayStation')) return 'PS'
-            if (name.includes('Xbox Series')) return 'Xbox Series'
-            if (name.includes('Xbox One')) return 'Xbox One'
-            if (name.includes('Xbox')) return 'Xbox'
-            if (name.includes('Nintendo Switch')) return 'Switch'
-            if (name.includes('iOS') || name.includes('Android')) return 'Mobile'
-            return null // skip obscure platforms
-        }
+        // Uses imported shortPlatform
 
         // ── CACHE WRAPPER FOR IGDB DATA ONLY ──
         const igdbDataCacheKey = `igdb-discover-v2-${genre}-${pageNum}-${limitNum}`
@@ -138,9 +124,7 @@ router.get('/discover', async (req, res) => {
             const rawGames = (Array.isArray(gamesData) ? gamesData : []).map(game => ({
                 id: game.id,
                 title: game.name,
-                cover: game.cover?.url
-                    ? game.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-                    : null,
+                cover: normalizeCover(game.cover?.url),
                 genre: game.genres?.[0]?.name || null,
                 platforms: [...new Set(
                     (game.platforms || [])
@@ -250,36 +234,18 @@ export const fetchGameDetailById = async (gameId) => {
                 ? ageRatingMap[g.age_ratings[0].rating] || null
                 : null
 
-            const cover = g.cover?.url
-                ? g.cover.url.replace('t_thumb', 't_cover_big_2x').replace('//', 'https://')
-                : null
+            const cover = normalizeCover(g.cover?.url, 't_cover_big_2x')
 
-            const screenshots = g.screenshots?.map(s =>
-                s.url.replace('t_thumb', 't_screenshot_big').replace('//', 'https://')
-            ) || []
+            const screenshots = g.screenshots?.map(s => normalizeCover(s.url, 't_screenshot_big')) || []
 
             const similarGames = g.similar_games?.slice(0, 6).map(sg => ({
                 id: sg.id,
                 title: sg.name,
-                cover: sg.cover?.url
-                    ? sg.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-                    : null,
+                cover: normalizeCover(sg.cover?.url),
                 rating: sg.rating ? (sg.rating / 10).toFixed(1) : null
             })) || []
 
-            const platforms = g.platforms?.map(p => {
-                const name = p.name
-                if (name.includes('PC')) return 'PC'
-                if (name.includes('PlayStation 5')) return 'PS5'
-                if (name.includes('PlayStation 4')) return 'PS4'
-                if (name.includes('PlayStation')) return 'PS'
-                if (name.includes('Xbox Series')) return 'Xbox Series'
-                if (name.includes('Xbox One')) return 'Xbox One'
-                if (name.includes('Xbox')) return 'Xbox'
-                if (name.includes('Nintendo Switch')) return 'Switch'
-                if (name.includes('iOS') || name.includes('Android')) return 'Mobile'
-                return p.name
-            }) || []
+            const platforms = g.platforms?.map(p => shortPlatform(p.name) || p.name) || []
 
             // ── Community Stats Fetching ──
             const [wishlistCount, likeCount, loggedCount] = await Promise.all([
@@ -347,35 +313,12 @@ router.get('/game/:id', async (req, res) => {
 // ── GET /api/igdb/trending ──
 router.get('/trending', async (req, res) => {
     try {
-        if (igdbCache.has('trending')) return res.json({ success: true, games: igdbCache.get('trending') })
-        const token = await getAccessToken()
-        const response = await fetch('https://api.igdb.com/v4/games', {
-            method: 'POST',
-            headers: {
-                'Client-ID': process.env.IGDB_CLIENT_ID,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'text/plain'
-            },
-            body: `
-        fields name, cover.url, genres.name, rating, rating_count;
-        where rating > 85 & rating_count > 500 & cover != null & genres != null;
-        sort rating_count desc;
-        limit 15;
-      `
-        })
-        const data = await response.json()
-        const games = data.map(game => ({
-            id: game.id,
-            title: game.name,
-            cover: game.cover?.url
-                ? game.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-                : null,
-            genre: game.genres?.[0]?.name || 'Unknown',
-            rating: game.rating ? (game.rating / 10).toFixed(1) : null,
-            ratingCount: game.rating_count
-        }))
-        igdbCache.set('trending', games)
-        res.json({ success: true, games })
+        let list = await GlobalList.findOne({ key: 'trending' })
+        if (!list || list.games.length === 0) {
+            await syncIGDBLists()
+            list = await GlobalList.findOne({ key: 'trending' })
+        }
+        res.json({ success: true, games: list?.games || [] })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch trending', error: error.message })
     }
@@ -384,34 +327,12 @@ router.get('/trending', async (req, res) => {
 // ── GET /api/igdb/top-rated ──
 router.get('/top-rated', async (req, res) => {
     try {
-        if (igdbCache.has('top-rated')) return res.json({ success: true, games: igdbCache.get('top-rated') })
-        const token = await getAccessToken()
-        const response = await fetch('https://api.igdb.com/v4/games', {
-            method: 'POST',
-            headers: {
-                'Client-ID': process.env.IGDB_CLIENT_ID,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'text/plain'
-            },
-            body: `
-        fields name, cover.url, genres.name, rating, rating_count;
-        where rating > 90 & rating_count > 200 & cover != null & genres != null;
-        sort rating desc;
-        limit 15;
-      `
-        })
-        const data = await response.json()
-        const games = data.map(game => ({
-            id: game.id,
-            title: game.name,
-            cover: game.cover?.url
-                ? game.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-                : null,
-            genre: game.genres?.[0]?.name || 'Unknown',
-            rating: game.rating ? (game.rating / 10).toFixed(1) : null,
-        }))
-        igdbCache.set('top-rated', games)
-        res.json({ success: true, games })
+        let list = await GlobalList.findOne({ key: 'top-rated' })
+        if (!list || list.games.length === 0) {
+            await syncIGDBLists()
+            list = await GlobalList.findOne({ key: 'top-rated' })
+        }
+        res.json({ success: true, games: list?.games || [] })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch top rated', error: error.message })
     }
@@ -420,43 +341,12 @@ router.get('/top-rated', async (req, res) => {
 // ── GET /api/igdb/coming-soon ──
 router.get('/coming-soon', async (req, res) => {
     try {
-        if (igdbCache.has('coming-soon')) return res.json({ success: true, games: igdbCache.get('coming-soon') })
-        const token = await getAccessToken()
-        const now = Math.floor(Date.now() / 1000)
-        const sixMonths = now + (60 * 60 * 24 * 180)
-        const response = await fetch('https://api.igdb.com/v4/games', {
-            method: 'POST',
-            headers: {
-                'Client-ID': process.env.IGDB_CLIENT_ID,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'text/plain'
-            },
-            body: `
-        fields name, cover.url, genres.name, first_release_date, hypes;
-        where first_release_date > ${now}
-          & first_release_date < ${sixMonths}
-          & cover != null & hypes > 5;
-        sort hypes desc;
-        limit 6;
-      `
-        })
-        const data = await response.json()
-        const games = data.map(game => ({
-            id: game.id,
-            title: game.name,
-            cover: game.cover?.url
-                ? game.cover.url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-                : null,
-            genre: game.genres?.[0]?.name || 'Unknown',
-            releaseDate: game.first_release_date
-                ? new Date(game.first_release_date * 1000).toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', year: 'numeric'
-                })
-                : 'TBA',
-            hypes: game.hypes
-        }))
-        igdbCache.set('coming-soon', games)
-        res.json({ success: true, games })
+        let list = await GlobalList.findOne({ key: 'coming-soon' })
+        if (!list || list.games.length === 0) {
+            await syncIGDBLists()
+            list = await GlobalList.findOne({ key: 'coming-soon' })
+        }
+        res.json({ success: true, games: list?.games || [] })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch coming soon', error: error.message })
     }
@@ -468,86 +358,26 @@ router.get('/coming-soon', async (req, res) => {
 // for all returned game IDs in one batch. Result cached for 12 h.
 router.get('/home', async (req, res) => {
     try {
-        const token = await getAccessToken()
-        const now = Math.floor(Date.now() / 1000)
-        const sixMonths = now + 60 * 60 * 24 * 180
-        const headers = {
-            'Client-ID': process.env.IGDB_CLIENT_ID,
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'text/plain'
-        }
-
-        // All 3 IGDB network calls fire in parallel
-        const [trendRes, topRes, comingRes] = await Promise.all([
-            fetch('https://api.igdb.com/v4/games', {
-                method: 'POST', headers,
-                body: 'fields name, cover.url, genres.name, rating, rating_count; where rating > 85 & rating_count > 500 & cover != null & genres != null; sort rating_count desc; limit 15;'
-            }),
-            fetch('https://api.igdb.com/v4/games', {
-                method: 'POST', headers,
-                body: 'fields name, cover.url, genres.name, rating, rating_count; where rating > 90 & rating_count > 200 & cover != null & genres != null; sort rating desc; limit 15;'
-            }),
-            fetch('https://api.igdb.com/v4/games', {
-                method: 'POST', headers,
-                body: `fields name, cover.url, genres.name, first_release_date, hypes; where first_release_date > ${now} & first_release_date < ${sixMonths} & cover != null & hypes > 5; sort hypes desc; limit 6;`
-            })
+        let [trendingDoc, topRatedDoc, comingSoonDoc] = await Promise.all([
+            GlobalList.findOne({ key: 'trending' }),
+            GlobalList.findOne({ key: 'top-rated' }),
+            GlobalList.findOne({ key: 'coming-soon' })
         ])
 
-        if (!trendRes.ok || !topRes.ok || !comingRes.ok) {
-            throw new Error(`IGDB API Error: ${trendRes.status} ${trendRes.statusText}`)
+        // If any list is empty, trigger a background sync and use fallback or wait
+        if (!trendingDoc || !topRatedDoc || !comingSoonDoc) {
+            await syncIGDBLists()
+            // Re-fetch after sync
+            ;[trendingDoc, topRatedDoc, comingSoonDoc] = await Promise.all([
+                GlobalList.findOne({ key: 'trending' }),
+                GlobalList.findOne({ key: 'top-rated' }),
+                GlobalList.findOne({ key: 'coming-soon' })
+            ])
         }
 
-        const [trendData, topData, comingData] = await Promise.all([
-            trendRes.json(), topRes.json(), comingRes.json()
-        ])
-
-        const normCover = (url) => url
-            ? url.replace('t_thumb', 't_cover_big').replace('//', 'https://')
-            : null
-
-        let trending = (Array.isArray(trendData) ? trendData : []).map(g => ({
-            id: g.id, title: g.name,
-            cover: normCover(g.cover?.url),
-            genre: g.genres?.[0]?.name || 'Unknown',
-            rating: g.rating ? (g.rating / 10).toFixed(1) : null,
-            ratingCount: g.rating_count
-        }))
-
-        let topRated = (Array.isArray(topData) ? topData : []).map(g => ({
-            id: g.id, title: g.name,
-            cover: normCover(g.cover?.url),
-            genre: g.genres?.[0]?.name || 'Unknown',
-            rating: g.rating ? (g.rating / 10).toFixed(1) : null
-        }))
-
-        let comingSoon = (Array.isArray(comingData) ? comingData : []).map(g => ({
-            id: g.id, title: g.name,
-            cover: normCover(g.cover?.url),
-            genre: g.genres?.[0]?.name || 'Unknown',
-            releaseDate: g.first_release_date
-                ? new Date(g.first_release_date * 1000).toLocaleDateString('en-US', {
-                    month: 'short', day: 'numeric', year: 'numeric'
-                })
-                : 'TBA',
-            hypes: g.hypes
-        }))
-
-        // ── CACHE WRAPPER FOR IGDB DATA ONLY (v4 to fix everything) ──
-        const igdbCacheKey = 'home_igdb_data_v4'
-        let igdbBundle = igdbCache.get(igdbCacheKey)
-
-        if (!igdbBundle) {
-            // ONLY cache if we actually got data back to avoid caching empty states
-            if (trending.length > 0 || topRated.length > 0) {
-                igdbBundle = { trending, topRated, comingSoon }
-                igdbCache.set(igdbCacheKey, igdbBundle, { ttl: 1000 * 60 * 60 * 12 }) 
-            }
-        } else {
-            // Use cached lists
-            trending = igdbBundle.trending
-            topRated = igdbBundle.topRated
-            comingSoon = igdbBundle.comingSoon
-        }
+        const trending = trendingDoc?.games || []
+        const topRated = topRatedDoc?.games || []
+        const comingSoon = comingSoonDoc?.games || []
 
         // ── FRESH STATS FETCHING (NOT CACHED) ──
         const allIds = [...trending, ...topRated].map(g => g.id).filter(Boolean)

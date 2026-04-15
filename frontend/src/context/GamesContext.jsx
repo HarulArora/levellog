@@ -70,61 +70,25 @@ export function GamesProvider({ children }) {
     }, [user, doFetch])
 
     // ── CRUD — update local state + cache immediately ──────────────────────────
-    const addGame = useCallback(async (gameData) => {
-        const token = localStorage.getItem('questdeck_token')
-        try {
-            const existing = games.find(g => {
-                const searchId = Number(gameData.igdbId)
-                const entryId = Number(g.igdbId)
-                if (searchId && entryId) return searchId === entryId
-                if (searchId || entryId) return false // One has ID, other doesn't -> different games
-                return g.title?.toLowerCase() === gameData.title?.toLowerCase()
-            })
-            if (existing) {
-                // Delegate to updateGame path
-                const res = await api.put(`/games/${existing._id}`, gameData, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-                const updated = games.map(g => g._id === existing._id ? res.data.game : g)
-                setGames(updated)
-                setCache(CACHE_KEY, updated, CACHE_TTL)
-                return { success: true, game: res.data.game, updated: true }
-            }
-            const res = await api.post('/games', gameData, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            const next = [res.data.game, ...games]
-            setGames(next)
-            setCache(CACHE_KEY, next, CACHE_TTL)
-
-            // Invalidate community stats caches (ensures avg ratings sync)
-            invalidateCache('home_data')
-            invalidatePrefix('discover_')
-            invalidatePrefix('game_stats_')
-            invalidateCache(`activity_${user?.id || user?._id}`)
-            invalidateCache(`feed_${user?.id || user?._id}`)
-            if (res.data.game?.igdbId) {
-                invalidateCache(`game_stats_v2_${res.data.game.igdbId}`)
-            }
-
-            return { success: true, game: res.data.game }
-        } catch (err) {
-            console.error('[GamesContext] addGame error:', err)
-            return { success: false, error: err.message }
-        }
-    }, [games])
-
     const updateGame = useCallback(async (id, updates) => {
         const token = localStorage.getItem('questdeck_token')
+        const previousGames = [...games]
+        
         try {
+            // OPTIMISTIC UPDATE
+            const next = games.map(g => g._id === id ? { ...g, ...updates } : g)
+            setGames(next)
+
             const res = await api.put(`/games/${id}`, updates, {
                 headers: { Authorization: `Bearer ${token}` }
             })
-            const next = games.map(g => g._id === id ? res.data.game : g)
-            setGames(next)
-            setCache(CACHE_KEY, next, CACHE_TTL)
+            
+            // Sync with final server state
+            const final = games.map(g => g._id === id ? res.data.game : g)
+            setGames(final)
+            setCache(CACHE_KEY, final, CACHE_TTL)
 
-            // Invalidate community stats caches (ensures avg ratings sync)
+            // Background invalidations
             invalidateCache('home_data')
             invalidatePrefix('discover_')
             invalidatePrefix('game_stats_')
@@ -137,9 +101,67 @@ export function GamesProvider({ children }) {
             return { success: true, game: res.data.game }
         } catch (err) {
             console.error('[GamesContext] updateGame error:', err)
+            setGames(previousGames) // Rollback
             return { success: false, error: err.message }
         }
-    }, [games])
+    }, [games, user])
+
+    const addGame = useCallback(async (gameData) => {
+        const token = localStorage.getItem('questdeck_token')
+        const previousGames = [...games]
+        
+        // Check if updating existing instead of adding new
+        const existing = games.find(g => {
+            const searchId = Number(gameData.igdbId)
+            const entryId = Number(g.igdbId)
+            if (searchId && entryId) return searchId === entryId
+            if (searchId || entryId) return false
+            return g.title?.toLowerCase() === gameData.title?.toLowerCase()
+        })
+
+        if (existing) {
+            return updateGame(existing._id, gameData)
+        }
+
+        // OPTIMISTIC ADD
+        const tempId = `temp_${Date.now()}`
+        const optimisticGame = {
+            ...gameData,
+            _id: tempId,
+            createdAt: new Date().toISOString(),
+            status: gameData.status || 'planned'
+        }
+        
+        const next = [optimisticGame, ...games]
+        setGames(next)
+
+        try {
+            const res = await api.post('/games', gameData, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            
+            // Replace temp with REAL data
+            const final = next.map(g => g._id === tempId ? res.data.game : g)
+            setGames(final)
+            setCache(CACHE_KEY, final, CACHE_TTL)
+
+            // Background invalidations
+            invalidateCache('home_data')
+            invalidatePrefix('discover_')
+            invalidatePrefix('game_stats_')
+            invalidateCache(`activity_${user?.id || user?._id}`)
+            invalidateCache(`feed_${user?.id || user?._id}`)
+            if (res.data.game?.igdbId) {
+                invalidateCache(`game_stats_v2_${res.data.game.igdbId}`)
+            }
+
+            return { success: true, game: res.data.game }
+        } catch (err) {
+            console.error('[GamesContext] addGame error:', err)
+            setGames(previousGames) // Rollback
+            return { success: false, error: err.message }
+        }
+    }, [games, updateGame, user])
 
     const deleteGame = useCallback(async (id) => {
         const token = localStorage.getItem('questdeck_token')

@@ -27,6 +27,7 @@
     "jsonwebtoken": "^9.0.3",
     "lru-cache": "^11.3.3",
     "mongoose": "^9.2.4",
+    "node-cron": "^4.2.1",
     "nodemailer": "^8.0.2",
     "resend": "^6.10.0",
     "sharp": "^0.34.5",

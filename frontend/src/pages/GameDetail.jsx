@@ -154,18 +154,24 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     }
 
     const handleReply = async () => {
-        if (!replyText.trim()) return
+        if (!replyText.trim() || submittingReply) return
+        
+        const text = replyText.trim()
         setSubmittingReply(true)
+        
         try {
             const topParentId = comment.parentId || comment._id
             const res = await api.post(`/comments/${igdbId}`, {
-                text: replyText, parentId: topParentId, replyToId: comment._id,
+                text, parentId: topParentId, replyToId: comment._id,
                 replyToUserId: comment.userId?._id, gameTitle,
             })
             onXpToast(res.data.message || '💬 Reply posted · +1 XP', 'gain')
             setReplyText(''); setShowReplyBox(false); setRepliesVisible(true)
-            onRefresh(true)
-        } catch (err) { console.error('Reply error:', err) }
+            onRefresh(true) // Silently sync with server
+        } catch (err) { 
+            console.error('Reply error:', err)
+            onXpToast('Failed to post reply', 'loss')
+        }
         finally { setSubmittingReply(false) }
     }
 
@@ -358,7 +364,7 @@ function GameDetail() {
         }
     }, [contextData])
 
-    const { data: commentsData, refetch: refetchComments } = useCachedFetch(
+    const { data: commentsData, refetch: refetchComments, setData: setCommentsData } = useCachedFetch(
         `game_comments_${igdbId}`,
         `/comments/${igdbId}`,
         { ttl: 1 * 60 * 1000, deps: [igdbId] } 
@@ -525,16 +531,53 @@ function GameDetail() {
 
     const handlePostComment = async () => {
         if (!commentText.trim() || submittingComment) return
+        const text = commentText.trim()
+        const previousComments = commentsData?.comments || []
+        
+        // Optimistic Comment
+        const tempId = `temp_${Date.now()}`
+        const optimisticComment = {
+            _id: tempId,
+            text,
+            createdAt: new Date().toISOString(),
+            userId: {
+                _id: user.id || user._id,
+                username: user.username,
+                avatar: user.avatar,
+                badge: user.badge || '🎮',
+                level: user.level || 1
+            },
+            likes: [],
+            dislikes: [],
+            replies: []
+        }
+
+        setCommentsData({
+            ...commentsData,
+            comments: [optimisticComment, ...previousComments]
+        })
+        setCommentText('')
         setSubmittingComment(true)
+
         try {
             const res = await api.post(`/comments/${igdbId}`, {
-                text: commentText.trim(),
+                text,
                 gameTitle: game?.title,
             })
             showXpToast(res.data.message || '💬 Comment posted · +1 XP', 'gain')
-            setCommentText('')
+            
+            // Re-sync with server to get real ID and correct data
             await fetchComments(true)
-        } catch (err) { console.error('Comment error:', err) }
+        } catch (err) { 
+            console.error('Comment error:', err)
+            // Rollback
+            setCommentsData({
+                ...commentsData,
+                comments: previousComments
+            })
+            setCommentText(text)
+            showXpToast('Failed to post comment', 'loss')
+        }
         finally { setSubmittingComment(false) }
     }
 
