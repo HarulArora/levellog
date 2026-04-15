@@ -73,12 +73,6 @@
     .hover\:shadow-\[0_8px_30px_rgba\(0\,0\,0\,0\.4\)\].group:hover {
         box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
     }
-
-    /* Simplify animations for low-end mobile devices */
-    * {
-        animation-duration: 0.2s !important;
-        transition-duration: 0.2s !important;
-    }
 }
 
 /* GPU acceleration for common transitions */

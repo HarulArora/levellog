@@ -38,19 +38,31 @@ const MinimalLoader = () => (
 
 /**
  * 🚀 Manual Progress Bar Trigger
- * Listens to location changes and shows the bar for a fixed time
- * to give immediate feedback on EVERY click.
+ * Listens to location changes AND global clicks for ultra-fast feedback.
  */
 const NavigationProgress = () => {
     const location = useLocation()
     const [visible, setVisible] = useState(false)
 
     useEffect(() => {
-        // Trigger on every route change
+        // Fallback: Trigger on route change (e.g. back/forward button)
         setVisible(true)
-        const timer = setTimeout(() => setVisible(false), 600) // Fixed pulse duration
+        const timer = setTimeout(() => setVisible(false), 800)
         return () => clearTimeout(timer)
     }, [location.pathname])
+
+    useEffect(() => {
+        // Immediate Trigger: Trigger on any internal link click
+        const handleInteraction = (e) => {
+            const link = e.target.closest('a')
+            // Only trigger for internal links that don't open in new tabs
+            if (link && link.href.includes(window.location.origin) && !link.target) {
+                setVisible(true)
+            }
+        }
+        window.addEventListener('mousedown', handleInteraction)
+        return () => window.removeEventListener('mousedown', handleInteraction)
+    }, [])
 
     if (!visible) return null
     return <MinimalLoader />
