@@ -390,9 +390,13 @@ function GameDetail() {
         setTimeout(() => setListToast(null), 3000) 
     }, [])
 
-    const myGame = userGames.find(g =>
-        g.igdbId === parseInt(igdbId) || g.title?.toLowerCase() === game?.title?.toLowerCase()
-    )
+    const myGame = userGames.find(g => {
+        const pageId = Number(igdbId)
+        const entryId = Number(g.igdbId)
+        if (pageId && entryId) return pageId === entryId
+        if (pageId || entryId) return false
+        return g.title?.toLowerCase() === game?.title?.toLowerCase()
+    })
 
     const fetchPlatformStats = refetchContext
     const fetchComments = refetchComments
@@ -427,13 +431,17 @@ function GameDetail() {
         setLiked(!wasLiked)
         setLiking(true)
 
-        // Optimistically update counts if data exists
-        if (oldData?.stats) {
+        // Optimistically update counts and status
+        if (oldData) {
             setContextData({
                 ...oldData,
-                stats: {
+                stats: oldData.stats ? {
                     ...oldData.stats,
                     likeCount: Math.max(0, (oldData.stats.likeCount || 0) + (wasLiked ? -1 : 1))
+                } : oldData.stats,
+                userStatus: {
+                    ...(oldData.userStatus || {}),
+                    liked: !wasLiked
                 }
             })
         }
@@ -464,13 +472,17 @@ function GameDetail() {
         setWishlisted(!wasWishlisted)
         setWishing(true)
 
-        // Optimistically update counts
-        if (oldData?.stats) {
+        // Optimistically update counts and status
+        if (oldData) {
             setContextData({
                 ...oldData,
-                stats: {
+                stats: oldData.stats ? {
                     ...oldData.stats,
                     wishlistCount: Math.max(0, (oldData.stats.wishlistCount || 0) + (wasWishlisted ? -1 : 1))
+                } : oldData.stats,
+                userStatus: {
+                    ...(oldData.userStatus || {}),
+                    wishlisted: !wasWishlisted
                 }
             })
         }

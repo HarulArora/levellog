@@ -82,10 +82,13 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
     const handleGameSelect = (game) => {
 
         // Check if this game is already in the user's library
-        const alreadyLogged = games.find(
-            g => g.title.toLowerCase() === game.title.toLowerCase() ||
-                (game.igdbId && g.igdbId === game.igdbId)
-        )
+        const alreadyLogged = games.find(g => {
+            const searchId = Number(game.igdbId)
+            const entryId = Number(g.igdbId)
+            if (searchId && entryId) return searchId === entryId
+            if (searchId || entryId) return false
+            return g.title?.toLowerCase() === game.title?.toLowerCase()
+        })
 
         const mappedPlatforms = game.platforms
 
