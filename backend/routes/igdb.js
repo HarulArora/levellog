@@ -82,7 +82,7 @@ router.get('/discover', async (req, res) => {
         const offset = (pageNum - 1) * limitNum
 
         const genreFilter = genre && genre.toLowerCase() !== 'all'
-            ? ` & genres.name = "${genre}"`
+            ? ` & (genres.name = "${genre}" | themes.name = "${genre}")`
             : ''
 
         const where = `where rating != null & rating_count > 20 & cover != null${genreFilter}`
