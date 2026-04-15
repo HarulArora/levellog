@@ -148,7 +148,7 @@ const GameCard = memo(({ game, entry, onClick }) => {
             <div className="game-card-banner">
                 {game.cover ? (
                     <img
-                        src={getIGDBImage(game.cover, SIZES.COVER_SMALL)}
+                        src={getIGDBImage(game.cover, SIZES.COVER_BIG)}
                         alt={game.title}
                         loading="lazy"
                         className="game-card-img"

@@ -11,26 +11,60 @@ import { updateGlobalStats } from '../utils/stats.js'
 
 const router = express.Router()
 
-// ── GET /api/lists/me ──────────────────────────────────────────────────────────
+// ── GET /api/lists/me (Summary View) ──────────────────────────────────────────
 router.get('/me', protect, async (req, res) => {
     try {
-        const [customLists, likes, wishlist, reviews, user] = await Promise.all([
+        const [customLists, likeCount, wishCount, reviews, user] = await Promise.all([
             GameList.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean(),
-            GameLike.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean(),
-            Wishlist.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean(),
-            GameReview.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean(),
-            User.findById(req.user._id).select('xp level badge username').lean(),
+            GameLike.countDocuments({ userId: req.user._id }),
+            Wishlist.countDocuments({ userId: req.user._id }),
+            GameReview.countDocuments({ userId: req.user._id }),
+            User.findById(req.user._id).select('xp level badge username avatar').lean(),
         ])
 
-        // attach entries to each list
+        // Get only the first 6 entries for each custom list as a preview
         const listIds = customLists.map(l => l._id)
-        const allEntries = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 }).lean()
-        const listsWithGames = customLists.map(list => ({
+        const entriesPreview = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 }).lean()
+        
+        // Get the first 6 likes/wishlist items for preview
+        const likesPreview = await GameLike.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(6).lean()
+        const wishlistPreview = await Wishlist.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(6).lean()
+
+        const listsWithPreviews = customLists.map(list => ({
             ...list,
-            games: allEntries.filter(e => e.listId.toString() === list._id.toString())
+            games: entriesPreview.filter(e => e.listId.toString() === list._id.toString()).slice(0, 6)
         }))
 
-        res.json({ success: true, customLists: listsWithGames, likes, wishlist, reviews, user })
+        res.json({ 
+            success: true, 
+            customLists: listsWithPreviews, 
+            likesCount: likeCount, 
+            wishlistCount: wishCount,
+            likesPreview,
+            wishlistPreview,
+            reviewsCount: reviews, 
+            user 
+        })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
+// ── GET /api/lists/likes (Full Fetch) ──────────────────────────────────────────
+router.get('/likes', protect, async (req, res) => {
+    try {
+        const likes = await GameLike.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean()
+        res.json({ success: true, likes })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
+// ── GET /api/lists/wishlist (Full Fetch) ───────────────────────────────────────
+router.get('/wishlist', protect, async (req, res) => {
+    try {
+        const wishlist = await Wishlist.find({ userId: req.user._id }).sort({ createdAt: -1 }).lean()
+        res.json({ success: true, wishlist })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }

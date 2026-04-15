@@ -101,15 +101,15 @@ function GameGrid({ games, onRemove, removeLabel = '✕', navigate }) {
                                    hover:border-[#c8ff57]/50 transition-all cursor-pointer"
                     >
                         {game.gameCover ? (
-                            <img src={game.gameCover} alt={game.gameTitle}
+                            <img src={game.gameCover.replace('t_cover_small', 't_cover_big').replace('t_thumb', 't_cover_big')} alt={game.gameTitle}
                                 loading="lazy"
                                 className="w-full h-[140px] object-cover" />
                         ) : (
                             <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center text-3xl">🎮</div>
                         )}
-                        <div className="p-2">
-                            <div className="text-white font-semibold text-xs truncate">{game.gameTitle}</div>
-                            {game.releaseYear && <div className="font-mono text-[9px] text-[#7a7a90] mt-0.5">{game.releaseYear}</div>}
+                        <div className="p-2 text-center">
+                            <div className="text-white font-semibold text-[10px] leading-tight line-clamp-2 h-[28px]">{game.gameTitle}</div>
+                            {game.releaseYear && <div className="font-mono text-[8px] text-[#7a7a90] mt-1">{game.releaseYear}</div>}
                         </div>
                     </div>
                     {onRemove && (
@@ -145,12 +145,30 @@ function ListDetail({ list, onBack, onUpdate, showToast, deleteConfirmGame, setD
     const [searchResults, setSearchResults] = useState([])
     const [searching, setSearching] = useState(false)
     const [currentList, setCurrentList] = useState(list)
+    const [loadingGames, setLoadingGames] = useState(false)
 
     // Search + pagination within the list's existing games
     const [listSearch, setListSearch] = useState('')
     const [listPage, setListPage] = useState(1)
 
-    useEffect(() => { setCurrentList(list) }, [list])
+    // Fetch full list content on mount if it's only a preview
+    useEffect(() => {
+        const loadFull = async () => {
+            if (list.gameCount > (list.games?.length || 0)) {
+                setLoadingGames(true)
+                try {
+                    const res = await api.get(`/lists/custom/${list._id}/game`)
+                    if (res.data.success) {
+                        setCurrentList(res.data.list)
+                    }
+                } catch { showToast('Failed to load full list', 'error') }
+                finally { setLoadingGames(false) }
+            } else {
+                setCurrentList(list)
+            }
+        }
+        loadFull()
+    }, [list, showToast])
 
     // Reset page when search changes
     useEffect(() => { setListPage(1) }, [listSearch])
@@ -356,7 +374,12 @@ function ListDetail({ list, onBack, onUpdate, showToast, deleteConfirmGame, setD
             )}
 
             {/* Games in list — search + pagination */}
-            {(currentList.games?.length > 0) ? (
+            {loadingGames ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <Loader2 className="animate-spin text-[#c8ff57]" />
+                    <div className="text-[#7a7a90] font-mono text-sm">Loading full list...</div>
+                </div>
+            ) : (currentList.games?.length > 0) ? (
                 <>
                     <div className="mb-4">
                         <SearchBar
@@ -393,12 +416,13 @@ function Lists() {
     const [activeTab, setActiveTab] = useState('lists')
     const [selectedListId, setSelectedListId] = useState(null)
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [deleteConfirmList, setDeleteConfirmList] = useState(null)
-    const [deleteConfirmGame, setDeleteConfirmGame] = useState(null)
-    const [createForm, setCreateForm] = useState({ name: '', description: '', isPublic: true })
-    const [creating, setCreating] = useState(false)
     const [createError, setCreateError] = useState('')
     const [toast, setToast] = useState(null)
+
+    // Data for tabs
+    const [fullLikes, setFullLikes] = useState(null)
+    const [fullWish, setFullWish] = useState(null)
+    const [loadingTab, setLoadingTab] = useState(false)
 
     // Per-tab search + pagination state
     const [likedSearch, setLikedSearch] = useState('')
@@ -424,10 +448,20 @@ function Lists() {
 
     const fetchData = useCallback(async (silent = true) => {
         invalidateCache(userId ? `lists_${userId}` : '')
+        // Reset full tab data to force fresh fetch
+        setFullLikes(null)
+        setFullWish(null)
         await refetchLists(silent)
     }, [userId, refetchLists])
 
-    const { customLists = [], likes = [], wishlist = [], user: userData } = listBundle || {}
+    const { 
+        customLists = [], 
+        likesCount = 0, 
+        wishlistCount = 0, 
+        likesPreview = [], 
+        wishlistPreview = [], 
+        user: userData 
+    } = listBundle || {}
 
     const selectedList = useMemo(() => 
         selectedListId ? customLists.find(l => l._id === selectedListId) : null
@@ -520,10 +554,28 @@ function Lists() {
         finally { setDeleteConfirmGame(null) }
     }, [deleteConfirmGame, selectedListId, showToast, fetchData])
 
-    const handleTabChange = useCallback((id) => {
+    const handleTabChange = useCallback(async (id) => {
         setActiveTab(id)
         setSelectedListId(null)
-    }, [])
+
+        if (id === 'liked' && !fullLikes) {
+            setLoadingTab(true)
+            try {
+                const res = await api.get('/lists/likes')
+                if (res.data.success) setFullLikes(res.data.likes)
+            } catch { showToast('Failed to load likes', 'error') }
+            finally { setLoadingTab(true) }
+        }
+
+        if (id === 'wishlist' && !fullWish) {
+            setLoadingTab(true)
+            try {
+                const res = await api.get('/lists/wishlist')
+                if (res.data.success) setFullWish(res.data.wishlist)
+            } catch { showToast('Failed to load wishlist', 'error') }
+            finally { setLoadingTab(false) }
+        }
+    }, [fullLikes, fullWish, showToast])
 
     if (!user) return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -696,20 +748,29 @@ function Lists() {
                                 <h3 className="font-black text-lg tracking-widest uppercase text-white"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Liked Games</h3>
                                 <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a35] mx-1" />
-                                <span className="font-mono text-[10px] text-[#7a7a90] font-bold uppercase tracking-wider">{filteredLikes.length} games</span>
+                                <span className="font-mono text-[10px] text-[#7a7a90] font-bold uppercase tracking-wider">{likesCount} games</span>
                             </div>
-                            {likes.length > 0 ? (
+                            {loadingTab ? (
+                                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                                    <Loader2 className="animate-spin text-[#c8ff57]" />
+                                    <div className="text-[#7a7a90] font-mono text-sm">Loading likes...</div>
+                                </div>
+                            ) : (fullLikes || []).length > 0 || likesPreview.length > 0 ? (
                                 <>
                                     <div className="mb-4">
                                         <SearchBar value={likedSearch} onChange={setLikedSearch} placeholder="Search liked games..." />
                                     </div>
-                                    {filteredLikes.length > 0 ? (
-                                        <>
-                                            <GameGrid games={pagedLikes} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'like' })} navigate={navigate} />
-                                            <Pagination currentPage={likedPage} total={filteredLikes.length} onPageChange={setLikedPage} />
-                                        </>
+                                    {(fullLikes || []).length > 0 ? (
+                                        filteredLikes.length > 0 ? (
+                                            <>
+                                                <GameGrid games={pagedLikes} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'like' })} navigate={navigate} />
+                                                <Pagination currentPage={likedPage} total={filteredLikes.length} onPageChange={setLikedPage} />
+                                            </>
+                                        ) : (
+                                            <EmptyState icon="🔍" text={`No liked games match "${likedSearch}"`} />
+                                        )
                                     ) : (
-                                        <EmptyState icon="🔍" text={`No liked games match "${likedSearch}"`} />
+                                        <GameGrid games={likesPreview} navigate={navigate} />
                                     )}
                                 </>
                             ) : (
@@ -726,20 +787,29 @@ function Lists() {
                                 <h3 className="font-black text-lg tracking-widest uppercase text-white"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Wishlist</h3>
                                 <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a35] mx-1" />
-                                <span className="font-mono text-[10px] text-[#7a7a90] font-bold uppercase tracking-wider">{filteredWish.length} games</span>
+                                <span className="font-mono text-[10px] text-[#7a7a90] font-bold uppercase tracking-wider">{wishlistCount} games</span>
                             </div>
-                            {wishlist.length > 0 ? (
+                            {loadingTab ? (
+                                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                                    <Loader2 className="animate-spin text-[#c8ff57]" />
+                                    <div className="text-[#7a7a90] font-mono text-sm">Loading wishlist...</div>
+                                </div>
+                            ) : (fullWish || []).length > 0 || wishlistPreview.length > 0 ? (
                                 <>
                                     <div className="mb-4">
                                         <SearchBar value={wishSearch} onChange={setWishSearch} placeholder="Search wishlist..." />
                                     </div>
-                                    {filteredWish.length > 0 ? (
-                                        <>
-                                            <GameGrid games={pagedWish} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'wishlist' })} navigate={navigate} />
-                                            <Pagination currentPage={wishPage} total={filteredWish.length} onPageChange={setWishPage} />
-                                        </>
+                                    {(fullWish || []).length > 0 ? (
+                                        filteredWish.length > 0 ? (
+                                            <>
+                                                <GameGrid games={pagedWish} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'wishlist' })} navigate={navigate} />
+                                                <Pagination currentPage={wishPage} total={filteredWish.length} onPageChange={setWishPage} />
+                                            </>
+                                        ) : (
+                                            <EmptyState icon="🔍" text={`No wishlist games match "${wishSearch}"`} />
+                                        )
                                     ) : (
-                                        <EmptyState icon="🔍" text={`No wishlist games match "${wishSearch}"`} />
+                                        <GameGrid games={wishlistPreview} navigate={navigate} />
                                     )}
                                 </>
                             ) : (
