@@ -30,7 +30,7 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
     const sc = statusConfig[game.status] || statusConfig.planned
 
     // ── IMAGE URL ──
-    const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_BIG)
+    const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_SMALL)
 
     // ── Navigate to game detail page if igdbId exists ──
     const handleCardClick = () => {

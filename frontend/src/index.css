@@ -59,6 +59,33 @@
     }
 }
 
+/* 🎨 Mobile Performance Optimizations */
+@media (max-width: 768px) {
+    /* Backdrop blur is extremely heavy on mobile GPUs */
+    .backdrop-blur-md, 
+    .backdrop-blur-xl, 
+    .backdrop-blur-2xl {
+        backdrop-filter: blur(4px) !important; /* Significantly reduced for speed */
+        -webkit-backdrop-filter: blur(4px) !important;
+    }
+
+    /* Disable some of the heavier hover shadows on mobile */
+    .hover\:shadow-\[0_8px_30px_rgba\(0\,0\,0\,0\.4\)\].group:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    }
+
+    /* Simplify animations for low-end mobile devices */
+    * {
+        animation-duration: 0.2s !important;
+        transition-duration: 0.2s !important;
+    }
+}
+
+/* GPU acceleration for common transitions */
+.game-card-hover, .btn-apple, .transition-all {
+    will-change: transform, opacity;
+}
+
 @keyframes loadingBar {
     0% { transform: translateX(-100%); width: 30%; }
     50% { width: 70%; }
