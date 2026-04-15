@@ -30,6 +30,12 @@ const PageLoader = () => (
     </div>
 )
 
+const MinimalLoader = () => (
+    <div className="fixed top-0 left-0 right-0 h-[2px] z-[9999] overflow-hidden pointer-events-none">
+        <div className="h-full bg-[#c8ff57] shadow-[0_0_8px_#c8ff57] animate-loading-bar" />
+    </div>
+)
+
 function NotFound() {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
@@ -64,7 +70,7 @@ function App() {
                         <Route path="/reset-password" element={<ResetPassword />} />
                         
                         {/* Main Layout Routes */}
-                        <Route element={<><Navbar /><div className="content-wrapper"><Suspense fallback={<PageLoader />}><Outlet /></Suspense></div></>}>
+                        <Route element={<><Navbar /><div className="content-wrapper"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></div></>}>
                             <Route path="/" element={<Home />} />
                             <Route path="/library" element={<Library />} />
                             <Route path="/lists" element={<Lists />} />

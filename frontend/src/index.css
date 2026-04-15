@@ -58,3 +58,13 @@
         @apply bg-[#111118]/80 backdrop-blur-2xl border border-[#2a2a35] shadow-[0_8px_30px_rgb(0,0,0,0.4)];
     }
 }
+
+@keyframes loadingBar {
+    0% { transform: translateX(-100%); width: 30%; }
+    50% { width: 70%; }
+    100% { transform: translateX(350%); width: 30%; }
+}
+
+.animate-loading-bar {
+    animation: loadingBar 1.5s infinite linear;
+}
