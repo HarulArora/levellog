@@ -416,6 +416,10 @@ function Lists() {
     const [activeTab, setActiveTab] = useState('lists')
     const [selectedListId, setSelectedListId] = useState(null)
     const [showCreateModal, setShowCreateModal] = useState(false)
+    const [deleteConfirmList, setDeleteConfirmList] = useState(null)
+    const [deleteConfirmGame, setDeleteConfirmGame] = useState(null)
+    const [createForm, setCreateForm] = useState({ name: '', description: '', isPublic: true })
+    const [creating, setCreating] = useState(false)
     const [createError, setCreateError] = useState('')
     const [toast, setToast] = useState(null)
 
@@ -467,10 +471,10 @@ function Lists() {
         selectedListId ? customLists.find(l => l._id === selectedListId) : null
     , [selectedListId, customLists])
 
-    const filteredLikes = useMemo(() => filterByQuery(likes, likedSearch), [likes, likedSearch])
+    const filteredLikes = useMemo(() => filterByQuery(fullLikes || [], likedSearch), [fullLikes, likedSearch])
     const pagedLikes = useMemo(() => paginate(filteredLikes, likedPage), [filteredLikes, likedPage])
 
-    const filteredWish = useMemo(() => filterByQuery(wishlist, wishSearch), [wishlist, wishSearch])
+    const filteredWish = useMemo(() => filterByQuery(fullWish || [], wishSearch), [fullWish, wishSearch])
     const pagedWish = useMemo(() => paginate(filteredWish, wishPage), [filteredWish, wishPage])
 
     const xp = userData?.xp || 0
@@ -508,40 +512,48 @@ function Lists() {
     const handleRemoveLike = useCallback(async () => {
         if (!deleteConfirmGame) return
         const { igdbId } = deleteConfirmGame
-        const previousLikes = likes
         
         try {
-            // OPTIMISTIC REMOVE
-            setListBundle({ ...listBundle, likes: likes.filter(g => g.igdbId !== igdbId) })
+            // OPTIMISTIC REMOVE from both summary and full data
+            if (fullLikes) setFullLikes(prev => prev.filter(g => g.igdbId !== igdbId))
+            setListBundle(prev => ({ 
+                ...prev, 
+                likesPreview: prev.likesPreview.filter(g => g.igdbId !== igdbId),
+                likesCount: Math.max(0, prev.likesCount - 1)
+            }))
             
             await api.post('/lists/like', { igdbId })
             showToast('Like removed')
             invalidateCache(`game_stats_v2_${igdbId}`)
         } catch { 
-            setListBundle({ ...listBundle, likes: previousLikes })
             showToast('Failed to remove like', 'error') 
+            fetchData() // Rollback by refetching
         }
         finally { setDeleteConfirmGame(null) }
-    }, [deleteConfirmGame, listBundle, likes, setListBundle, showToast])
+    }, [deleteConfirmGame, fullLikes, setListBundle, showToast, fetchData])
 
     const handleRemoveWishlist = useCallback(async () => {
         if (!deleteConfirmGame) return
         const { igdbId } = deleteConfirmGame
-        const previousWishlist = wishlist
         
         try {
             // OPTIMISTIC REMOVE
-            setListBundle({ ...listBundle, wishlist: wishlist.filter(g => g.igdbId !== igdbId) })
+            if (fullWish) setFullWish(prev => prev.filter(g => g.igdbId !== igdbId))
+            setListBundle(prev => ({ 
+                ...prev, 
+                wishlistPreview: prev.wishlistPreview.filter(g => g.igdbId !== igdbId),
+                wishlistCount: Math.max(0, prev.wishlistCount - 1)
+            }))
 
             await api.post('/lists/wishlist', { igdbId })
             showToast('Wishlist updated')
             invalidateCache(`game_stats_v2_${igdbId}`)
         } catch { 
-            setListBundle({ ...listBundle, wishlist: previousWishlist })
             showToast('Failed to update wishlist', 'error') 
+            fetchData()
         }
         finally { setDeleteConfirmGame(null) }
-    }, [deleteConfirmGame, listBundle, wishlist, setListBundle, showToast])
+    }, [deleteConfirmGame, fullWish, setListBundle, showToast, fetchData])
 
     const handleRemoveGameFromCustom = useCallback(async () => {
         if (!deleteConfirmGame || !selectedListId) return
@@ -564,7 +576,7 @@ function Lists() {
                 const res = await api.get('/lists/likes')
                 if (res.data.success) setFullLikes(res.data.likes)
             } catch { showToast('Failed to load likes', 'error') }
-            finally { setLoadingTab(true) }
+            finally { setLoadingTab(false) }
         }
 
         if (id === 'wishlist' && !fullWish) {
@@ -597,8 +609,8 @@ function Lists() {
 
     const tabs = [
         { id: 'lists', label: 'My Lists', count: customLists.length + 2 },
-        { id: 'liked', label: 'Liked Games', count: likes.length },
-        { id: 'wishlist', label: 'Wishlist', count: wishlist.length },
+        { id: 'liked', label: 'Liked Games', count: likesCount },
+        { id: 'wishlist', label: 'Wishlist', count: wishlistCount },
     ]
 
     return (
@@ -648,8 +660,8 @@ function Lists() {
                         <div className="flex flex-col gap-4">
                             {/* Built-ins */}
                             {[
-                                { id: 'liked', icon: '❤️', bg: 'bg-[#ff5c5c]/15', label: 'Liked Games', count: likes.length },
-                                { id: 'wishlist', icon: '🎯', bg: 'bg-[#5c9fff]/15', label: 'Wishlist', count: wishlist.length },
+                                { id: 'liked', icon: '❤️', bg: 'bg-[#ff5c5c]/15', label: 'Liked Games', count: likesCount },
+                                { id: 'wishlist', icon: '🎯', bg: 'bg-[#5c9fff]/15', label: 'Wishlist', count: wishlistCount },
                             ].map(b => (
                                 <div key={b.id} onClick={() => handleTabChange(b.id)}
                                     className="flex items-center gap-4 p-4 bg-[#111118] border border-[#2a2a35]
