@@ -51,80 +51,96 @@ function Stats() {
     }
 
     // ── Computed stats ──
-    const totalGames = games.length
-    const totalHours = games.reduce((s, g) => s + (g.hours || 0), 0)
-    const ratedGames = games.filter(g => g.rating > 0)
-    const avgRating = ratedGames.length > 0
-        ? (ratedGames.reduce((s, g) => s + g.rating, 0) / ratedGames.length).toFixed(1)
-        : '—'
-    const completed = games.filter(g => g.status === 'completed').length
-    const playing = games.filter(g => g.status === 'playing').length
-    const planned = games.filter(g => g.status === 'planned').length
-    const dropped = games.filter(g => g.status === 'dropped').length
-    const paused = games.filter(g => g.status === 'paused').length
-    const completionRate = totalGames > 0
-        ? Math.round((completed / totalGames) * 100)
-        : 0
+    const { totalGames, totalHours, ratedGames, avgRating, completed, playing, planned, dropped, paused, completionRate } = useMemo(() => {
+        const totalGames = games.length
+        const totalHours = games.reduce((s, g) => s + (g.hours || 0), 0)
+        const ratedGames = games.filter(g => g.rating > 0)
+        const avgRating = ratedGames.length > 0
+            ? (ratedGames.reduce((s, g) => s + g.rating, 0) / ratedGames.length).toFixed(1)
+            : '—'
+        const completed = games.filter(g => g.status === 'completed').length
+        const playing = games.filter(g => g.status === 'playing').length
+        const planned = games.filter(g => g.status === 'planned').length
+        const dropped = games.filter(g => g.status === 'dropped').length
+        const paused = games.filter(g => g.status === 'paused').length
+        const completionRate = totalGames > 0
+            ? Math.round((completed / totalGames) * 100)
+            : 0
+        
+        return { totalGames, totalHours, ratedGames, avgRating, completed, playing, planned, dropped, paused, completionRate }
+    }, [games])
 
     const memberYear = user.createdAt
         ? new Date(user.createdAt).getFullYear()
         : new Date().getFullYear()
 
     // ── Genre breakdown ──
-    const genreMap = {}
-    games.forEach(game => {
-        const genre = game.genre || 'Unknown'
-        genreMap[genre] = (genreMap[genre] || 0) + 1
-    })
-    const genreList = Object.entries(genreMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8)
-    const maxGenreCount = genreList[0]?.[1] || 1
+    const { genreList, maxGenreCount } = useMemo(() => {
+        const genreMap = {}
+        games.forEach(game => {
+            const genre = game.genre || 'Unknown'
+            genreMap[genre] = (genreMap[genre] || 0) + 1
+        })
+        const genreList = Object.entries(genreMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+        const maxGenreCount = genreList[0]?.[1] || 1
+        return { genreList, maxGenreCount }
+    }, [games])
 
     // ── Platform breakdown ──
-    const platformMap = {}
-    games.forEach(game => {
-        game.platforms?.forEach(p => {
-            platformMap[p] = (platformMap[p] || 0) + 1
+    const { platformList, maxPlatformCount } = useMemo(() => {
+        const platformMap = {}
+        games.forEach(game => {
+            game.platforms?.forEach(p => {
+                platformMap[p] = (platformMap[p] || 0) + 1
+            })
         })
-    })
-    const platformList = Object.entries(platformMap)
-        .sort((a, b) => b[1] - a[1])
-    const maxPlatformCount = platformList[0]?.[1] || 1
+        const platformList = Object.entries(platformMap)
+            .sort((a, b) => b[1] - a[1])
+        const maxPlatformCount = platformList[0]?.[1] || 1
+        return { platformList, maxPlatformCount }
+    }, [games])
 
     // ── Rating distribution ──
-    const ratingBuckets = { '9-10': 0, '7-8': 0, '5-6': 0, '1-4': 0 }
-    ratedGames.forEach(g => {
-        if (g.rating >= 9) ratingBuckets['9-10']++
-        else if (g.rating >= 7) ratingBuckets['7-8']++
-        else if (g.rating >= 5) ratingBuckets['5-6']++
-        else ratingBuckets['1-4']++
-    })
-    const maxRatingCount = Math.max(...Object.values(ratingBuckets), 1)
+    const { ratingBuckets, maxRatingCount } = useMemo(() => {
+        const buckets = { '9-10': 0, '7-8': 0, '5-6': 0, '1-4': 0 }
+        ratedGames.forEach(g => {
+            if (g.rating >= 9) buckets['9-10']++
+            else if (g.rating >= 7) buckets['7-8']++
+            else if (g.rating >= 5) buckets['5-6']++
+            else buckets['1-4']++
+        })
+        const maxRatingCount = Math.max(...Object.values(buckets), 1)
+        return { ratingBuckets: buckets, maxRatingCount }
+    }, [ratedGames])
 
     // ── Most played genre (by hours) ──
-    const genreHoursMap = {}
-    games.forEach(game => {
-        const genre = game.genre || 'Unknown'
-        genreHoursMap[genre] = (genreHoursMap[genre] || 0) + (game.hours || 0)
-    })
-    const genreHoursList = Object.entries(genreHoursMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
-    const maxGenreHours = genreHoursList[0]?.[1] || 1
+    const { genreHoursList, maxGenreHours } = useMemo(() => {
+        const genreHoursMap = {}
+        games.forEach(game => {
+            const genre = game.genre || 'Unknown'
+            genreHoursMap[genre] = (genreHoursMap[genre] || 0) + (game.hours || 0)
+        })
+        const genreHoursList = Object.entries(genreHoursMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6)
+        const maxGenreHours = genreHoursList[0]?.[1] || 1
+        return { genreHoursList, maxGenreHours }
+    }, [games])
 
     // ── Avg hours per game ──
-    const avgHours = totalGames > 0
+    const avgHours = useMemo(() => totalGames > 0
         ? (totalHours / totalGames).toFixed(1)
-        : 0
+        : 0, [totalHours, totalGames])
 
     // ── Longest game ──
-    const longestGame = games.reduce((max, g) =>
-        (g.hours || 0) > (max?.hours || 0) ? g : max, null)
+    const longestGame = useMemo(() => games.reduce((max, g) =>
+        (g.hours || 0) > (max?.hours || 0) ? g : max, null), [games])
 
     // ── Highest rated game ──
-    const highestRated = ratedGames.reduce((max, g) =>
-        g.rating > (max?.rating || 0) ? g : max, null)
+    const highestRated = useMemo(() => ratedGames.reduce((max, g) =>
+        g.rating > (max?.rating || 0) ? g : max, null), [ratedGames])
 
 
 

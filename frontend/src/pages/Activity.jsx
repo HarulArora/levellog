@@ -282,7 +282,7 @@ function Activity() {
                         <div className="flex flex-col gap-3">
                             {feed.map(game => {
                                 const sc = statusConfig[game.status] || statusConfig.planned
-                                const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.CONSTANT)
+                                const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.THUMB)
 
                                 const myRating = getMyRating(game.title)
 

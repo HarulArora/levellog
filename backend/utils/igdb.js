@@ -1,3 +1,5 @@
+import { shortPlatform, normalizeCover } from './helpers.js'
+
 let cachedToken = null
 let tokenExpiry = null
 
@@ -47,25 +49,13 @@ export const searchGames = async (query) => {
 
     return data.map(game => {
 
-        const cover = game.cover?.url
-            ? game.cover.url
-                .replace('t_thumb', 't_cover_big')
-                .replace('//', 'https://')
-            : null
+        const cover = normalizeCover(game.cover?.url)
 
-        const platforms = game.platforms?.map(p => {
-            const name = p.name
-            if (name.includes('PC')) return 'PC'
-            if (name.includes('PlayStation 5')) return 'PS5'
-            if (name.includes('PlayStation 4')) return 'PS4'
-            if (name.includes('PlayStation')) return 'PS'
-            if (name.includes('Xbox Series')) return 'Xbox Series'
-            if (name.includes('Xbox One')) return 'Xbox One'
-            if (name.includes('Xbox')) return 'Xbox'
-            if (name.includes('Nintendo Switch')) return 'Switch'
-            if (name.includes('iOS') || name.includes('Android')) return 'Mobile'
-            return null
-        }).filter(Boolean) || []
+        const platforms = [...new Set(
+            (game.platforms || [])
+                .map(p => shortPlatform(p.name))
+                .filter(Boolean)
+        )]
 
         return {
             igdbId: game.id,

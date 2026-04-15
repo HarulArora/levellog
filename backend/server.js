@@ -17,6 +17,7 @@ import notificationsRouter from './routes/notifications.js'
 import listsRouter from './routes/lists.js'
 import commentsRouter from './routes/comments.js'
 import dealsRouter from './routes/deals.js'
+import { initCronJobs } from './tasks/igdbSync.js'
 
 dotenv.config()
 
@@ -128,6 +129,7 @@ mongoose
         const PORT = process.env.PORT || 5000
         app.listen(PORT, () => {
             logger.info(`🚀 Server running on port ${PORT}`)
+            initCronJobs() // 🕒 Start background tasks
         })
     })
     .catch((error) => {
