@@ -145,20 +145,19 @@ const GameCard = memo(({ game, entry, onClick }) => {
             }}
         >
             {/* Banner image */}
-            <div style={{ height: 110, position: 'relative', overflow: 'hidden', background: '#18181f' }}>
+            <div className="game-card-banner">
                 {game.cover ? (
                     <img
-                        src={getIGDBImage(game.cover, SIZES.COVER_BIG)}
+                        src={getIGDBImage(game.cover, SIZES.COVER_SMALL)}
                         alt={game.title}
                         loading="lazy"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
+                        className="game-card-img"
                     />
                 ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>🎮</div>
+                    <div className="game-card-placeholder">🎮</div>
                 )}
                 {/* gradient fade at bottom like the sample */}
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 45, background: 'linear-gradient(to top, #111118, transparent)' }} />
-
+                <div className="game-card-gradient" />
             </div>
 
             {/* Status pill — positioned relative to CARD (not banner) so overflow:hidden doesn't clip it */}
@@ -487,6 +486,35 @@ export default function Discover() {
         }
         @media (min-width: 480px) {
           .game-card-title-text { font-size: 13px; }
+        }
+        .game-card-banner {
+          height: 110px;
+          position: relative;
+          overflow: hidden;
+          background: #18181f;
+        }
+        .game-card-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center top;
+          display: block;
+        }
+        .game-card-placeholder {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-center;
+          font-size: 30px;
+        }
+        .game-card-gradient {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 45px;
+          background: linear-gradient(to top, #111118, transparent);
         }
       `}</style>
             <div className="discover-page-padding">

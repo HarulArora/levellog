@@ -1,5 +1,5 @@
-import { useState, lazy, Suspense } from 'react'
-import { HashRouter, Routes, Route, Outlet } from 'react-router-dom'
+import { useState, lazy, Suspense, useEffect } from 'react'
+import { HashRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 
 const Home = lazy(() => import('./pages/Home'))
@@ -31,10 +31,30 @@ const PageLoader = () => (
 )
 
 const MinimalLoader = () => (
-    <div className="fixed top-0 left-0 right-0 h-[2px] z-[9999] overflow-hidden pointer-events-none">
-        <div className="h-full bg-[#c8ff57] shadow-[0_0_8px_#c8ff57] animate-loading-bar" />
+    <div className="fixed top-0 left-0 right-0 h-[2.5px] z-[9999] overflow-hidden pointer-events-none">
+        <div className="h-full bg-[#c8ff57] shadow-[0_0_12px_#c8ff57] animate-loading-bar" />
     </div>
 )
+
+/**
+ * 🚀 Manual Progress Bar Trigger
+ * Listens to location changes and shows the bar for a fixed time
+ * to give immediate feedback on EVERY click.
+ */
+const NavigationProgress = () => {
+    const location = useLocation()
+    const [visible, setVisible] = useState(false)
+
+    useEffect(() => {
+        // Trigger on every route change
+        setVisible(true)
+        const timer = setTimeout(() => setVisible(false), 600) // Fixed pulse duration
+        return () => clearTimeout(timer)
+    }, [location.pathname])
+
+    if (!visible) return null
+    return <MinimalLoader />
+}
 
 function NotFound() {
     return (
@@ -60,6 +80,7 @@ function App() {
     return (
         <HashRouter>
             <ScrollToTop />
+            <NavigationProgress />
             <div className="bg-[#0a0a0f] min-h-screen">
                 <Suspense fallback={<PageLoader />}>
                     <Routes>
