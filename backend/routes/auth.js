@@ -24,7 +24,7 @@ import logger from '../utils/logger.js'
 const router = express.Router()
 
 // Simple profanity list for common offensive terms
-const BLOOCKED_WORDS = ['admin', 'moderator', 'support', 'questdeck', 'levellog', 'staff', 'offensive', 'slur', 'nazi', 'fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy']
+const BLOOCKED_WORDS = ['admin', 'moderator', 'support', 'questduck', 'levellog', 'staff', 'offensive', 'slur', 'nazi', 'fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy']
 
 const isProfane = (str) => {
     const s = str.toLowerCase()
@@ -46,7 +46,7 @@ const sendTokenResponse = (user, statusCode, res) => {
     }
 
     res.status(statusCode)
-        .cookie('questdeck_token', token, cookieOptions)
+        .cookie('questduck_token', token, cookieOptions)
         .json({
             success: true,
             token, // still sending for mobile compatibility if needed
@@ -237,7 +237,7 @@ router.post('/login', async (req, res) => {
 
 // ── POST /api/auth/logout ─────────────────────────────────────────────────────
 router.post('/logout', (req, res) => {
-    res.cookie('questdeck_token', '', {
+    res.cookie('questduck_token', '', {
         expires: new Date(0),
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -599,7 +599,7 @@ router.get('/profile/:username', async (req, res) => {
         let isFollowedByMe = false
         let isRequestedByMe = false
         let followsMe = false
-        const token = req.cookies?.questdeck_token || req.headers.authorization?.split(' ')[1]
+        const token = req.cookies?.questduck_token || req.headers.authorization?.split(' ')[1]
         if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET)

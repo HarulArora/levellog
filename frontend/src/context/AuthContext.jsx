@@ -24,7 +24,7 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         const initAuth = async () => {
-            const token = localStorage.getItem('questdeck_token')
+            const token = localStorage.getItem('questduck_token')
             
             // If we have a token in localStorage, set it as default. 
             // If not, we still try /auth/me to see if an HttpOnly cookie exists.
@@ -38,7 +38,7 @@ export function AuthProvider({ children }) {
             } catch (err) {
                 // Clear if unauthorized (401) or forbidden/unverified (403)
                 if (err.response?.status === 401 || err.response?.status === 403) {
-                    localStorage.removeItem('questdeck_token')
+                    localStorage.removeItem('questduck_token')
                     delete api.defaults.headers.common['Authorization']
                 }
             } finally {
@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
     }, [])
 
     const _setSession = (token, userData) => {
-        localStorage.setItem('questdeck_token', token)
+        localStorage.setItem('questduck_token', token)
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`
         setUser(buildUser(userData))
     }
@@ -108,7 +108,7 @@ export function AuthProvider({ children }) {
         } catch (err) {
             console.error('Logout request failed', err)
         } finally {
-            localStorage.removeItem('questdeck_token')
+            localStorage.removeItem('questduck_token')
             delete api.defaults.headers.common['Authorization']
             setUser(null)
         }

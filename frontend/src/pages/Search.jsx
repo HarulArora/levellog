@@ -241,7 +241,7 @@ function Search() {
                                                     </div>
                                                 ) : (
                                                     <div className="font-mono text-[10px] text-[#7a7a90] truncate inline-block">
-                                                        Popular on QuestDeck
+                                                        Popular on QuestDuck
                                                     </div>
                                                 )}
                                             </div>

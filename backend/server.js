@@ -42,7 +42,7 @@ if (process.env.SENTRY_DSN) {
 app.use(cors({
     origin: [
         'http://localhost:5173',
-        'https://questdeck.onrender.com',
+        'https://questduck.onrender.com',
         'https://levellog-b3tf.onrender.com',
         process.env.CLIENT_URL?.replace(/\/$/, '')
     ].filter(Boolean),

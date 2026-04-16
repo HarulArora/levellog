@@ -653,9 +653,9 @@ function GameDetail() {
     return (
         <div className="min-h-screen">
             <Helmet>
-                <title>{game.title || game.name} | QuestDeck</title>
-                <meta name="description" content={game.summary?.slice(0, 160) || `View community stats and reviews for ${game.title} on QuestDeck.`} />
-                <meta property="og:title" content={`${game.title} - QuestDeck Community`} />
+                <title>{game.title || game.name} | QuestDuck</title>
+                <meta name="description" content={game.summary?.slice(0, 160) || `View community stats and reviews for ${game.title} on QuestDuck.`} />
+                <meta property="og:title" content={`${game.title} - QuestDuck Community`} />
                 <meta property="og:description" content={game.summary?.slice(0, 200)} />
                 {game.cover && <meta property="og:image" content={game.cover} />}
                 <meta name="twitter:card" content="summary_large_image" />
@@ -820,7 +820,7 @@ function GameDetail() {
                                 ) : (
                                     <Link to="/login">
                                         <button className="btn-apple btn-apple-primary px-5 py-2.5">
-                                            Join QuestDeck
+                                            Join QuestDuck
                                         </button>
                                     </Link>
                                 )}
