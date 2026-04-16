@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 import api from '../api/axios'
 
 function EditProfile() {
-    const { user, refreshUser } = useAuth()
+    const { user, refreshUser, loading: authLoading } = useAuth()
     const navigate = useNavigate()
 
     const [username, setUsername] = useState(user?.username || '')
@@ -19,6 +19,21 @@ function EditProfile() {
         user?.avatar?.startsWith('http') ? user.avatar : ''
     )
     const [urlError, setUrlError] = useState('')
+
+    // 🚀 NEW: Sync profile data once the auth session is restored (Reload Fix)
+    const hasInitialized = useRef(false)
+    useEffect(() => {
+        if (user && !hasInitialized.current) {
+            setUsername(user.username || '')
+            setBio(user.bio || '')
+            setAvatarPreview(user.avatar || '')
+            setAvatarData(user.avatar || '')
+            if (user.avatar?.startsWith('http')) {
+                setAvatarUrl(user.avatar)
+            }
+            hasInitialized.current = true
+        }
+    }, [user])
 
     const [saving, setSaving] = useState(false)
     const [saved, setSaved] = useState(false)
@@ -250,8 +265,40 @@ function EditProfile() {
 
 
     // ─── Derived ──────────────────────────────────────────────────────────────
-
     const canSave = !saving && username.trim().length > 0 && !urlError
+
+    // ─── Early Loading Guard ───────────────────────────────────────────
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 border-4 border-[#c8ff57]/20 border-t-[#c8ff57] rounded-full animate-spin" />
+                    <p className="font-mono text-xs text-[#7a7a90] tracking-widest uppercase animate-pulse">
+                        Retrieving Profile...
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
+    if (!user && !authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-6 text-center">
+                <div className="max-w-xs mb-20">
+                    <div className="text-4xl mb-4">🛑</div>
+                    <h2 className="text-white font-black text-2xl uppercase tracking-widest mb-3" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        Access Denied
+                    </h2>
+                    <p className="font-mono text-xs text-[#7a7a90] mb-8">
+                        You must be logged in to modify your identity in the odyssey.
+                    </p>
+                    <Link to="/login" className="px-8 py-3 bg-[#c8ff57] text-black font-bold text-sm rounded-lg hover:bg-[#d4ff6e] transition-all">
+                        LOGIN TO PROCEED
+                    </Link>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen flex items-start justify-center pt-16 px-4">
