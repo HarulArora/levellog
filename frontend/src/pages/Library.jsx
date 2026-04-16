@@ -131,7 +131,7 @@ function Library() {
                         className="ml-auto px-3 py-2 bg-[#c8ff57] text-black font-bold text-sm
                                    rounded hover:bg-[#d4ff6e] transition-all whitespace-nowrap shrink-0"
                     >
-                        + Add to Deck
+                        + Add to Pond
                     </button>
                 </div>
 

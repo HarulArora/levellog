@@ -78,7 +78,7 @@ function Navbar() {
                 <Link to="/" onClick={handleLinkClick}>
                     <div className="font-black text-2xl md:text-3xl tracking-widest text-[#c8ff57]"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        QUEST<span className="text-white">DECK</span>
+                        QUEST<span className="text-white">DUCK</span>
                     </div>
                 </Link>
 

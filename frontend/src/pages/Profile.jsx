@@ -454,7 +454,7 @@ function Profile() {
                         </div>
                     ) : (
                         <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">
-                            No games decked yet
+                            No games ponded yet
                         </div>
                     )}
                 </div>

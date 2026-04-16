@@ -787,7 +787,7 @@ function GameDetail() {
                                 <div>
                                     <div className="font-black text-4xl text-[#ff9f5c] leading-none"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.loggedCount ?? '—'}</div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Decked</div>
+                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">In Pond</div>
                                 </div>
                                 <div>
                                     <div className="font-black text-4xl text-[#ff5c5c] leading-none"
@@ -814,7 +814,7 @@ function GameDetail() {
                                         </button>
                                     ) : (
                                         <button onClick={() => setShowAddModal(true)} className="btn-apple btn-apple-primary px-5 py-2.5 gap-1.5">
-                                            <Plus size={16} strokeWidth={3} /> Add to Deck
+                                            <Plus size={16} strokeWidth={3} /> Add to Pond
                                         </button>
                                     )
                                 ) : (

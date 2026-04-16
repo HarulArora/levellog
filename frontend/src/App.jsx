@@ -25,7 +25,7 @@ const PageLoader = () => (
     <div className="fixed inset-0 bg-[#0a0a0f] z-[9999] flex items-center justify-center pointer-events-none">
         <div className="font-black text-4xl tracking-widest text-[#c8ff57] animate-pulse" 
              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-            QUEST<span className="text-white">DECK</span>
+            QUEST<span className="text-white">DUCK</span>
         </div>
     </div>
 )

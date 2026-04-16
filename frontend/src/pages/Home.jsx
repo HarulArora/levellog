@@ -210,7 +210,9 @@ function GameSearchBar() {
         <div ref={wrapperRef} className="relative w-full">
             {/* Input */}
             <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none text-base"><Search size={16} /></span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none z-10">
+                    <Search size={18} strokeWidth={2.5} />
+                </span>
                 <input
                     type="text"
                     placeholder="Search any game..."
@@ -219,12 +221,12 @@ function GameSearchBar() {
                     onKeyDown={handleKeyDown}
                     onFocus={() => results.length > 0 && setOpen(true)}
                     className="w-full bg-[#111118] border border-[#2a2a35] rounded-lg
-                               pl-10 pr-24 py-3 text-white text-sm
+                               pl-11 pr-24 py-3 text-white text-sm
                                focus:outline-none focus:border-[#c8ff57]
-                               placeholder:text-[#3a3a4a] transition-all"
+                               placeholder:text-[#7a7a90] transition-all"
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#3a3a4a] pointer-events-none">
-                    {loading ? <span className="text-[#7a7a90] animate-pulse">searching…</span> : 'QuestDuck'}
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#a0a0b8] pointer-events-none">
+                    {loading ? <span className="text-[#c8ff57] animate-pulse font-bold">searching…</span> : 'QuestDuck'}
                 </span>
             </div>
 
@@ -309,7 +311,7 @@ function Home() {
         setShowAddModal(false)
         const res = await addGame(gameData)
         if (res.success) {
-            showToast(res.updated ? `"${res.game.title}" updated!` : `"${res.game.title}" added to deck!`)
+            showToast(res.updated ? `"${res.game.title}" updated!` : `"${res.game.title}" added to pond!`)
         } else {
             showToast(res.error || 'Failed to log game', 'error')
         }
@@ -397,7 +399,7 @@ function Home() {
                                 style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                             >
                                 Your Quest<br />
-                                <span className="text-[#c8ff57]">Deck.</span>
+                                <span className="text-[#c8ff57]">Pond.</span>
                             </h1>
 
                             <p className="text-[#7a7a90] text-sm leading-relaxed mb-6 max-w-md">
@@ -411,7 +413,7 @@ function Home() {
                                     <>
                                         <button onClick={() => setShowAddModal(true)}
                                             className="btn-apple btn-apple-primary px-6 py-3 gap-1.5">
-                                            <Plus size={16} strokeWidth={2.5} /> Add to Deck
+                                            <Plus size={16} strokeWidth={2.5} /> Add to Pond
                                         </button>
                                         <button onClick={() => navigate('/library')}
                                             className="btn-apple btn-apple-secondary px-6 py-3 gap-1.5">
@@ -437,7 +439,7 @@ function Home() {
                             {user && games.length > 0 ? (
                                 <div className="flex gap-8">
                                     {[
-                                        { value: userStats.total, label: 'Games Decked' },
+                                        { value: userStats.total, label: 'In the Pond' },
                                         { value: userStats.totalHours, label: 'Hours Played' },
                                         { value: userStats.avgRating, label: 'Avg Rating' }
                                     ].map(stat => (
@@ -544,7 +546,7 @@ function Home() {
                                     ))}
                                     <Link to={user ? '/library' : '/signup'}>
                                         <button className="w-full py-3 border border-dashed border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded-lg hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
-                                            + Build Your Quest Deck
+                                            + Build Your Quest Pond
                                         </button>
                                     </Link>
                                 </>
@@ -618,7 +620,7 @@ function Home() {
                 <div className="flex items-center gap-3 mb-6">
                     <span className="text-2xl"><Flame className="text-[#ff5c5c] fill-current" size={24} /></span>
                     <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Trending Now</h2>
-                    <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Most decked this week</span>
+                    <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Most ponded this week</span>
                 </div>
                 {loading && trending.length === 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -796,7 +798,7 @@ function Home() {
                                 onClick={() => setShowAddModal(true)}
                                 className="btn-apple btn-apple-primary px-6 py-2.5"
                             >
-                                + Add to Deck
+                                + Add to Pond
                             </button>
                         </div>
                     )}
