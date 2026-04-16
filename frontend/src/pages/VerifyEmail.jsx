@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-import Logo from '../assets/logo.svg'
 
 function VerifyEmail() {
     const { verifyEmail, resendVerification } = useAuth()
@@ -67,18 +66,13 @@ function VerifyEmail() {
                                hover:text-[#c8ff57] transition-colors mb-6">
                     ← BACK TO LOGIN
                 </button>
-                <div className="text-center mb-8 flex flex-col items-center">
-                    <Link to="/" className="mb-4 group">
-                        <img 
-                            src={Logo} 
-                            alt="QuestDuck Logo" 
-                            className="w-16 h-16 md:w-20 md:h-20 object-contain transition-all group-hover:scale-105" 
-                        />
+                <div className="text-center mb-8">
+                    <Link to="/" className="group block mb-2">
+                        <div className="font-black text-5xl tracking-[0.1em] text-[#c8ff57]"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            VERIFY<span className="text-white"> EMAIL</span>
+                        </div>
                     </Link>
-                    <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        VERIFY<span className="text-white"> EMAIL</span>
-                    </div>
                     <p className="text-[#7a7a90] font-mono text-xs">Enter the 6-digit code sent to your email</p>
                 </div>
                 <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6 shadow-2xl">

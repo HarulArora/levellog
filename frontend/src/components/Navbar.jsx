@@ -6,7 +6,6 @@ import { Bell, User, Search, LogOut, ChevronDown, UserSearch, Tags } from 'lucid
 import { useDeals } from '../context/DealsContext'
 import Avatar from './ui/Avatar'
 
-import Logo from '../assets/logo.svg'
 
 function Navbar() {
     const location = useLocation()
@@ -79,11 +78,6 @@ function Navbar() {
                 {/* Logo */}
                 <Link to="/" onClick={handleLinkClick}>
                     <div className="flex items-center gap-1 md:gap-1 group">
-                        <img 
-                            src={Logo} 
-                            alt="QuestDuck" 
-                            className="w-10 h-10 md:w-12 md:h-12 object-contain transition-transform group-hover:scale-110 duration-300" 
-                        />
                         <div className="font-black text-2xl md:text-3xl tracking-widest text-[#c8ff57]"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                             QUEST<span className="text-white">DUCK</span>
