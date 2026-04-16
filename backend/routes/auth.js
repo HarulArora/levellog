@@ -745,7 +745,10 @@ router.get('/search', async (req, res) => {
         const query = req.query.q
         if (!query || query.trim().length < 2) return res.json({ success: true, users: [] })
         const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        const users = await User.find({ username: { $regex: escapedQuery, $options: 'i' } })
+        const users = await User.find({ 
+            username: { $regex: escapedQuery, $options: 'i' },
+            isEmailVerified: true 
+        })
             .select('-password -email').limit(10).lean()
 
         // check followsMe for each user if logged in
@@ -891,7 +894,10 @@ router.get('/suggestions', protect, async (req, res) => {
 
         // Fallback to non-followed users if needed
         if (suggestedIds.length < 20) {
-            const randomUsers = await User.find({ _id: { $nin: [...excludeIds, ...suggestedIds] } })
+            const randomUsers = await User.find({ 
+                _id: { $nin: [...excludeIds, ...suggestedIds] },
+                isEmailVerified: true 
+            })
                 .limit(20 - suggestedIds.length)
                 .select('_id')
                 .lean()
@@ -900,8 +906,11 @@ router.get('/suggestions', protect, async (req, res) => {
 
         suggestedIds = suggestedIds.slice(0, 20)
 
-        // Bulk fetch all relevant users
-        const users = await User.find({ _id: { $in: suggestedIds } })
+        // Bulk fetch all relevant users (Must be verified)
+        const users = await User.find({ 
+            _id: { $in: suggestedIds },
+            isEmailVerified: true 
+        })
             .select('username avatar bio level badge isPrivate followerCount')
             .lean()
 
