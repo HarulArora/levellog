@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
+import Logo from '../assets/logo.svg'
+
 function VerifyEmail() {
     const { verifyEmail, resendVerification } = useAuth()
     const navigate = useNavigate()
@@ -65,7 +67,14 @@ function VerifyEmail() {
                                hover:text-[#c8ff57] transition-colors mb-6">
                     ← BACK TO LOGIN
                 </button>
-                <div className="text-center mb-8">
+                <div className="text-center mb-8 flex flex-col items-center">
+                    <Link to="/" className="mb-4 group">
+                        <img 
+                            src={Logo} 
+                            alt="QuestDuck Logo" 
+                            className="w-16 h-16 md:w-20 md:h-20 object-contain transition-all group-hover:scale-105" 
+                        />
+                    </Link>
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         VERIFY<span className="text-white"> EMAIL</span>

@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 
+import Logo from '../assets/logo.svg'
+
 function isValidEmail(email) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
@@ -84,7 +86,14 @@ function Login() {
                         HOME
                     </button>
                 </div>
-                <div className="text-center mb-8">
+                <div className="text-center mb-8 flex flex-col items-center">
+                    <Link to="/" className="mb-4 group">
+                        <img 
+                            src={Logo} 
+                            alt="QuestDuck Logo" 
+                            className="w-20 h-20 md:w-24 md:h-24 object-contain transition-all group-hover:scale-105" 
+                        />
+                    </Link>
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         QUEST<span className="text-white">DUCK</span>

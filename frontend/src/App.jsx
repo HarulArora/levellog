@@ -1,6 +1,7 @@
-import { useState, lazy, Suspense, useEffect } from 'react'
+import { useState, lazy, Suspense, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
+import Logo from './assets/logo.svg'
 
 const Home = lazy(() => import('./pages/Home'))
 const Library = lazy(() => import('./pages/Library'))
@@ -22,7 +23,8 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 import ScrollToTop from './components/ScrollToTop'
 
 const PageLoader = () => (
-    <div className="fixed inset-0 bg-[#0a0a0f] z-[9999] flex items-center justify-center pointer-events-none">
+    <div className="fixed inset-0 bg-[#0a0a0f] z-[9999] flex flex-col items-center justify-center pointer-events-none gap-6">
+        <img src={Logo} alt="QuestDuck Logo" className="w-24 h-24 md:w-32 md:h-32 object-contain animate-bounce" />
         <div className="font-black text-4xl tracking-widest text-[#c8ff57] animate-pulse" 
              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
             QUEST<span className="text-white">DUCK</span>
@@ -43,21 +45,28 @@ const MinimalLoader = () => (
 const NavigationProgress = () => {
     const location = useLocation()
     const [visible, setVisible] = useState(false)
+    const timerRef = useRef(null)
 
-    useEffect(() => {
-        // Fallback: Trigger on route change (e.g. back/forward button)
+    const startLoader = () => {
+        if (timerRef.current) clearTimeout(timerRef.current)
         setVisible(true)
-        const timer = setTimeout(() => setVisible(false), 800)
-        return () => clearTimeout(timer)
-    }, [location.pathname])
+        timerRef.current = setTimeout(() => setVisible(false), 800)
+    }
 
     useEffect(() => {
-        // Immediate Trigger: Trigger on any internal link click
+        // Trigger on any route change (including back/forward)
+        startLoader()
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current)
+        }
+    }, [location.pathname, location.search, location.hash])
+
+    useEffect(() => {
+        // Immediate Trigger for perceived performance
         const handleInteraction = (e) => {
             const link = e.target.closest('a')
-            // Only trigger for internal links that don't open in new tabs
             if (link && link.href.includes(window.location.origin) && !link.target) {
-                setVisible(true)
+                startLoader()
             }
         }
         window.addEventListener('mousedown', handleInteraction)
