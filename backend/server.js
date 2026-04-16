@@ -43,6 +43,7 @@ app.use(cors({
     origin: [
         'http://localhost:5173',
         'https://questdeck.onrender.com',
+        'https://levellog-b3tf.onrender.com',
         process.env.CLIENT_URL?.replace(/\/$/, '')
     ].filter(Boolean),
     credentials: true,
@@ -104,6 +105,12 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/lists', listsRouter)
 app.use('/api/comments', commentsRouter)
 app.use('/api/deals', dealsRouter)
+
+app.get('/', (req, res) => res.json({ 
+    success: true, 
+    message: 'LevelLog API is running',
+    docs: 'https://github.com/HarulArora/levellog' 
+}))
 
 app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }))
 

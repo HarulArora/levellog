@@ -105,7 +105,7 @@ router.get('/stats/:igdbId', async (req, res) => {
                     totalRatingSum: r.sum,
                     avgRating: parseFloat(r.avg.toFixed(1))
                 },
-                { new: true, upsert: true }
+                { returnDocument: 'after', upsert: true }
             )
         }
 
