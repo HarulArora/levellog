@@ -778,7 +778,27 @@ router.get('/search', async (req, res) => {
             return uObj
         }))
 
-        res.json({ success: true, users: enriched })
+        // ── Priority Sorting ──
+        const queryLower = query.trim().toLowerCase()
+        enriched.sort((a, b) => {
+            const aName = a.username.toLowerCase()
+            const bName = b.username.toLowerCase()
+
+            // 1. Exact match
+            if (aName === queryLower && bName !== queryLower) return -1
+            if (bName === queryLower && aName !== queryLower) return 1
+
+            // 2. Starts with
+            const aStarts = aName.startsWith(queryLower)
+            const bStarts = bName.startsWith(queryLower)
+            if (aStarts && !bStarts) return -1
+            if (bStarts && !aStarts) return 1
+
+            // 3. Alphabetical fallback
+            return aName.localeCompare(bName)
+        })
+
+        res.json({ success: true, users: enriched, query })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Search failed', error: error.message })
     }
