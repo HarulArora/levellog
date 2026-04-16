@@ -51,7 +51,11 @@ function Search() {
 
     const suggestions = localSuggestions
     const results     = (searchData?.users || []).filter(u => u.username !== currentUser?.username)
-    const loading     = loadingSearch
+
+    // 🚀 Improved Loading Logic: show indicator immediately when typing
+    const isWaitingForDebounce = query.trim().length >= 2 && query.trim() !== debouncedQuery.trim()
+    const isAwaitingResults = trimmed.length >= 2 && searchData?.query !== trimmed
+    const loading = loadingSearch || isWaitingForDebounce || isAwaitingResults
 
     return (
         <div className="max-w-[800px] mx-auto px-5 md:px-10 py-8 md:py-10">
