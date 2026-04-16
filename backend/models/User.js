@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema(
         badge: { type: String, default: '🎮' },
         isPro: { type: Boolean, default: false },
 
-        googleId: { type: String, default: null, sparse: true },
+        googleId: { type: String, default: null, sparse: true, unique: true },
 
         isEmailVerified: { type: Boolean, default: false },
         emailVerifyToken: { type: String, default: null },

@@ -415,56 +415,98 @@ router.post('/google', async (req, res) => {
         if (!accessToken)
             return res.status(400).json({ success: false, message: 'No Google token provided' })
 
-        const { data: googleData } = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-            timeout: 5000 // Add a timeout to prevent hanging
-        })
+        // 1. Get user info from Google
+        let googleData;
+        try {
+            const response = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${accessToken}` },
+                timeout: 8000
+            })
+            googleData = response.data
+        } catch (axiosErr) {
+            logger.error('Google userInfo fetch failed:', axiosErr.response?.data || axiosErr.message)
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Failed to verify Google account. Please try again.',
+                error: axiosErr.message 
+            })
+        }
         
         const { sub: googleId, email, name, picture } = googleData
         if (!email)
-            return res.status(401).json({ success: false, message: 'Could not get email from Google' })
+            return res.status(401).json({ success: false, message: 'Your Google account must have an email address' })
 
+        // 2. Find user by googleId or email
         let user = await User.findOne({ $or: [{ googleId }, { email: email.toLowerCase() }] })
+
         if (user) {
-            // Update existing user with googleId if missing
+            let userChanged = false
+            
+            // Link googleId if missing
             if (!user.googleId) {
                 user.googleId = googleId
-                if (!user.avatar && picture) user.avatar = picture
+                userChanged = true
             }
-            // Auto-verify existing account if logged in via Google
+            
+            // Sync avatar if missing
+            if (!user.avatar && picture) {
+                user.avatar = picture
+                userChanged = true
+            }
+
+            // ENFORCE 12-CHAR LIMIT for existing users (fixes validation errors for legacy accounts)
+            if (user.username.length > 12) {
+                const base = user.username.slice(0, 9) // keep some prefix
+                user.username = base + Math.floor(100 + Math.random() * 899) // make it unique but short
+                userChanged = true
+            }
+
+            // AUTO-VERIFY: Google login confirms the email identity
             if (!user.isEmailVerified) {
                 user.isEmailVerified = true
-                logger.info(`Existing user ${user.email} auto-verified via Google Login`)
+                user.emailVerifyToken = null
+                user.emailVerifyExpires = null
+                userChanged = true
+                logger.info(`User ${user.email} auto-verified via Google Login`)
             }
-            await user.save()
+
+            if (userChanged) await user.save()
         } else {
+            // 3. Create new user
             let baseUsername = (name || 'user').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 12)
-            if (!baseUsername) baseUsername = 'user'
+            if (!baseUsername || baseUsername.length < 3) baseUsername = 'user_' + Math.floor(100+Math.random()*900)
+            
             let username = baseUsername
             let counter = 1
             
-            // Loop until we find a unique username that is <= 12 characters
-            while (await User.findOne({ username })) {
-                // If adding the counter makes it too long, trim the base further
+            // Robust unique username search
+            while (await User.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } })) {
                 let suffix = counter.toString()
                 let availableSpace = 12 - suffix.length
                 username = baseUsername.slice(0, availableSpace) + suffix
                 counter++
             }
+
             user = await User.create({ 
                 username, 
                 email: email.toLowerCase(), 
-                password: null, // No password set yet
+                password: null, 
                 googleId, 
                 avatar: picture || '',
-                isEmailVerified: true // Google accounts are pre-verified
+                isEmailVerified: true 
             })
+            logger.info(`New user created via Google: ${user.email} (@${user.username})`)
         }
 
         sendTokenResponse(user, 200, res)
     } catch (error) {
-        logger.error('Google login error:', error)
-        res.status(500).json({ success: false, message: 'Google sign-in failed', error: error.message })
+        console.error('DEBUG GOOGLE ERROR:', error)
+        logger.error('CRITICAL Google login error:', error.stack || error)
+        res.status(500).json({ 
+            success: false, 
+            message: 'Google sign-in failed due to a server error. Please try again later.',
+            error: error.message 
+        })
     }
 })
 

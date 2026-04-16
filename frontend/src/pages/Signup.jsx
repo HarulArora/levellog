@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 import api from '../api/axios'
 
-import Logo from '../assets/logo.svg'
 
 function useDebounce(value, delay) {
     const [debounced, setDebounced] = useState(value)
@@ -161,18 +160,13 @@ function Signup() {
                     </button>
                 </div>
 
-                <div className="text-center mb-8 flex flex-col items-center">
-                    <Link to="/" className="mb-4 group">
-                        <img 
-                            src={Logo} 
-                            alt="QuestDuck Logo" 
-                            className="w-20 h-20 md:w-24 md:h-24 object-contain transition-all group-hover:scale-105" 
-                        />
+                <div className="text-center mb-8">
+                    <Link to="/" className="group block mb-2">
+                        <div className="font-black text-5xl tracking-[0.15em] text-[#c8ff57]"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            QUEST<span className="text-white">DUCK</span>
+                        </div>
                     </Link>
-                    <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        QUEST<span className="text-white">DUCK</span>
-                    </div>
                     <p className="text-[#7a7a90] font-mono text-xs">Start your gaming odyssey today</p>
                 </div>
 

@@ -1,7 +1,6 @@
 import { useState, lazy, Suspense, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
-import Logo from './assets/logo.svg'
 
 const Home = lazy(() => import('./pages/Home'))
 const Library = lazy(() => import('./pages/Library'))
@@ -24,8 +23,7 @@ import ScrollToTop from './components/ScrollToTop'
 
 const PageLoader = () => (
     <div className="fixed inset-0 bg-[#0a0a0f] z-[9999] flex flex-col items-center justify-center pointer-events-none gap-6">
-        <img src={Logo} alt="QuestDuck Logo" className="w-24 h-24 md:w-32 md:h-32 object-contain animate-bounce" />
-        <div className="font-black text-4xl tracking-widest text-[#c8ff57] animate-pulse" 
+        <div className="font-black text-6xl tracking-[0.2em] text-[#c8ff57] animate-pulse" 
              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
             QUEST<span className="text-white">DUCK</span>
         </div>

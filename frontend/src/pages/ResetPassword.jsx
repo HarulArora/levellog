@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 function ResetPassword() {
@@ -65,10 +65,12 @@ function ResetPassword() {
                     ← BACK TO LOGIN
                 </button>
                 <div className="text-center mb-8">
-                    <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        RESET<span className="text-white"> PASSWORD</span>
-                    </div>
+                    <Link to="/" className="group block mb-2">
+                        <div className="font-black text-4xl md:text-5xl tracking-[0.05em] text-[#c8ff57]"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            RESET<span className="text-white"> PASSWORD</span>
+                        </div>
+                    </Link>
                     <p className="text-[#7a7a90] font-mono text-xs">Enter the code and your new password</p>
                 </div>
                 <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6 shadow-2xl">
