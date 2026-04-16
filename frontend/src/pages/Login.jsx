@@ -87,7 +87,7 @@ function Login() {
                 <div className="text-center mb-8">
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        QUEST<span className="text-white">DECK</span>
+                        QUEST<span className="text-white">DUCK</span>
                     </div>
                 </div>
                 <form noValidate onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">

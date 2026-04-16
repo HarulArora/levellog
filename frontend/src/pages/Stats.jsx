@@ -595,7 +595,7 @@ function Stats() {
                                 <button onClick={() => navigate('/library')}
                                     className="px-6 py-3 bg-[#c8ff57] text-black font-bold
                                                text-sm rounded hover:bg-[#d4ff6e] transition-all">
-                                    + Add to Deck
+                                    + Add to Pond
                                 </button>
                             </div>
                         )}
@@ -713,7 +713,7 @@ function Stats() {
                                 </div>
                                 <div className="p-2">
                                     {[
-                                        { action: 'Add to deck (any status)', xp: '+1 XP', icon: <Gamepad2 size={16} />, color: '#c8ff57' },
+                                        { action: 'Add to pond (any status)', xp: '+1 XP', icon: <Gamepad2 size={16} />, color: '#c8ff57' },
                                         { action: 'Rate a game', xp: '+1 XP', icon: <Star size={16} />, color: '#ff9f5c' },
                                         { action: 'Like a game', xp: '+1 XP', icon: <Heart size={16} />, color: '#ff5c5c' },
                                         { action: 'Follow someone', xp: '+1 XP', icon: <Zap size={16} />, color: '#5c9fff' },

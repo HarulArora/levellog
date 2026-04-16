@@ -267,7 +267,7 @@ function Activity() {
                             </div>
                             <Link to="/library">
                                 <button className="btn-apple btn-apple-primary px-6 py-2.5">
-                                    + Add to Deck
+                                    + Add to Pond
                                 </button>
                             </Link>
                         </div>

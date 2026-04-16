@@ -27,13 +27,13 @@ function HeroSection() {
                     style={{ fontSize: 'clamp(2.5rem, 7vw, 5.5rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                 >
                     Build Your <br />
-                    <em className="not-italic text-[#c8ff57]">Ultimate Deck</em>
+                    <em className="not-italic text-[#c8ff57]">Ultimate Pond</em>
                 </h1>
 
                 {/* Description */}
                 <p className="text-[#7a7a90] leading-relaxed text-sm md:text-base mb-8 max-w-md">
                     Add your games, track your hours, rate your experiences.
-                    Your personal gaming deck — built for gamers who care
+                    Your personal gaming pond — built for gamers who care
                     about what they play.
                 </p>
 
@@ -58,7 +58,7 @@ function HeroSection() {
                 {/* Stats */}
                 <div className="flex gap-6 md:gap-8 mt-10">
                     {[
-                        { number: '12K+', label: 'Games Decked' },
+                        { number: '12K+', label: 'In the Pond' },
                         { number: '3.4K', label: 'Active Users' },
                         { number: '180K', label: 'Hours Tracked' },
                     ].map(stat => (

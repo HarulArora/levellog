@@ -162,7 +162,7 @@ function Signup() {
                 <div className="text-center mb-8">
                     <div className="font-black text-4xl tracking-widest text-[#c8ff57] mb-2"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        QUEST<span className="text-white">DECK</span>
+                        QUEST<span className="text-white">DUCK</span>
                     </div>
                     <p className="text-[#7a7a90] font-mono text-xs">Start your gaming odyssey today</p>
                 </div>
