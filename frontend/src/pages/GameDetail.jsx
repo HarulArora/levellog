@@ -810,7 +810,7 @@ function GameDetail() {
                                                        ${statusConfig[myGame.status]?.bg || 'bg-[#c8ff57]/10'}
                                                        ${statusConfig[myGame.status]?.color || 'text-[#c8ff57]'}
                                                        border-current hover:brightness-125`}>
-                                            <Check size={16} strokeWidth={2.5} /> {statusConfig[myGame.status]?.label || 'In Library'} · Update Data
+                                            {statusConfig[myGame.status]?.label || 'In Library'} · Update Data
                                         </button>
                                     ) : (
                                         <button onClick={() => setShowAddModal(true)} className="btn-apple btn-apple-primary px-5 py-2.5 gap-1.5">
