@@ -82,7 +82,7 @@ router.get('/', async (req, res) => {
             const url = `https://www.cheapshark.com/api/1.0/deals?${p.toString()}`
 
             try {
-                const r = await axios.get(url, { headers: { 'User-Agent': 'QuestDeck/1.4', 'Accept': 'application/json' } })
+                const r = await axios.get(url, { headers: { 'User-Agent': 'QuestDuck/1.4', 'Accept': 'application/json' } })
                 const data = r.data || []
                 
                 // Success - keep coolingDown false

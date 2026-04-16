@@ -29,7 +29,7 @@ export function DealsProvider({ children }) {
 
                 // Browser Notification
                 if (Notification?.permission === 'granted') {
-                    new Notification('🎮 New QuestDeck Deals!', {
+                    new Notification('🎮 New QuestDuck Deals!', {
                         body: `${fresh.length} new deal${fresh.length > 1 ? 's' : ''} detected! Check them out now.`,
                         icon: '/favicon.ico',
                     })

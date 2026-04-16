@@ -224,7 +224,7 @@ function GameSearchBar() {
                                placeholder:text-[#3a3a4a] transition-all"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#3a3a4a] pointer-events-none">
-                    {loading ? <span className="text-[#7a7a90] animate-pulse">searching…</span> : 'QuestDeck'}
+                    {loading ? <span className="text-[#7a7a90] animate-pulse">searching…</span> : 'QuestDuck'}
                 </span>
             </div>
 

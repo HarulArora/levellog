@@ -34,7 +34,7 @@ export function GamesProvider({ children }) {
         if (!user) return
         if (!silent) setLoading(true)
         try {
-            const token = localStorage.getItem('questdeck_token')
+            const token = localStorage.getItem('questduck_token')
             const res = await api.get('/games', {
                 headers: { Authorization: `Bearer ${token}` }
             })
@@ -71,7 +71,7 @@ export function GamesProvider({ children }) {
 
     // ── CRUD — update local state + cache immediately ──────────────────────────
     const updateGame = useCallback(async (id, updates) => {
-        const token = localStorage.getItem('questdeck_token')
+        const token = localStorage.getItem('questduck_token')
         const previousGames = [...games]
         
         try {
@@ -107,7 +107,7 @@ export function GamesProvider({ children }) {
     }, [games, user])
 
     const addGame = useCallback(async (gameData) => {
-        const token = localStorage.getItem('questdeck_token')
+        const token = localStorage.getItem('questduck_token')
         const previousGames = [...games]
         
         // Check if updating existing instead of adding new
@@ -164,7 +164,7 @@ export function GamesProvider({ children }) {
     }, [games, updateGame, user])
 
     const deleteGame = useCallback(async (id) => {
-        const token = localStorage.getItem('questdeck_token')
+        const token = localStorage.getItem('questduck_token')
         const previousGames = [...games] // Backup for rollback
         try {
             // Optimistic update
