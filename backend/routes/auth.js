@@ -510,7 +510,7 @@ router.post('/unlink-google', protect, async (req, res) => {
         const user = await User.findByIdAndUpdate(
             req.user._id, 
             { $set: { googleId: null } },
-            { new: true }
+            { returnDocument: 'after' }
         )
 
         if (!user) return res.status(404).json({ success: false, message: 'User not found' })

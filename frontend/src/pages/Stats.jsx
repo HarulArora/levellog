@@ -8,8 +8,8 @@ import { getLevelInfo, getXPProgress, LEVELS } from '../utils/levels'
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 function Stats() {
-    const { user } = useAuth()
-    const { games } = useGamesContext()
+    const { user, loading: authLoading } = useAuth()
+    const { games, loading: gamesLoading } = useGamesContext()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'stats')
@@ -30,26 +30,6 @@ function Stats() {
     const { current: currentLevel, next: nextLevel } = useMemo(() => getLevelInfo(xp), [xp])
     const xpProgress = useMemo(() => getXPProgress(xp), [xp])
 
-    if (!user) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-                <div className="text-5xl">📊</div>
-                <div
-                    className="text-white font-black text-2xl tracking-widest uppercase"
-                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                >
-                    Login to see your stats
-                </div>
-                <Link to="/login">
-                    <button className="px-6 py-3 bg-[#c8ff57] text-black font-bold
-                             text-sm rounded hover:bg-[#d4ff6e] transition-all">
-                        Login
-                    </button>
-                </Link>
-            </div>
-        )
-    }
-
     // ── Computed stats ──
     const { totalGames, totalHours, ratedGames, avgRating, completed, playing, planned, dropped, paused, completionRate } = useMemo(() => {
         const totalGames = games.length
@@ -66,11 +46,11 @@ function Stats() {
         const completionRate = totalGames > 0
             ? Math.round((completed / totalGames) * 100)
             : 0
-        
+
         return { totalGames, totalHours, ratedGames, avgRating, completed, playing, planned, dropped, paused, completionRate }
     }, [games])
 
-    const memberYear = user.createdAt
+    const memberYear = user?.createdAt
         ? new Date(user.createdAt).getFullYear()
         : new Date().getFullYear()
 
@@ -142,7 +122,33 @@ function Stats() {
     const highestRated = useMemo(() => ratedGames.reduce((max, g) =>
         g.rating > (max?.rating || 0) ? g : max, null), [ratedGames])
 
+    if (authLoading || (gamesLoading && games.length === 0)) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="text-[#7a7a90] font-mono text-sm animate-pulse">Loading stats...</div>
+            </div>
+        )
+    }
 
+    if (!user) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <div className="text-5xl">📊</div>
+                <div
+                    className="text-white font-black text-2xl tracking-widest uppercase"
+                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                >
+                    Login to see your stats
+                </div>
+                <Link to="/login">
+                    <button className="px-6 py-3 bg-[#c8ff57] text-black font-bold
+                             text-sm rounded hover:bg-[#d4ff6e] transition-all">
+                        Login
+                    </button>
+                </Link>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen">

@@ -73,7 +73,7 @@ export const syncIGDBLists = async () => {
                     games: normalizedGames,
                     lastUpdated: new Date()
                 },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             )
             
             logger.info(`[Sync] Successfully updated ${config.key} (${normalizedGames.length} games)`)

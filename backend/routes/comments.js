@@ -161,7 +161,7 @@ router.post('/:id/like', protect, async (req, res) => {
         const updatedComment = await Comment.findByIdAndUpdate(
             commentId,
             { $inc: { likeCount: likeDiff, dislikeCount: dislikeDiff } },
-            { new: true }
+            { returnDocument: 'after' }
         )
 
         res.json({
@@ -208,7 +208,7 @@ router.post('/:id/dislike', protect, async (req, res) => {
         const updatedComment = await Comment.findByIdAndUpdate(
             commentId,
             { $inc: { likeCount: likeDiff, dislikeCount: dislikeDiff } },
-            { new: true }
+            { returnDocument: 'after' }
         )
 
         res.json({
