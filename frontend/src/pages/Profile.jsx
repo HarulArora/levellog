@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import useCachedFetch from '../hooks/useCachedFetch'
@@ -174,6 +175,13 @@ function Profile() {
 
     return (
         <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10">
+            <Helmet>
+                <title>{user.username}'s Profile | QuestDuck</title>
+                <meta name="description" content={`Check out ${user.username}'s gaming library, stats, and lists on QuestDuck.`} />
+                <meta property="og:title" content={`${user.username}'s Gaming Odyssey - QuestDuck`} />
+                <meta property="og:description" content={`See ${user.username}'s gaming stats and library.`} />
+                {user.avatar && <meta property="og:image" content={user.avatar} />}
+            </Helmet>
 
             {/* XP Toast */}
             {xpToast && (
