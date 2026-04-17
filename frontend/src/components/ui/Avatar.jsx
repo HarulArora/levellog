@@ -1,8 +1,10 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
 const Avatar = ({ size = 'md', className = '' }) => {
     const { user } = useAuth()
+    const [imgError, setImgError] = useState(false)
+    
     if (!user) return null
 
     const dimensions = {
@@ -14,10 +16,11 @@ const Avatar = ({ size = 'md', className = '' }) => {
 
     return (
         <div className={`relative flex-shrink-0 ${className}`}>
-            {user.avatar ? (
+            {user.avatar && !imgError ? (
                 <img 
                     src={user.avatar} 
                     alt={user.username} 
+                    onError={() => setImgError(true)}
                     className={`${currentSize} rounded-full object-cover ring-2 ring-[#2a2a35]`} 
                 />
             ) : (

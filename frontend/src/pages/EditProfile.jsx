@@ -19,6 +19,7 @@ function EditProfile() {
         user?.avatar?.startsWith('http') ? user.avatar : ''
     )
     const [urlError, setUrlError] = useState('')
+    const [previewError, setPreviewError] = useState(false)
 
     // 🚀 NEW: Sync profile data once the auth session is restored (Reload Fix)
     const hasInitialized = useRef(false)
@@ -28,6 +29,7 @@ function EditProfile() {
             setBio(user.bio || '')
             setAvatarPreview(user.avatar || '')
             setAvatarData(user.avatar || '')
+            setPreviewError(false)
             if (user.avatar?.startsWith('http')) {
                 setAvatarUrl(user.avatar)
             }
@@ -79,6 +81,7 @@ function EditProfile() {
             const result = ev.target.result
             setAvatarData(result)
             setAvatarPreview(result)
+            setPreviewError(false)
         }
         reader.onerror = () => {
             setError('Failed to read file. Please try again.')
@@ -99,11 +102,13 @@ function EditProfile() {
         if (!val.trim()) {
             setAvatarData('')
             setAvatarPreview('')
+            setPreviewError(false)
             return
         }
 
         // Optimistically show preview; validate on load/error
         setAvatarPreview(val.trim())
+        setPreviewError(false)
     }, [])
 
     const handleUrlImageLoad = useCallback(() => {
@@ -115,6 +120,7 @@ function EditProfile() {
     const handleUrlImageError = useCallback(() => {
         setUrlError('Could not load image from this URL')
         setAvatarData('')   // don't save a broken URL
+        setPreviewError(true)
     }, [])
 
     // ─── Remove Avatar ────────────────────────────────────────────────────────
@@ -334,12 +340,15 @@ function EditProfile() {
 
                         <div className="flex items-center gap-4 mb-4">
                             <div className="relative flex-shrink-0">
-                                {avatarPreview ? (
+                                {avatarPreview && !previewError ? (
                                     <img
                                         src={avatarPreview}
                                         alt="preview"
                                         onLoad={avatarMode === 'url' ? handleUrlImageLoad : undefined}
-                                        onError={avatarMode === 'url' ? handleUrlImageError : undefined}
+                                        onError={() => {
+                                            if (avatarMode === 'url') handleUrlImageError()
+                                            setPreviewError(true)
+                                        }}
                                         className="w-16 h-16 rounded-full object-cover ring-2 ring-[#c8ff57]/50"
                                     />
                                 ) : (
