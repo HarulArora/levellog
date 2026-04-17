@@ -34,7 +34,7 @@ if (transporter) {
 
 export const sendEmail = async ({ to, subject, html }) => {
     try {
-        const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_USER || 'QuestDuck <questduck69@gmail.com>'
+        const fromEmail = process.env.EMAIL_FROM || `QuestDuck <${process.env.SMTP_USER || 'questduck69@gmail.com'}>`
         
         if (!transporter) {
             throw new Error('SMTP transporter not initialized')
