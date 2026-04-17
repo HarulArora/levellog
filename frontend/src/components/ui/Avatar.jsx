@@ -36,6 +36,5 @@ const Avatar = ({ user: passedUser, size = 'md', className = '' }) => {
         </div>
     )
 }
- Arkansas
 
 export default Avatar
