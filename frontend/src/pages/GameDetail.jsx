@@ -9,6 +9,7 @@ import { invalidateCache } from '../utils/cache'
 import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play } from 'lucide-react'
 import AddGameModal from '../components/library/AddGameModal'
 import Skeleton from '../components/ui/Skeleton'
+import Avatar from '../components/ui/Avatar'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
 // ── Single comment + replies ──
@@ -208,15 +209,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-2">
                         <Link to={profilePath || '#'} className={`flex-shrink-0 ${!profilePath && 'pointer-events-none'}`}>
-                            {comment.userId?.avatar ? (
-                                <img src={comment.userId.avatar} alt={username} className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a35]" />
-                            ) : (
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black
-                                                ${isOwn ? 'bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] text-black' : 'bg-[#2a2a35] text-white'}`}
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                    {username?.charAt(0).toUpperCase() || '?'}
-                                </div>
-                            )}
+                            <Avatar user={comment.userId} size="w-7 h-7 text-[10px]" />
                         </Link>
                         <Link to={profilePath || '#'} className={`font-bold text-xs hover:underline ${isOwn ? 'text-[#c8ff57]' : 'text-white'} ${!profilePath && 'pointer-events-none'}`}>
                             {username || 'User'}
