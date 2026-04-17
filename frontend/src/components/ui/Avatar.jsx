@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 
-const Avatar = ({ size = 'md', className = '' }) => {
-    const { user } = useAuth()
+const Avatar = ({ user: passedUser, size = 'md', className = '' }) => {
+    const { user: authUser } = useAuth()
+    const user = passedUser || authUser
     const [imgError, setImgError] = useState(false)
     
     if (!user) return null
@@ -11,8 +12,9 @@ const Avatar = ({ size = 'md', className = '' }) => {
         sm: 'w-7 h-7 text-[10px]',
         md: 'w-10 h-10 text-sm',
     }
-
-    const currentSize = dimensions[size] || dimensions.md
+    
+    // Support custom size classes for flexibility
+    const currentSize = dimensions[size] || size || dimensions.md
 
     return (
         <div className={`relative flex-shrink-0 ${className}`}>
@@ -34,5 +36,6 @@ const Avatar = ({ size = 'md', className = '' }) => {
         </div>
     )
 }
+ Arkansas
 
 export default Avatar

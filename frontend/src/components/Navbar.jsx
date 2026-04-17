@@ -245,13 +245,7 @@ function Navbar() {
                         user ? (
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-3 py-2">
-                                    {user.avatar ? (
-                                        <img src={user.avatar} alt={user.username} className="w-9 h-9 rounded-full object-cover ring-2 ring-[#2a2a35]" />
-                                    ) : (
-                                        <div className="w-9 h-9 rounded-full bg-[#c8ff57]/15 border-2 border-[#2a2a35] flex items-center justify-center font-black text-[#c8ff57] uppercase text-xs">
-                                            {user.username?.[0] || '?'}
-                                        </div>
-                                    )}
+                                    <Avatar size="w-9 h-9 text-xs" />
                                     <div>
                                         <div className="text-white font-bold text-sm tracking-tight">{user.username}</div>
                                         <div className="flex items-center gap-2 mt-0.5">
