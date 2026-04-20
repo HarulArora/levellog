@@ -188,7 +188,7 @@ function Profile() {
     const theme = rankThemes[rank]
 
     return (
-        <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10">
+        <div className="w-full max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10 min-h-[80vh]">
             <Helmet>
                 <title>{user.username}'s Profile | QuestDuck</title>
                 <meta name="description" content={`Check out ${user.username}'s gaming library, stats, and lists on QuestDuck.`} />
