@@ -104,7 +104,7 @@ function App() {
         <BrowserRouter>
             <ScrollToTop />
             <NavigationProgress />
-            <div className="bg-[#0a0a0f] min-h-screen">
+            <div className="bg-[#0a0a0f] min-h-screen flex flex-col">
                 <Suspense fallback={<PageLoader />}>
                     <Routes>
                         <Route path="/login" element={<Login />} />
@@ -114,7 +114,7 @@ function App() {
                         <Route path="/reset-password" element={<ResetPassword />} />
                         
                         {/* Main Layout Routes */}
-                        <Route element={<><Navbar /><div className="content-wrapper"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></div><Footer /></>}>
+                        <Route element={<><Navbar /><main className="flex-1 flex flex-col"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></main><Footer /></>}>
                             <Route path="/" element={<Home />} />
                             <Route path="/library" element={<Library />} />
                             <Route path="/lists" element={<Lists />} />

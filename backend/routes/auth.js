@@ -927,10 +927,14 @@ router.get('/suggestions', protect, async (req, res) => {
         const excludeIds = [req.user._id, ...myFollowingIds]
 
         // Find users strictly followed by my following (mutual context)
+        // 🚀 OPTIMIZATION: Limit scan to 1000 relationships to keep it snappy
         const mutualFollows = await Follow.find({
             followerId: { $in: myFollowingIds },
             followingId: { $nin: excludeIds }
-        }).lean()
+        })
+        .limit(1000)
+        .sort({ createdAt: -1 })
+        .lean()
 
         const mutualCounts = {}
         mutualFollows.forEach(f => {
