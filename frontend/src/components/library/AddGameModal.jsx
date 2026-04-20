@@ -1,9 +1,10 @@
 import { useState } from 'react'
-
+import { useSound } from '../../context/SoundContext'
 import GameSearch from './GameSearch'
 
 
 function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = null, games = [] }) {
+    const { playSound } = useSound()
 
 
     const [formData, setFormData] = useState({
@@ -80,7 +81,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
 
     const handleGameSelect = (game) => {
-
+        playSound('pop', 0.2)
         // Check if this game is already in the user's library
         const alreadyLogged = games.find(g => {
             const searchId = Number(game.igdbId)
@@ -91,69 +92,41 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
         })
 
         const mappedPlatforms = game.platforms
-
             .map(p => {
-
                 if (p.includes('PC')) return 'PC'
-
                 if (p.includes('PlayStation')) return 'PS'
-
                 if (p.includes('Xbox')) return 'Xbox'
-
                 if (p.includes('Nintendo Switch')) return 'Switch'
-
                 if (p.includes('Mac')) return 'Mac'
-
                 return null
-
             })
-
             .filter(Boolean)
-
             .filter((v, i, a) => a.indexOf(v) === i)
 
         setFormData(prev => ({
-
             ...prev,
-
             title: game.title,
-
             genre: game.genres[0] || '',
-
             cover: game.cover || '',
-
             summary: game.summary || '',
-
             igdbId: game.igdbId || '',
-
-            // If already logged, pre-fill user's saved data; otherwise use IGDB platforms
             platforms: alreadyLogged ? alreadyLogged.platforms : mappedPlatforms,
-
             status: alreadyLogged ? alreadyLogged.status : 'playing',
-
             rating: alreadyLogged ? alreadyLogged.rating : 0,
-
             hours: alreadyLogged ? alreadyLogged.hours : '',
-
         }))
-
         setGameSelected(true)
-
     }
 
-
     const handleSubmit = async () => {
-
         if (!formData.title.trim()) return
-
         setSubmitting(true)
-
         const result = await onAdd(formData)
-
         setSubmitting(false)
-
-        if (result.success) onClose()
-
+        if (result.success) {
+            playSound('levelUp', 0.5)
+            onClose()
+        }
     }
 
 

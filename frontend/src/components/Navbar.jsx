@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import useNotifications from '../hooks/useNotifications'
-import { Bell, User, Search, LogOut, ChevronDown, UserSearch, Tags, ListChecks, Flame } from 'lucide-react'
+import { Bell, User, Search, LogOut, ChevronDown, UserSearch, Tags, ListChecks, Flame, Volume2, VolumeX } from 'lucide-react'
 import { useDeals } from '../context/DealsContext'
+import { useSound } from '../context/SoundContext'
 import Avatar from './ui/Avatar'
 
 
@@ -12,6 +13,7 @@ function Navbar() {
     const navigate = useNavigate()
     const { user, logout, loading } = useAuth()
     const { unreadCount, setUnreadCount } = useNotifications()
+    const { isMuted, toggleMute, playSound } = useSound()
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const { newDealsCount, clearNewDealsCount } = useDeals()
@@ -94,7 +96,11 @@ function Navbar() {
                             <li key={link.path} className="relative">
                                 <Link
                                     to={link.path}
-                                    onClick={isDeals ? handleDealsClick : handleLinkClick}
+                                    onMouseEnter={() => playSound('pop', 0.1)}
+                                    onClick={() => {
+                                        playSound('click', 0.2);
+                                        isDeals ? handleDealsClick() : handleLinkClick();
+                                    }}
                                     className={`text-xs font-semibold tracking-widest uppercase transition-colors
                                                ${isActive ? 'text-[#c8ff57]' : 'text-[#7a7a90] hover:text-[#c8ff57]'}`}
                                 >
@@ -113,6 +119,19 @@ function Navbar() {
 
                 {/* Desktop right */}
                 <div className="hidden md:flex gap-3 items-center min-w-[120px] justify-end">
+                    {/* Audio Toggle */}
+                    <button 
+                        onClick={() => { toggleMute(); if (isMuted) playSound('quack', 0.3); }} 
+                        onMouseEnter={() => playSound('pop', 0.1)}
+                        className="p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group mr-1"
+                        title={isMuted ? "Unmute sounds" : "Mute sounds"}
+                    >
+                        {isMuted ? (
+                            <VolumeX size={18} className="text-[#ff5c5c] opacity-60" />
+                        ) : (
+                            <Volume2 size={18} className="text-[#a0a0b8] group-hover:text-[#c8ff57]" />
+                        )}
+                    </button>
                     {!loading && (
                         user ? (
                             <>
