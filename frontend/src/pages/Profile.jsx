@@ -269,30 +269,32 @@ function Profile() {
                             })}
                         </p>
 
-                        {/* ── Followers / Following counts — now uses followerCount/followingCount ── */}
+                        {/* ── Followers / Following counts ── */}
                         <div className="flex gap-4 mt-3 justify-center sm:justify-start">
                             <button
-                                onClick={() => setFollowModal('followers')}
-                                className="text-left hover:opacity-70 transition-opacity"
+                                onClick={() => canSeeGames ? setFollowModal('followers') : null}
+                                className={`text-left transition-all ${canSeeGames ? 'hover:opacity-70 cursor-pointer' : 'cursor-default group'}`}
                             >
                                 <span className="font-black text-lg text-white"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                     {user.followerCount ?? 0}
                                 </span>
-                                <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider ml-1">
+                                <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider ml-1 inline-flex items-center gap-1">
                                     Followers
+                                    {!canSeeGames && <Lock size={10} className="text-[#3a3a4a] group-hover:text-[#ff5c5c] transition-colors" />}
                                 </span>
                             </button>
                             <button
-                                onClick={() => setFollowModal('following')}
-                                className="text-left hover:opacity-70 transition-opacity"
+                                onClick={() => canSeeGames ? setFollowModal('following') : null}
+                                className={`text-left transition-all ${canSeeGames ? 'hover:opacity-70 cursor-pointer' : 'cursor-default group'}`}
                             >
                                 <span className="font-black text-lg text-white"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                     {user.followingCount ?? 0}
                                 </span>
-                                <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider ml-1">
+                                <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider ml-1 inline-flex items-center gap-1">
                                     Following
+                                    {!canSeeGames && <Lock size={10} className="text-[#3a3a4a] group-hover:text-[#ff5c5c] transition-colors" />}
                                 </span>
                             </button>
                         </div>

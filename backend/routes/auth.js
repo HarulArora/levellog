@@ -858,6 +858,40 @@ router.get('/search', async (req, res) => {
 // ── GET /api/auth/followers/:userId ──────────────────────────────────────────
 router.get('/followers/:userId', async (req, res) => {
     try {
+        const targetUser = await User.findById(req.params.userId).select('isPrivate').lean()
+        if (!targetUser) return res.status(404).json({ success: false, message: 'User not found' })
+
+        // 🛡️ Privacy Wall
+        if (targetUser.isPrivate) {
+            let isAuthorized = false
+            const authHeader = req.headers.authorization
+            
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                try {
+                    const token = authHeader.split(' ')[1]
+                    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+                    const requesterId = decoded.id
+
+                    if (requesterId === req.params.userId) {
+                        isAuthorized = true // Owner
+                    } else {
+                        const isFollowing = await Follow.findOne({ followerId: requesterId, followingId: req.params.userId }).lean()
+                        if (isFollowing) isAuthorized = true // Approved Follower
+                    }
+                } catch (err) {
+                    // Invalid token, treat as guest
+                }
+            }
+
+            if (!isAuthorized) {
+                return res.status(403).json({ 
+                    success: false, 
+                    message: 'This profile is private. Follow them to see their followers.',
+                    isRestricted: true 
+                })
+            }
+        }
+
         const follows = await Follow.find({ followingId: req.params.userId })
             .populate('followerId', 'username avatar bio isPrivate followerCount badge level')
             .lean()
@@ -870,6 +904,40 @@ router.get('/followers/:userId', async (req, res) => {
 // ── GET /api/auth/following/:userId ──────────────────────────────────────────
 router.get('/following/:userId', async (req, res) => {
     try {
+        const targetUser = await User.findById(req.params.userId).select('isPrivate').lean()
+        if (!targetUser) return res.status(404).json({ success: false, message: 'User not found' })
+
+        // 🛡️ Privacy Wall
+        if (targetUser.isPrivate) {
+            let isAuthorized = false
+            const authHeader = req.headers.authorization
+            
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                try {
+                    const token = authHeader.split(' ')[1]
+                    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+                    const requesterId = decoded.id
+
+                    if (requesterId === req.params.userId) {
+                        isAuthorized = true // Owner
+                    } else {
+                        const isFollowing = await Follow.findOne({ followerId: requesterId, followingId: req.params.userId }).lean()
+                        if (isFollowing) isAuthorized = true // Approved Follower
+                    }
+                } catch (err) {
+                    // Invalid token, treat as guest
+                }
+            }
+
+            if (!isAuthorized) {
+                return res.status(403).json({ 
+                    success: false, 
+                    message: 'This profile is private. Follow them to see who they follow.',
+                    isRestricted: true 
+                })
+            }
+        }
+
         const follows = await Follow.find({ followerId: req.params.userId })
             .populate('followingId', 'username avatar bio isPrivate followerCount badge level')
             .lean()

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import { Lock } from 'lucide-react'
 import api from '../../api/axios'
 
 const PAGE_SIZE = 10
@@ -10,14 +11,21 @@ function FollowListModal({ userId, type, onClose }) {
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [page, setPage] = useState(1)
+    const [error, setError] = useState(null)
 
     useEffect(() => {
         const fetchList = async () => {
+            setError(null)
             try {
                 const res = await api.get(`/auth/${type}/${userId}`)
                 setUsers(res.data.users)
             } catch (err) {
                 console.error('Follow list error:', err)
+                if (err.response?.status === 403) {
+                    setError(err.response.data.message || 'This list is private.')
+                } else {
+                    setError('Failed to load list. Please try again.')
+                }
             } finally {
                 setLoading(false)
             }
@@ -112,6 +120,21 @@ function FollowListModal({ userId, type, onClose }) {
                     {loading ? (
                         <div className="text-center py-8 text-[#7a7a90] font-mono text-sm">
                             Loading...
+                        </div>
+                    ) : error ? (
+                        <div className="flex flex-col items-center justify-center py-12 px-6 text-center gap-4 animate-in fade-in duration-500">
+                            <div className="w-16 h-16 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center border border-[#ff5c5c]/20">
+                                <Lock size={28} className="text-[#ff5c5c]" strokeWidth={1.5} />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="text-white font-black text-lg tracking-widest uppercase"
+                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                    Access Restricted
+                                </div>
+                                <div className="text-[#7a7a90] font-mono text-[11px] leading-relaxed">
+                                    {error}
+                                </div>
+                            </div>
                         </div>
                     ) : users.length === 0 ? (
                         <div className="text-center py-8">
