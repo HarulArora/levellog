@@ -72,7 +72,7 @@ function Footer() {
                                 <a href="https://twitter.com/questduck69" target="_blank" rel="noopener noreferrer" className="social-btn" aria-label="Twitter">
                                     <TwitterIcon />
                                 </a>
-                                <a href="mailto:questducksupport@gmail.com" className="social-btn" aria-label="Email">
+                                <a href="mailto:questduck69@gmail.com" className="social-btn" aria-label="Email">
                                     <MailIcon />
                                 </a>
                             </div>

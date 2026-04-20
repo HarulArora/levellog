@@ -43,6 +43,8 @@ if (process.env.SENTRY_DSN) {
 app.use(cors({
     origin: [
         'http://localhost:5173',
+        'https://questduck.com',
+        'https://www.questduck.com',
         'https://questduck.onrender.com',
         'https://levellog-b3tf.onrender.com',
         process.env.CLIENT_URL?.replace(/\/$/, '')
@@ -75,7 +77,7 @@ app.use(helmet({
         directives: {
             "default-src": ["'self'"],
             "script-src": ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
-            "connect-src": ["'self'", "https://*.onrender.com", "https://*.googleapis.com"],
+            "connect-src": ["'self'", "https://questduck.com", "https://*.onrender.com", "https://*.googleapis.com"],
             "img-src": ["'self'", "data:", "https://images.igdb.com", "https://www.cheapshark.com", "https://*.googleusercontent.com"],
             "frame-src": ["'self'", "https://accounts.google.com"],
             "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
@@ -83,6 +85,7 @@ app.use(helmet({
         },
     }
 }))
+
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
