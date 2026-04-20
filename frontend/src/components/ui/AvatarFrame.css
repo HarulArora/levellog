@@ -1,0 +1,70 @@
+.avatar-frame-container {
+    position: relative;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.avatar-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-cover: cover;
+    border: 2px solid #2a2a35;
+    position: relative;
+    z-index: 2;
+}
+
+/* Rank 1 Specific Glow */
+.is-top-10 .avatar-image {
+    border-color: rgba(200, 255, 87, 0.5);
+}
+
+.king-glow {
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 215, 0, 0.4) 0%, transparent 70%);
+    animation: kingPulse 3s infinite ease-in-out;
+    z-index: 1;
+}
+
+@keyframes kingPulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.1); opacity: 0.6; }
+}
+
+/* Crown Styles */
+.rank-crown {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    z-index: 10;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    animation: crownFloat 3s infinite ease-in-out;
+}
+
+@keyframes crownFloat {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(-3px); }
+}
+
+/* Badge for Ranks 5-10 */
+.rank-badge {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    background: #c8ff57;
+    color: #000;
+    font-size: 8px;
+    font-weight: 900;
+    padding: 1px 4px;
+    border-radius: 4px;
+    z-index: 10;
+    border: 1px solid #000;
+    font-family: 'DM Mono', monospace;
+}

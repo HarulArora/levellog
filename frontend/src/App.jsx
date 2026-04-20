@@ -4,6 +4,7 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
+import Leaderboard from './pages/Leaderboard'
 import ScrollToTop from './components/ScrollToTop'
 
 const Home = lazy(() => import('./pages/Home'))
@@ -126,6 +127,7 @@ function App() {
                             <Route path="/edit-profile" element={<EditProfile />} />
                             <Route path="/discover" element={<Discover />} />
                             <Route path="/deals" element={<Deals />} />
+                            <Route path="/leaderboard" element={<Leaderboard />} />
                             <Route path="/privacy" element={<PrivacyPolicy />} />
                             <Route path="/terms" element={<TermsOfService />} />
                         </Route>

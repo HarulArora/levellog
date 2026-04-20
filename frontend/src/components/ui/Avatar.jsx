@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import AvatarFrame from './AvatarFrame'
 
 const Avatar = ({ user: passedUser, size = 'md', className = '' }) => {
     const { user: authUser } = useAuth()
@@ -16,24 +17,15 @@ const Avatar = ({ user: passedUser, size = 'md', className = '' }) => {
     // Support custom size classes for flexibility
     const currentSize = dimensions[size] || size || dimensions.md
 
+    const pixelSize = size === 'sm' ? 28 : size === 'md' ? 40 : parseInt(size) || 40
+
     return (
-        <div className={`relative flex-shrink-0 ${className}`}>
-            {user.avatar && !imgError ? (
-                <img 
-                    src={user.avatar} 
-                    alt={user.username} 
-                    onError={() => setImgError(true)}
-                    className={`${currentSize} rounded-full object-cover ring-2 ring-[#2a2a35]`} 
-                />
-            ) : (
-                <div 
-                    className={`${currentSize} rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] flex items-center justify-center font-black text-black uppercase`}
-                    style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-                >
-                    {user.username?.[0] || '?'}
-                </div>
-            )}
-        </div>
+        <AvatarFrame 
+            userId={user._id} 
+            src={imgError ? null : user.avatar} 
+            size={pixelSize} 
+            className={className} 
+        />
     )
 }
 
