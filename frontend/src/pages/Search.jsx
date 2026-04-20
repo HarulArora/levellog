@@ -22,12 +22,18 @@ const RANK_TITLES = {
 }
 
 function Search() {
-    const { user: currentUser } = useAuth()
+    const { user: currentUser, loading: authLoading } = useAuth()
     const navigate = useNavigate()
     const [query, setQuery] = useState('')
     const [debouncedQuery, setDebouncedQuery] = useState('')
     const { getFollowStatus, handleFollowToggle, loadingMap } = useFollow()
     const { topUsers } = useLeaderboard()
+
+    useEffect(() => {
+        if (!authLoading && !currentUser) {
+            navigate('/login?redirect=/search')
+        }
+    }, [currentUser, authLoading, navigate])
 
     useEffect(() => {
         const timer = setTimeout(() => {
