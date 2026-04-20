@@ -109,7 +109,7 @@ function Library() {
     }, [])
 
     return (
-        <div className="max-w-[1200px] mx-auto px-4 md:px-10 py-8 md:py-10">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-10 py-8 md:py-10 min-h-[70vh]">
 
             {/* ── Page Header ── */}
             <div className="mb-3 pb-4 border-b border-[#2a2a35]">
