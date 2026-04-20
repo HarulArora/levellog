@@ -180,7 +180,7 @@ function Notifications() {
                         <span className="text-white font-semibold">{n.meta.gameTitle}</span>
                     )}
                     {n.meta?.preview && (
-                        <span className="block font-mono text-[10px] text-[#7a7a90] mt-0.5 truncate max-w-[300px]">
+                        <span className="block font-mono text-[10px] text-[#7a7a90] mt-0.5 truncate max-w-[180px] sm:max-w-[350px]">
                             "{n.meta.preview}"
                         </span>
                     )}
@@ -218,7 +218,7 @@ function Notifications() {
     }
 
     return (
-        <div className="max-w-[700px] mx-auto px-5 md:px-10 py-8 md:py-10">
+        <div className="w-full max-w-[700px] mx-auto px-5 md:px-10 py-8 md:py-10">
 
             {/* ── Header ── */}
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#2a2a35]">
@@ -332,9 +332,9 @@ function Notifications() {
                                                 handleMarkOneRead(notif._id)
                                             }
                                         }}
-                                        className={`flex items-center gap-4 px-5 py-4 transition-all no-underline
-                               ${selectMode ? 'cursor-pointer' : link ? 'cursor-pointer' : ''}
-                               ${isSelected
+                                        className={`flex items-start gap-4 px-4 sm:px-5 py-4 transition-all no-underline
+                                ${selectMode ? 'cursor-pointer' : link ? 'cursor-pointer' : ''}
+                                ${isSelected
                                                 ? 'bg-[#c8ff57]/08 border-l-2 border-l-[#c8ff57]'
                                                 : isUnread
                                                     ? 'bg-[#18181f] border-l-2 border-l-[#5c9fff]'

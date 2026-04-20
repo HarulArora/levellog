@@ -114,6 +114,19 @@ router.post('/custom', protect, async (req, res) => {
     }
 })
 
+// ── GET /api/lists/custom/:id/game ── fetch full list with all games ──────────
+router.get('/custom/:id/game', protect, async (req, res) => {
+    try {
+        const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id }).lean()
+        if (!list) return res.status(404).json({ success: false, message: 'List not found' })
+
+        const entries = await GameListEntry.find({ listId: list._id }).sort({ createdAt: -1 }).lean()
+        res.json({ success: true, list: { ...list, games: entries } })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
 // ── PUT /api/lists/custom/:id ──────────────────────────────────────────────────
 router.put('/custom/:id', protect, async (req, res) => {
     try {

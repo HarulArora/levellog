@@ -15,7 +15,7 @@ export default function Leaderboard() {
     const { topUsers, loading } = useLeaderboard()
 
     return (
-        <div className="max-w-[1000px] mx-auto px-5 md:px-10 py-12">
+        <div className="w-full max-w-[1000px] mx-auto px-5 md:px-10 py-12">
             <Helmet>
                 <title>Leaderboard | QuestDuck</title>
                 <meta name="description" content="Check out the top contributors and best gamers of the week on QuestDuck." />
@@ -102,19 +102,19 @@ export default function Leaderboard() {
                         return (
                             <Link to={`/user/${user.username}`} key={user._id} className={`grid grid-cols-[60px_1fr_100px] items-center px-6 py-4 border-b border-[#2a2a35]/50 last:border-0 hover:bg-[#c8ff57]/5 transition-all group ${style.bgColor}`}>
                                 <div className={`font-mono font-black text-xl ${style.textColor}`}>#{user.rank}</div>
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-4 min-w-0">
                                     <AvatarFrame userId={user._id} src={user.avatar} size={42} className="leaderboard-list-avatar" />
-                                    <div>
-                                        <div className="text-white font-bold tracking-tight group-hover:text-[#c8ff57] transition-colors">{user.username}</div>
+                                    <div className="min-w-0">
+                                        <div className="text-white font-bold tracking-tight group-hover:text-[#c8ff57] transition-colors truncate">{user.username}</div>
                                         <div className="text-[#7a7a90] text-[10px] font-medium uppercase tracking-widest flex items-center gap-2">
                                             <span>{user.badge || '🎮'}</span>
                                             <span>Lv.{user.level}</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-white font-mono font-bold">{user.xp.toLocaleString()}</div>
-                                    <div className="text-[#7a7a90] text-[8px] font-black uppercase tracking-widest">XP</div>
+                                <div className="text-right flex flex-col items-end justify-center h-full">
+                                    <div className="text-white font-mono font-bold leading-tight">{user.xp.toLocaleString()}</div>
+                                    <div className="text-[#7a7a90] text-[8px] font-black uppercase tracking-widest leading-none">XP</div>
                                 </div>
                             </Link>
                         )

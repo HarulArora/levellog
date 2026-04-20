@@ -95,8 +95,8 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         setLikes(prev => liked ? prev - 1 : prev + 1)
         if (disliked) setDislikes(prev => prev - 1)
 
-        // Trigger rank burst if it's a new like on a Top 4 user
-        if (!liked && isTop4) {
+        // Trigger burst animation on new like
+        if (!liked) {
             setShowBurst(true)
             setTimeout(() => setShowBurst(false), 800)
         }
@@ -273,7 +273,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                             <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm relative">
                                 {showBurst && (
                                     <div className="rank-like-burst">
-                                        {rank === 1 ? '👑' : rank === 2 ? '🪽' : rank === 3 ? '⭐' : '⚔️'}
+                                        {rank === 1 ? '👑' : rank === 2 ? '🪽' : rank === 3 ? '⭐' : rank === 4 ? '⚔️' : '🐥'}
                                     </div>
                                 )}
                                 <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg transition-all active:scale-95
