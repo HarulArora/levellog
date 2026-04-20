@@ -94,13 +94,12 @@ function ResetPassword() {
                             id="email"
                             name="email"
                             type="email"
+                            readOnly
                             autoComplete="username email"
                             value={formData.email}
-                            onChange={e => handleChange('email', e.target.value)}
                             className="w-full bg-[#18181f] border border-[#2a2a35] rounded
-                                       px-3 py-2 text-sm text-white
-                                       focus:outline-none focus:border-[#c8ff57]
-                                       placeholder:text-[#7a7a90] transition-colors"
+                                       px-3 py-2 text-sm text-white opacity-60 cursor-not-allowed
+                                       focus:outline-none transition-colors"
                         />
                     </div>
 
