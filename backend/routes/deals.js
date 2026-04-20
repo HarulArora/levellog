@@ -1,135 +1,131 @@
 import express from 'express'
-import { LRUCache } from 'lru-cache'
 import axios from 'axios'
-
-import { z } from 'zod'
 import logger from '../utils/logger.js'
 
 const router = express.Router()
 
-const cache = new LRUCache({
-    max: 100, // accommodate different queries
-    ttl: 1000 * 60 * 60, // 60 mins cache (Industry standard for external deals)
-})
+/**
+ * 🚀 QUESTDUCK DEAL-CLOUD ARCHITECTURE
+ * Instead of fetching on-demand, we maintain a massive in-memory cache
+ * of EVERY deal available, refreshed periodically in the background.
+ */
+let GLOBAL_DEAL_CACHE = {
+    all: [],
+    stores: {}, // store-specific sub-caches
+    lastSynced: null,
+    isSyncing: false
+}
 
-// 🚀 Industry Standard: In-flight request tracking to prevent Cache Stampede
-const inFlightRequests = new Map()
+const SYNC_INTERVAL_MS = 60 * 60 * 1000 // Refresh every hour
+const STORES_TO_SYNC = ['1', '25', '7', '11', '15', '3', '21', '6', '8', '13']
 
-// 🚀 Global Pacer: Absolute protection against rate limiting
-let globalLastFetch = 0
-const GLOBAL_PACE_MS = 2000 // Max 1 request every 2 seconds across ALL users
-let isCoolingDown = false
+/**
+ * Background Scraper: Crawls the API for every available deal.
+ * Respects rate limits by using sequential page fetching.
+ */
+async function syncAllDeals() {
+    if (GLOBAL_DEAL_CACHE.isSyncing) return
+    
+    logger.info('🚀 DEAL-SYNC: Starting global market crawl...')
+    GLOBAL_DEAL_CACHE.isSyncing = true
+    
+    const startTime = Date.now()
+    let allDeals = []
+    const storeDeals = {}
 
-const ALL_STORE_IDS = ['1', '7', '11', '15', '3', '25', '35', '21', '6', '8', '13']
+    try {
+        // We fetch the top 10 stores
+        for (const storeID of STORES_TO_SYNC) {
+            let storePage = 0
+            let hasMoreForStore = true
+            storeDeals[storeID] = []
 
-// 🎨 Premium Fallback for "Startup Readiness" - ensures page never looks empty
-const MOCK_FALLBACK_DEALS = [
-    { title: "Elden Ring", salePrice: "35.99", normalPrice: "59.99", savings: "40", thumb: "https://shared.fastly.steamstatic.com/store_apps/1245620/header.jpg", dealID: "mock1" },
-    { title: "Cyberpunk 2077", salePrice: "29.99", normalPrice: "59.99", savings: "50", thumb: "https://shared.fastly.steamstatic.com/store_apps/1091500/header.jpg", dealID: "mock2" },
-    { title: "Hades II", salePrice: "24.99", normalPrice: "29.99", savings: "17", thumb: "https://shared.fastly.steamstatic.com/store_apps/1145350/header.jpg", dealID: "mock3" },
-    { title: "Stardew Valley", salePrice: "8.99", normalPrice: "14.99", savings: "40", thumb: "https://shared.fastly.steamstatic.com/store_apps/413150/header.jpg", dealID: "mock4" },
-    { title: "Baldur's Gate 3", salePrice: "53.99", normalPrice: "59.99", savings: "10", thumb: "https://shared.fastly.steamstatic.com/store_apps/1086940/header.jpg", dealID: "mock5" },
-    { title: "The Witcher 3: Wild Hunt", salePrice: "9.99", normalPrice: "39.99", savings: "75", thumb: "https://shared.fastly.steamstatic.com/store_apps/292030/header.jpg", dealID: "mock6" }
-]
+            // Scrape up to 5 pages per store (300 deals per store)
+            // This gives us a massive pool of ~3,000 deals
+            while (hasMoreForStore && storePage < 5) {
+                try {
+                    const url = `https://www.cheapshark.com/api/1.0/deals?storeID=${storeID}&onSale=1&pageSize=60&pageNumber=${storePage}`
+                    const r = await axios.get(url, { timeout: 10000 })
+                    const pageData = r.data || []
+                    
+                    if (pageData.length === 0) {
+                        hasMoreForStore = false
+                    } else {
+                        storeDeals[storeID].push(...pageData)
+                        allDeals.push(...pageData)
+                        storePage++
+                        // Tiny delay to respect API rate limits
+                        await new Promise(res => setTimeout(res, 300))
+                    }
+                } catch (e) {
+                    logger.error(`DEAL-SYNC: Error fetching store ${storeID} page ${storePage}: ${e.message}`)
+                    hasMoreForStore = false
+                }
+            }
+        }
 
-const dealsQuerySchema = z.object({
-    storeFilter: z.string().optional().default('all'),
-    freeOnly: z.enum(['true', 'false']).optional().default('false')
-})
+        // 🛠️ Post-Processing: Deduplicate and Clean
+        const seen = new Set()
+        const uniqueAll = allDeals.filter(d => {
+            if (!d?.dealID || seen.has(d.dealID)) return false
+            seen.add(d.dealID)
+            return true
+        })
+
+        // Sort by highest savings globally
+        uniqueAll.sort((a, b) => parseFloat(b.savings) - parseFloat(a.savings))
+
+        const cleanedAll = uniqueAll.filter(d => {
+            const sale = parseFloat(d.salePrice)
+            const normal = parseFloat(d.normalPrice)
+            const pct = Math.trunc(parseFloat(d.savings))
+            return sale === 0 || (pct > 0 && normal > sale)
+        })
+
+        // Update the global cache
+        GLOBAL_DEAL_CACHE.all = cleanedAll
+        GLOBAL_DEAL_CACHE.stores = storeDeals
+        GLOBAL_DEAL_CACHE.lastSynced = new Date()
+        
+        logger.info(`✅ DEAL-SYNC: Success. Synced ${cleanedAll.length} total deals in ${Math.round((Date.now() - startTime)/1000)}s`)
+    } catch (err) {
+        logger.error('DEAL-SYNC: Critical failure:', err)
+    } finally {
+        GLOBAL_DEAL_CACHE.isSyncing = false
+    }
+}
+
+// 🚦 Start first sync on boot
+syncAllDeals()
+// 🔄 Schedule periodic sync
+setInterval(syncAllDeals, SYNC_INTERVAL_MS)
 
 router.get('/', async (req, res) => {
-    try {
-        const validated = dealsQuerySchema.parse(req.query)
-        const { storeFilter, freeOnly } = validated
-        const isFree = freeOnly === 'true'
-        
-        const cacheKey = `${storeFilter}-${isFree}`
-        
-        // 1. Check persistent cache
-        if (cache.has(cacheKey)) {
-            return res.json({ success: true, deals: cache.get(cacheKey) })
-        }
+    const { storeFilter, freeOnly } = req.query
+    const isFree = freeOnly === 'true'
 
-        // 2. Check for identical request already in progress
-        if (inFlightRequests.has(cacheKey)) {
-            const data = await inFlightRequests.get(cacheKey)
-            return res.json({ success: true, deals: data })
-        }
-
-        // 3. Define the fetcher with a promise tracker
-        const performFetch = async () => {
-            if (isCoolingDown) {
-                logger.warn('Deals API is cooling down. Serving fallback.')
-                return MOCK_FALLBACK_DEALS
-            }
-
-            // Global Pacing
-            const now = Date.now()
-            const timeSinceLast = now - globalLastFetch
-            if (timeSinceLast < GLOBAL_PACE_MS) {
-                await new Promise(r => setTimeout(r, GLOBAL_PACE_MS - timeSinceLast))
-            }
-            globalLastFetch = Date.now()
-
-            const stores = storeFilter === 'all' ? '' : storeFilter
-            
-            // Minimalist URL - avoiding all non-essential params
-            const p = new URLSearchParams()
-            p.append('onSale', '1')
-            if (stores) p.append('storeID', stores)
-            if (isFree) p.append('upperPrice', '0')
-            
-            const url = `https://www.cheapshark.com/api/1.0/deals?${p.toString()}`
-
-            try {
-                const r = await axios.get(url, { headers: { 'User-Agent': 'QuestDuck/1.4', 'Accept': 'application/json' } })
-                const data = r.data || []
-                
-                // Success - keep coolingDown false
-                isCoolingDown = false 
-                
-                const seen = new Set()
-                const unique = data.filter(d => {
-                    if (!d?.dealID || seen.has(d.dealID)) return false
-                    seen.add(d.dealID)
-                    return true
-                })
-
-                unique.sort((a, b) => parseFloat(b.savings) - parseFloat(a.savings))
-
-                const cleaned = unique.filter(d => {
-                    const sale = parseFloat(d.salePrice)
-                    const normal = parseFloat(d.normalPrice)
-                    const pct = Math.trunc(parseFloat(d.savings))
-                    return sale === 0 || (pct > 0 && normal > sale)
-                })
-
-                cache.set(cacheKey, cleaned)
-                return cleaned
-            } catch (e) {
-                if (e.response?.status === 429) {
-                    logger.error('CRITICAL: 429 DETECTED. ENTERING 5-MIN COOL DOWN.')
-                    isCoolingDown = true
-                    setTimeout(() => { isCoolingDown = false }, 5 * 60 * 1000)
-                }
-                logger.error(`CheapShark Fetch Err: ${e.message}`, { url })
-                return MOCK_FALLBACK_DEALS
-            }
-        }
-
-        // 4. Start the fetch and track it
-        const fetchPromise = performFetch()
-        inFlightRequests.set(cacheKey, fetchPromise)
-        
-        const finalData = await fetchPromise
-        inFlightRequests.delete(cacheKey) // Cleanup after done
-        
-        res.json({ success: true, deals: finalData })
-
-    } catch (err) {
-        logger.error('Deals Route Exception:', err)
-        res.status(500).json({ success: false, message: 'Failed to fetch deals' })
+    // ⚡ ZERO LATENCY: Serve directly from memory
+    let results = []
+    
+    if (storeFilter && storeFilter !== 'all') {
+        const storeId = String(storeFilter)
+        results = GLOBAL_DEAL_CACHE.stores[storeId] || []
+    } else {
+        results = GLOBAL_DEAL_CACHE.all
     }
+
+    // Filter free if requested
+    if (isFree) {
+        results = results.filter(d => parseFloat(d.salePrice) === 0)
+    }
+
+    res.json({ 
+        success: true, 
+        deals: results,
+        total: results.length,
+        lastUpdated: GLOBAL_DEAL_CACHE.lastSynced,
+        isSyncing: GLOBAL_DEAL_CACHE.isSyncing
+    })
 })
 
 export default router
