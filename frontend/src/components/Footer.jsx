@@ -41,7 +41,7 @@ function Footer() {
                             </div>
                         </Link>
                         <p className="brand-description">
-                            The ultimate companion for your gaming journey. Track your progress, discover new worlds, and connect with fellow hunters.
+                            QuestDuck is the ultimate gaming log and tracker platform. Rate games, maintain your personal gaming diary, follow friends' activities, and discover the best deals across the digital pond.
                         </p>
                     </div>
 
