@@ -132,14 +132,14 @@ const HeroBanner = memo(({ games }) => {
             <div className="absolute top-0 left-0 right-0 h-[55%] flex items-end gap-3 pb-2">
                 <div className="flex gap-3 items-end will-change-transform" style={{ animation: `mosaicLeft ${isMobile ? '25s' : '40s'} linear infinite`, width: 'max-content' }}>
                     {[...row1Tiles, ...row1Tiles].map((tile, i) => (
-                        <img key={i} src={getIGDBImage(tile.img, SIZES.COVER_BIG)} alt="" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
+                        <img key={i} src={getIGDBImage(tile.img, SIZES.COVER_BIG)} alt="Game Cover Mosaic" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
                     ))}
                 </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-[55%] flex items-start gap-3 pt-2">
                 <div className="flex gap-3 items-start will-change-transform" style={{ animation: `mosaicRight ${isMobile ? '20s' : '32s'} linear infinite`, width: 'max-content' }}>
                     {[...row2Tiles, ...row2Tiles].map((tile, i) => (
-                        <img key={i} src={getIGDBImage(tile.img, SIZES.COVER_BIG)} alt="" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
+                        <img key={i} src={getIGDBImage(tile.img, SIZES.COVER_BIG)} alt="Trending Game Collection" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
                     ))}
                 </div>
             </div>
@@ -467,6 +467,7 @@ function Home() {
                                 className="font-black uppercase leading-none tracking-wide text-white mb-6"
                                 style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                             >
+                                <span className="block text-sm font-mono text-[#c8ff57] mb-2 tracking-[0.3em]">QuestDuck: The Ultimate Game Tracker</span>
                                 Your Quest<br />
                                 <span className="text-[#c8ff57]">Pond.</span>
                             </h1>
