@@ -92,7 +92,7 @@ function Pagination({ currentPage, total, onPageChange }) {
 
 function GameGrid({ games, onRemove, removeLabel = '✕', navigate }) {
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
             {games.map(game => (
                 <div key={game.igdbId ?? game._id} className="relative group">
                     <div
@@ -614,7 +614,7 @@ function Lists() {
     ]
 
     return (
-        <div className="max-w-[900px] mx-auto px-5 md:px-10 py-8 md:py-10">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 md:px-10 py-8 md:py-10">
 
             {/* Toast */}
             {toast && (
@@ -657,7 +657,7 @@ function Lists() {
 
                     {/* ══ MY LISTS ══ */}
                     {activeTab === 'lists' && (
-                        <div className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Built-ins */}
                             {[
                                 { id: 'liked', icon: '❤️', bg: 'bg-[#ff5c5c]/15', label: 'Liked Games', count: likesCount },
@@ -720,7 +720,7 @@ function Lists() {
                             {/* Create CTA */}
                             {canCreateList ? (
                                 atListLimit ? (
-                                    <div className="w-full py-4 border border-dashed border-[#2a2a35] rounded-lg flex flex-col items-center gap-2 p-5">
+                                    <div className="w-full py-4 border border-dashed border-[#2a2a35] rounded-lg flex flex-col items-center gap-2 p-5 md:col-span-2">
                                         <div className="text-2xl">📋</div>
                                         <div className="text-white font-semibold text-sm">List limit reached</div>
                                         <div className="font-mono text-[10px] text-[#7a7a90] text-center">
@@ -731,12 +731,12 @@ function Lists() {
                                     <button onClick={() => setShowCreateModal(true)}
                                         className="w-full py-4 border border-dashed border-[#c8ff57]/40 text-[#c8ff57]
                                                    font-mono text-xs rounded-lg hover:border-[#c8ff57] hover:bg-[#c8ff57]/05
-                                                   transition-all flex items-center justify-center gap-2">
+                                                   transition-all flex items-center justify-center gap-2 md:col-span-2">
                                         <span className="text-lg">+</span> Create Custom List ({customLists.length}/{MAX_CUSTOM_LISTS})
                                     </button>
                                 )
                             ) : (
-                                <div className="w-full py-5 border border-dashed border-[#2a2a35] rounded-lg flex flex-col items-center gap-2 p-5">
+                                <div className="w-full py-5 border border-dashed border-[#2a2a35] rounded-lg flex flex-col items-center gap-2 p-5 md:col-span-2">
                                     <div className="text-2xl">🔒</div>
                                     <div className="text-white font-semibold text-sm">Custom List Locked</div>
                                     <div className="font-mono text-[10px] text-[#7a7a90] text-center max-w-xs">
