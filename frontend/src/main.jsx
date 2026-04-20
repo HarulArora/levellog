@@ -10,6 +10,7 @@ import { GoogleOAuthProvider } from '@react-oauth/google'
 import { GamesProvider } from './context/GamesContext.jsx'
 import { DealsProvider } from './context/DealsContext.jsx'
 import { FollowProvider } from './context/FollowContext.jsx'
+import { LeaderboardProvider } from './context/LeaderboardContext.jsx'
 
 if (import.meta.env.VITE_SENTRY_DSN) {
     Sentry.init({
@@ -35,7 +36,9 @@ createRoot(document.getElementById('root')).render(
                         <GamesProvider>
                             <DealsProvider>
                                 <FollowProvider>
-                                    <App />
+                                    <LeaderboardProvider>
+                                        <App />
+                                    </LeaderboardProvider>
                                 </FollowProvider>
                             </DealsProvider>
                         </GamesProvider>
@@ -46,7 +49,9 @@ createRoot(document.getElementById('root')).render(
                     <GamesProvider>
                         <DealsProvider>
                             <FollowProvider>
-                                <App />
+                                <LeaderboardProvider>
+                                    <App />
+                                </LeaderboardProvider>
                             </FollowProvider>
                         </DealsProvider>
                     </GamesProvider>

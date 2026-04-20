@@ -17,6 +17,7 @@ import notificationsRouter from './routes/notifications.js'
 import listsRouter from './routes/lists.js'
 import commentsRouter from './routes/comments.js'
 import dealsRouter from './routes/deals.js'
+import leaderboardRouter from './routes/leaderboard.js'
 import { initCronJobs } from './tasks/igdbSync.js'
 
 dotenv.config()
@@ -105,6 +106,7 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/lists', listsRouter)
 app.use('/api/comments', commentsRouter)
 app.use('/api/deals', dealsRouter)
+app.use('/api/leaderboard', leaderboardRouter)
 
 app.get('/', (req, res) => res.json({ 
     success: true, 

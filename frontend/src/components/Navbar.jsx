@@ -23,6 +23,7 @@ function Navbar() {
         { name: 'DEALS🔥', path: '/deals' },
         { name: 'LIBRARY', path: '/library' },
         { name: 'LISTS', path: '/lists' },
+        { name: 'LEADERBOARD', path: '/leaderboard' },
     ]
 
     // Listen for new deals from Deals page
