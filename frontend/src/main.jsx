@@ -11,7 +11,6 @@ import { GamesProvider } from './context/GamesContext.jsx'
 import { DealsProvider } from './context/DealsContext.jsx'
 import { FollowProvider } from './context/FollowContext.jsx'
 import { LeaderboardProvider } from './context/LeaderboardContext.jsx'
-import { SoundProvider } from './context/SoundContext.jsx'
 
 if (import.meta.env.VITE_SENTRY_DSN) {
     Sentry.init({
@@ -38,9 +37,7 @@ createRoot(document.getElementById('root')).render(
                             <DealsProvider>
                                 <FollowProvider>
                                     <LeaderboardProvider>
-                                        <SoundProvider>
-                                            <App />
-                                        </SoundProvider>
+                                        <App />
                                     </LeaderboardProvider>
                                 </FollowProvider>
                             </DealsProvider>
