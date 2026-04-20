@@ -75,7 +75,7 @@ function Search() {
     const loading = loadingSearch || isWaitingForDebounce || isAwaitingResults
 
     return (
-        <div className="w-full max-w-[800px] mx-auto px-5 md:px-10 py-8 md:py-10">
+        <div className="w-full max-w-[800px] mx-auto px-5 md:px-10 py-8 md:py-10 min-h-[70vh]">
 
             {/* Header */}
             <div className="flex items-baseline gap-4 mb-6 pb-4 border-b border-[#2a2a35]">
