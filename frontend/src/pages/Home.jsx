@@ -11,6 +11,7 @@ import AvatarFrame from '../components/ui/AvatarFrame'
 import { getXPProgress } from '../utils/levels'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 import { useLeaderboard } from '../context/LeaderboardContext'
+import { Helmet } from 'react-helmet-async'
 
 const BAR_THEMES = {
     1: 'bg-gradient-to-r from-[#ffd700]/15 to-[#111118] border-y-[#ffd700]/40 shadow-[0_0_40px_rgba(255,215,0,0.05)]',
@@ -383,6 +384,57 @@ function Home() {
 
     return (
         <div className="min-h-screen">
+            <Helmet>
+                <title>QuestDuck | The Ultimate Game Tracker & Community</title>
+                <meta name="description" content="Track your games across PC, PlayStation, Xbox, and Switch. Join the QuestDuck community, manage your backlog, find deals, and level up your gaming life." />
+                <link rel="canonical" href="https://questduck.com/" />
+                
+                {/* Open Graph / Facebook */}
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content="https://questduck.com/" />
+                <meta property="og:title" content="QuestDuck | The Ultimate Game Tracker & Community" />
+                <meta property="og:description" content="Hatch your ultimate game library. Track, rate, and discover games across all platforms." />
+                <meta property="og:image" content="https://questduck.com/og-image.png" />
+
+                {/* Twitter */}
+                <meta property="twitter:card" content="summary_large_image" />
+                <meta property="twitter:url" content="https://questduck.com/" />
+                <meta property="twitter:title" content="QuestDuck | The Ultimate Game Tracker & Community" />
+                <meta property="twitter:description" content="Hatch your ultimate game library. Track, rate, and discover games across all platforms." />
+                <meta property="twitter:image" content="https://questduck.com/og-image.png" />
+
+                {/* AI / Google Structured Data (JSON-LD) */}
+                <script type="application/ld+json">
+                    {`
+                    {
+                      "@context": "https://schema.org",
+                      "@type": "WebApplication",
+                      "name": "QuestDuck",
+                      "url": "https://questduck.com",
+                      "description": "The ultimate platform to track your game backlog, rate titles, and join a community of gamers. Support for PC, PS5, Xbox, Switch and more.",
+                      "applicationCategory": "GameTracker",
+                      "operatingSystem": "All",
+                      "offers": {
+                        "@type": "Offer",
+                        "price": "0",
+                        "priceCurrency": "USD"
+                      },
+                      "featureList": [
+                        "Game Backlog Management",
+                        "Personalized Game Ratings",
+                        "Real-time Gaming Leaderboards",
+                        "Gaming Community Social Features",
+                        "Price Drop Alerts & Deals"
+                      ],
+                      "screenshot": "https://questduck.com/og-image.png",
+                      "creator": {
+                        "@type": "Organization",
+                        "name": "QuestDuck Team"
+                      }
+                    }
+                    `}
+                </script>
+            </Helmet>
 
             {/* Mobile search bar — sticky just below navbar, hidden on desktop */}
             <div className="md:hidden sticky top-[57px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center">
