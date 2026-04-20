@@ -69,10 +69,10 @@ function Footer() {
                                 <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="social-btn" aria-label="GitHub">
                                     <GithubIcon />
                                 </a>
-                                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="social-btn" aria-label="Twitter">
+                                <a href="https://twitter.com/questduck69" target="_blank" rel="noopener noreferrer" className="social-btn" aria-label="Twitter">
                                     <TwitterIcon />
                                 </a>
-                                <a href="mailto:hello@questduck.com" className="social-btn" aria-label="Email">
+                                <a href="mailto:questducksupport@gmail.com" className="social-btn" aria-label="Email">
                                     <MailIcon />
                                 </a>
                             </div>
