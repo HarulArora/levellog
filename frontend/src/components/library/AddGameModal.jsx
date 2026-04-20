@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { useSound } from '../../context/SoundContext'
 import GameSearch from './GameSearch'
 
 
 function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = null, games = [] }) {
-    const { playSound } = useSound()
 
 
     const [formData, setFormData] = useState({
@@ -81,7 +79,6 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
 
     const handleGameSelect = (game) => {
-        playSound('pop', 0.2)
         // Check if this game is already in the user's library
         const alreadyLogged = games.find(g => {
             const searchId = Number(game.igdbId)
@@ -123,10 +120,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
         setSubmitting(true)
         const result = await onAdd(formData)
         setSubmitting(false)
-        if (result.success) {
-            playSound('levelUp', 0.5)
-            onClose()
-        }
+        if (result.success) onClose()
     }
 
 
