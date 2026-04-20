@@ -386,7 +386,7 @@ function Home() {
         <div className="min-h-screen">
             <Helmet>
                 <title>QuestDuck | The Ultimate Gaming Log, Tracker & Community</title>
-                <meta name="description" content="Track your games across PC, PlayStation, Xbox, and Switch. Join the QuestDuck community, manage your backlog, find deals, and level up your gaming life." />
+                <meta name="description" content="QuestDuck: The ultimate gaming log & tracker. Log hours, rate games, manage backlogs, and find deals across PC, Xbox, PS5 & Switch." />
                 <link rel="canonical" href="https://questduck.com/" />
                 
                 {/* Open Graph / Facebook */}
@@ -463,14 +463,19 @@ function Home() {
                                 </span>
                             </div>
 
-                            <h1
+                                                         <h1
+                                className="font-black uppercase leading-none tracking-wide text-[#c8ff57] mb-2"
+                                style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', letterSpacing: '0.2em' }}
+                            >
+                                QuestDuck: The Ultimate Gaming Log & Tracker
+                            </h1>
+                            <h2
                                 className="font-black uppercase leading-none tracking-wide text-white mb-6"
                                 style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                             >
-                                <span className="block text-sm font-mono text-[#c8ff57] mb-2 tracking-[0.3em]">QuestDuck: The Ultimate Gaming Log & Tracker</span>
                                 Your Quest<br />
                                 <span className="text-[#c8ff57]">Pond.</span>
-                            </h1>
+                            </h2>
 
                             <p className="text-[#7a7a90] text-sm leading-relaxed mb-6 max-w-md">
                                 Track every game across PC, PlayStation, Xbox, Switch,
@@ -897,8 +902,38 @@ function Home() {
                     onClose={() => setToast(null)} 
                 />
             )}
+                    {/* ══════════════════════════
+                FAQ / KNOWLEDGE BASE (SEO BOOST)
+            ══════════════════════════ */}
+            <section className="max-w-[1200px] mx-auto px-5 md:px-10 py-20 border-t border-[#2a2a35]/50">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                    <div className="flex flex-col gap-4">
+                        <h3 className="font-black text-xl text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            What is QuestDuck?
+                        </h3>
+                        <p className="text-[#7a7a90] text-xs leading-relaxed">
+                            QuestDuck is the ultimate gaming log and discovery platform designed for gamers who want to organize their digital lives. Whether you play on PC, PlayStation 5, Xbox Series X, or Nintendo Switch, our tracker helps you maintain a personal gaming diary, rate titles, and log your precious hours played. Join the "QuestPond" and transform your backlog into a completed masterpiece.
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                        <h3 className="font-black text-xl text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            How to track games?
+                        </h3>
+                        <p className="text-[#7a7a90] text-xs leading-relaxed">
+                            Log games instantly using our integrated database. Simply search for any title, select your platform, and update your status to "Playing," "Completed," or "Planned." You can record your play sessions, set personal ratings out of 10, and see how your tastes compare to the rest of the gaming community. Our system acts as your permanent gaming record and backlog manager.
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                        <h3 className="font-black text-xl text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            Discovery & Deals
+                        </h3>
+                        <p className="text-[#7a7a90] text-xs leading-relaxed">
+                            Beyond simple tracking, QuestDuck is a powerful game discovery tool. Explore "Trending Now" sections to see what the community is playing, or browse "Coming Soon" for upcoming releases. Our integrated deals tracker surfaces the best discounts across digital storefronts, ensuring you never miss a bargain. Level up your profile, earn gaming XP, and climb the leaderboard as you log more adventures.
+                        </p>
+                    </div>
+                </div>
+            </section>
         </div>
     )
 }
-
 export default Home
