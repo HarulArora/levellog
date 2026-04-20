@@ -887,7 +887,8 @@ router.get('/followers/:userId', protectOptional, async (req, res) => {
         const follows = await Follow.find({ followingId: req.params.userId })
             .populate('followerId', 'username avatar bio isPrivate followerCount badge level')
             .lean()
-        res.json({ success: true, users: follows.map(f => f.followerId) })
+        const users = follows.map(f => f.followerId).filter(u => u != null)
+        res.json({ success: true, users })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch followers', error: error.message })
     }
@@ -925,7 +926,8 @@ router.get('/following/:userId', protectOptional, async (req, res) => {
         const follows = await Follow.find({ followerId: req.params.userId })
             .populate('followingId', 'username avatar bio isPrivate followerCount badge level')
             .lean()
-        res.json({ success: true, users: follows.map(f => f.followingId) })
+        const users = follows.map(f => f.followingId).filter(u => u != null)
+        res.json({ success: true, users })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch following', error: error.message })
     }

@@ -151,44 +151,47 @@ function FollowListModal({ userId, type, onClose }) {
                             </div>
                         </div>
                     ) : (
-                        paginated.map(u => (
-                            <Link
-                                key={u._id}
-                                to={`/user/${u.username}`}
-                                onClick={onClose}
-                                className="flex items-center gap-3 p-3 rounded-lg
-                                           bg-[#18181f] border border-[#2a2a35]
-                                           hover:border-[#c8ff57]/50 transition-all"
-                            >
-                                {u.avatar ? (
-                                    <img
-                                        src={u.avatar}
-                                        alt={u.username}
-                                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35]"
-                                    />
-                                ) : (
-                                    <div
-                                        className="w-10 h-10 rounded-full bg-gradient-to-br
-                                                   from-[#c8ff57] to-[#5c9fff]
-                                                   flex items-center justify-center
-                                                   font-black text-sm text-black flex-shrink-0"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                    >
-                                        {u.username.charAt(0).toUpperCase()}
+                        paginated.map(u => {
+                            if (!u) return null
+                            return (
+                                <Link
+                                    key={u._id}
+                                    to={`/user/${u.username}`}
+                                    onClick={onClose}
+                                    className="flex items-center gap-3 p-3 rounded-lg
+                                               bg-[#18181f] border border-[#2a2a35]
+                                               hover:border-[#c8ff57]/50 transition-all"
+                                >
+                                    {u.avatar ? (
+                                        <img
+                                            src={u.avatar}
+                                            alt={u.username}
+                                            className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35]"
+                                        />
+                                    ) : (
+                                        <div
+                                            className="w-10 h-10 rounded-full bg-gradient-to-br
+                                                       from-[#c8ff57] to-[#5c9fff]
+                                                       flex items-center justify-center
+                                                       font-black text-sm text-black flex-shrink-0"
+                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                                        >
+                                            {u.username?.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-white font-semibold text-sm truncate">
+                                            {u.username}
+                                        </div>
+                                        <div className="font-mono text-[10px] text-[#7a7a90] mt-[2px]">
+                                            {u.followerCount ?? 0} followers
+                                            {u.isPrivate && ' · 🔒 Private'}
+                                        </div>
                                     </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <div className="text-white font-semibold text-sm truncate">
-                                        {u.username}
-                                    </div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90] mt-[2px]">
-                                        {u.followerCount ?? 0} followers
-                                        {u.isPrivate && ' · 🔒 Private'}
-                                    </div>
-                                </div>
-                                <span className="text-[#7a7a90] text-sm">→</span>
-                            </Link>
-                        ))
+                                    <span className="text-[#7a7a90] text-sm">→</span>
+                                </Link>
+                            )
+                        })
                     )}
                 </div>
 
