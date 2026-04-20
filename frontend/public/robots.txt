@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://questduck.com/sitemap.xml
