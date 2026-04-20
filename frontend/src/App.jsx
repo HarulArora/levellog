@@ -1,6 +1,10 @@
 import { useState, lazy, Suspense, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
+import Footer from './components/Footer'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import ScrollToTop from './components/ScrollToTop'
 
 const Home = lazy(() => import('./pages/Home'))
 const Library = lazy(() => import('./pages/Library'))
@@ -19,7 +23,6 @@ const Deals = lazy(() => import('./pages/Deals'))
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
-import ScrollToTop from './components/ScrollToTop'
 
 const PageLoader = () => (
     <div className="fixed inset-0 bg-[#0a0a0f] z-[9999] flex flex-col items-center justify-center pointer-events-none gap-6">
@@ -110,7 +113,7 @@ function App() {
                         <Route path="/reset-password" element={<ResetPassword />} />
                         
                         {/* Main Layout Routes */}
-                        <Route element={<><Navbar /><div className="content-wrapper"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></div></>}>
+                        <Route element={<><Navbar /><div className="content-wrapper"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></div><Footer /></>}>
                             <Route path="/" element={<Home />} />
                             <Route path="/library" element={<Library />} />
                             <Route path="/lists" element={<Lists />} />
@@ -123,6 +126,8 @@ function App() {
                             <Route path="/edit-profile" element={<EditProfile />} />
                             <Route path="/discover" element={<Discover />} />
                             <Route path="/deals" element={<Deals />} />
+                            <Route path="/privacy" element={<PrivacyPolicy />} />
+                            <Route path="/terms" element={<TermsOfService />} />
                         </Route>
                         <Route path="*" element={<><Navbar /><NotFound /></>} />
                     </Routes>

@@ -1,0 +1,227 @@
+
+.footer-container {
+    position: relative;
+    padding-top: 2.5rem;
+    padding-bottom: 1.5rem;
+    background-color: #0a0a0f;
+    border-top: 1px solid #2a2a35;
+    overflow: hidden;
+    z-index: 10;
+}
+
+.footer-glow-line {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        #c8ff57 50%, 
+        transparent 100%);
+    opacity: 0.3;
+    animation: pulseGlow 4s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.1; }
+    50% { opacity: 0.4; }
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+    z-index: 2;
+}
+
+.footer-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 3fr;
+    gap: 3rem;
+    margin-bottom: 2.5rem;
+}
+
+@media (max-width: 1024px) {
+    .footer-grid {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+    }
+}
+
+.footer-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.footer-logo {
+    text-decoration: none;
+}
+
+.logo-text {
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    color: #c8ff57;
+}
+
+.brand-description {
+    color: #7a7a90;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    max-width: 280px;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.social-links {
+    display: flex;
+    gap: 1rem;
+}
+
+.social-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: rgba(42, 42, 53, 0.4);
+    border: 1px solid rgba(42, 42, 53, 0.6);
+    color: #7a7a90;
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.social-btn:hover {
+    background: rgba(200, 255, 87, 0.1);
+    border-color: #c8ff57;
+    color: #c8ff57;
+    transform: translateY(-3px);
+}
+
+.footer-links-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 2rem;
+}
+
+@media (max-width: 640px) {
+    .footer-links-grid {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+    }
+}
+
+.footer-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.col-title {
+    color: #ffffff;
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    position: relative;
+    padding-bottom: 0.5rem;
+}
+
+.col-title::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 20px;
+    height: 2px;
+    background: #c8ff57;
+    border-radius: 1px;
+}
+
+.col-links {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.col-links li a {
+    color: #7a7a90;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+    font-family: 'DM Sans', sans-serif;
+}
+
+.col-links li a:hover {
+    color: #ffffff;
+    transform: translateX(4px);
+}
+
+.col-links li a svg {
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+}
+
+.col-links li a:hover svg {
+    opacity: 1;
+    color: #c8ff57;
+}
+
+.footer-bottom {
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(42, 42, 53, 0.5);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.copyright {
+    color: #4a4a5a;
+    font-size: 0.8rem;
+    font-family: 'Inter', sans-serif;
+}
+
+.built-with {
+    color: #7a7a90;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.heart-icon {
+    color: #ff5c5c;
+    animation: beat 2s infinite ease-in-out;
+}
+
+@keyframes beat {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+.footer-bg-glow {
+    position: absolute;
+    bottom: -150px;
+    right: -100px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(200, 255, 87, 0.08) 0%, transparent 70%);
+    pointer-events: none;
+    filter: blur(80px);
+    animation: floatGlow 10s infinite alternate ease-in-out;
+}
+
+@keyframes floatGlow {
+    0% { transform: translate(0, 0); opacity: 0.5; }
+    100% { transform: translate(-50px, -20px); opacity: 0.8; }
+}
