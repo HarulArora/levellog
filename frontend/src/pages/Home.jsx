@@ -7,8 +7,17 @@ import useCachedFetch from '../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Gamepad2, Flame, Plus } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../components/ui/Skeleton'
 import Toast from '../components/ui/Toast'
+import AvatarFrame from '../components/ui/AvatarFrame'
 import { getXPProgress } from '../utils/levels'
 import { getIGDBImage, SIZES } from '../utils/igdb'
+import { useLeaderboard } from '../context/LeaderboardContext'
+
+const BAR_THEMES = {
+    1: 'bg-gradient-to-r from-[#ffd700]/15 to-[#111118] border-y-[#ffd700]/40 shadow-[0_0_40px_rgba(255,215,0,0.05)]',
+    2: 'bg-gradient-to-r from-[#B9F2FF]/15 to-[#111118] border-y-[#B9F2FF]/30',
+    3: 'bg-gradient-to-r from-[#cd7f32]/15 to-[#111118] border-y-[#cd7f32]/30',
+    4: 'bg-gradient-to-r from-[#94999c]/15 to-[#111118] border-y-[#94999c]/30',
+}
 
 const AddGameModal = lazy(() => import('../components/library/AddGameModal'))
 
@@ -158,7 +167,7 @@ const normalizeGame = (g) => ({
 })
 
 // ── IGDB Search Bar ──
-function GameSearchBar() {
+function GameSearchBar({ id = 'game-search' }) {
     const navigate = useNavigate()
     const [query, setQuery] = useState('')
     const [results, setResults] = useState([])
@@ -214,6 +223,8 @@ function GameSearchBar() {
                     <Search size={18} strokeWidth={2.5} />
                 </span>
                 <input
+                    id={id}
+                    name={id}
                     type="text"
                     placeholder="Search any game..."
                     value={query}
@@ -300,6 +311,7 @@ function Home() {
     const { user } = useAuth()
     const navigate = useNavigate()
     const { games, addGame } = useGamesContext()
+    const { topUsers } = useLeaderboard()
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
     const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
@@ -347,6 +359,11 @@ function Home() {
             : '—'
     }), [games])
 
+    const userRank = useMemo(() => {
+        if (!user) return null
+        return topUsers.find(tu => tu._id === (user.id || user._id))?.rank
+    }, [topUsers, user])
+
     const recentGames = useMemo(() => games.slice(0, 4), [games])
 
     const statusConfig = useMemo(() => ({
@@ -370,7 +387,7 @@ function Home() {
             {/* Mobile search bar — sticky just below navbar, hidden on desktop */}
             <div className="md:hidden sticky top-[57px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center">
                 <div className="w-full">
-                    <GameSearchBar />
+                    <GameSearchBar id="game-search-mobile" />
                 </div>
             </div>
 
@@ -473,7 +490,7 @@ function Home() {
                                 {/* <div className="font-mono text-[10px] text-[#3a3a4a] uppercase tracking-widest mb-2">
                                     🔍 Search any game
                                 </div> */}
-                                <GameSearchBar />
+                                <GameSearchBar id="game-search-desktop" />
                             </div>
 
                             {/* Divider */}
@@ -560,17 +577,20 @@ function Home() {
                 USER STATS BAR
             ══════════════════════════ */}
             {user && (
-                <section className="border-y border-[#2a2a35] bg-[#111118] cursor-pointer hover:bg-[#18181f] transition-colors" onClick={() => navigate('/stats')}>
+                <section 
+                    className={`border-y border-[#2a2a35] cursor-pointer hover:brightness-110 transition-all duration-500
+                                ${BAR_THEMES[userRank] || 'bg-[#111118] hover:bg-[#18181f]'}`} 
+                    onClick={() => navigate('/stats')}
+                >
                     <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-5">
                         <div className="flex flex-col sm:flex-row items-center gap-6">
                             <div className="flex items-center gap-3">
-                                {user.avatar ? (
-                                    <img src={user.avatar} alt={user.username} className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-[#2a2a35]" />
-                                ) : (
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff] flex items-center justify-center font-black text-sm text-black flex-shrink-0" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                        {user.username.charAt(0).toUpperCase()}
-                                    </div>
-                                )}
+                                <AvatarFrame 
+                                    userId={user?._id || user?.id} 
+                                    src={user?.avatar} 
+                                    size={42} 
+                                    className="home-stats-avatar" 
+                                />
                                 <div className="flex flex-col gap-1 min-w-0">
                                     <div className="text-white font-bold text-sm truncate">{user.username}</div>
                                     <div className="font-mono text-[10px] text-[#7a7a90]">@{user.username} · All platforms</div>

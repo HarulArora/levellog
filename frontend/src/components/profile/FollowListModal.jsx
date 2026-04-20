@@ -83,6 +83,8 @@ function FollowListModal({ userId, type, onClose }) {
                                 🔍
                             </span>
                             <input
+                                id="follow-list-search"
+                                name="follow-list-search"
                                 type="text"
                                 placeholder="Search by username..."
                                 value={search}

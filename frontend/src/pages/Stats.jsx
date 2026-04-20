@@ -4,12 +4,22 @@ import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import { Target, Heart, Search, Gamepad2, TrendingUp, Trophy, Star, Sparkles, Flame, Diamond, Crown, Rocket, Zap, Clock, BarChart3, Check, X } from 'lucide-react'
 import { getLevelInfo, getXPProgress, LEVELS } from '../utils/levels'
+import AvatarFrame from '../components/ui/AvatarFrame'
+import { useLeaderboard } from '../context/LeaderboardContext'
+
+const HEADER_THEMES = {
+    1: { bg: 'from-[#ffd700]/15', border: 'border-b-[#ffd700]/30', accent: 'text-[#ffd700]', glow: 'shadow-[0_4px_30px_rgba(255,215,0,0.1)]' },
+    2: { bg: 'from-[#B9F2FF]/15', border: 'border-b-[#B9F2FF]/30', accent: 'text-[#B9F2FF]', glow: 'shadow-[0_4px_30px_rgba(185,242,255,0.1)]' },
+    3: { bg: 'from-[#cd7f32]/15', border: 'border-b-[#cd7f32]/30', accent: 'text-[#cd7f32]', glow: 'shadow-[0_4px_30px_rgba(205,127,50,0.1)]' },
+    4: { bg: 'from-[#94999c]/15', border: 'border-b-[#94999c]/30', accent: 'text-[#94999c]', glow: 'shadow-[0_4px_30px_rgba(148,153,156,0.1)]' },
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 function Stats() {
     const { user, loading: authLoading } = useAuth()
     const { games, loading: gamesLoading } = useGamesContext()
+    const { topUsers } = useLeaderboard()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'stats')
@@ -29,6 +39,13 @@ function Stats() {
     const xp = user?.xp || 0
     const { current: currentLevel, next: nextLevel } = useMemo(() => getLevelInfo(xp), [xp])
     const xpProgress = useMemo(() => getXPProgress(xp), [xp])
+
+    const userRank = useMemo(() => {
+        if (!user) return null
+        return topUsers.find(tu => tu._id === (user?._id || user?.id))?.rank
+    }, [topUsers, user])
+    
+    const theme = HEADER_THEMES[userRank] || null
 
     // ── Computed stats ──
     const { totalGames, totalHours, ratedGames, avgRating, completed, playing, planned, dropped, paused, completionRate } = useMemo(() => {
@@ -154,7 +171,7 @@ function Stats() {
         <div className="min-h-screen">
 
             {/* ══ HERO HEADER ══ */}
-            <div className="relative overflow-hidden border-b border-[#2a2a35]">
+            <div className={`relative overflow-hidden border-b transition-all duration-700 ${theme ? `${theme.border} ${theme.glow}` : 'border-[#2a2a35]'}`}>
 
                 {/* Blurred avatar background */}
                 {user.avatar && (
@@ -164,7 +181,8 @@ function Stats() {
                             filter: 'blur(60px) brightness(0.2) saturate(1.4)'
                         }} />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f]/60 via-[#0a0a0f]/75 to-[#0a0a0f]" />
+                <div className={`absolute inset-0 bg-gradient-to-b via-[#0a0a0f]/75 to-[#0a0a0f] 
+                                ${theme ? theme.bg : 'from-[#0a0a0f]/60'}`} />
 
                 <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 py-10">
 
@@ -179,19 +197,12 @@ function Stats() {
 
                         {/* Left — avatar + name */}
                         <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-                            {user.avatar ? (
-                                <img src={user.avatar} alt={user.username}
-                                    className="w-20 h-20 rounded-full object-cover flex-shrink-0
-                                               ring-2 ring-[#2a2a35] shadow-2xl" />
-                            ) : (
-                                <div className="w-20 h-20 rounded-full bg-gradient-to-br
-                                                from-[#c8ff57] to-[#5c9fff]
-                                                flex items-center justify-center
-                                                font-black text-3xl text-black flex-shrink-0"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                    {user.username.slice(0, 2).toUpperCase()}
-                                </div>
-                            )}
+                            <AvatarFrame 
+                                userId={user?._id || user?.id} 
+                                src={user?.avatar} 
+                                size={80} 
+                                className="stats-header-avatar" 
+                            />
                             <div>
                                 <div className="font-black text-3xl md:text-4xl text-white
                                                 uppercase tracking-widest"
@@ -223,7 +234,7 @@ function Stats() {
                                 { value: `${completionRate}%`, label: 'Completion' },
                             ].map(stat => (
                                 <div key={stat.label} className="text-center">
-                                    <div className="font-black text-3xl text-[#c8ff57] leading-none"
+                                    <div className={`font-black text-3xl leading-none transition-colors ${theme ? theme.accent : 'text-[#c8ff57]'}`}
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                         {stat.value}
                                     </div>

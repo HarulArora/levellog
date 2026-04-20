@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import useNotifications from '../hooks/useNotifications'
-import { Bell, User, Search, LogOut, ChevronDown, UserSearch, Tags } from 'lucide-react'
+import { Bell, User, Search, LogOut, ChevronDown, UserSearch, Tags, ListChecks, Flame } from 'lucide-react'
 import { useDeals } from '../context/DealsContext'
 import Avatar from './ui/Avatar'
 
@@ -20,9 +20,8 @@ function Navbar() {
     const links = [
         { name: 'HOME', path: '/' },
         { name: 'DISCOVER', path: '/discover' },
-        { name: 'DEALS🔥', path: '/deals' },
+        { name: 'FIND FRIENDS', path: '/search' },
         { name: 'LIBRARY', path: '/library' },
-        { name: 'LISTS', path: '/lists' },
         { name: 'LEADERBOARD', path: '/leaderboard' },
     ]
 
@@ -160,10 +159,23 @@ function Navbar() {
                                                     <span>My Profile</span>
                                                 </Link>
 
-                                                <Link to="/search" onClick={handleLinkClick}
+                                                <Link to="/lists" onClick={handleLinkClick}
                                                     className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
-                                                    <Search size={14} className="opacity-70" strokeWidth={2.5} />
-                                                    <span>Find Friends</span>
+                                                    <ListChecks size={14} className="opacity-70" strokeWidth={2.5} />
+                                                    <span>My Lists</span>
+                                                </Link>
+
+                                                <Link to="/deals" onClick={handleDealsClick}
+                                                    className="flex items-center justify-between px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider group/deals">
+                                                    <div className="flex items-center gap-3">
+                                                        <Flame size={14} className={`opacity-70 ${newDealsCount > 0 ? 'text-[#ff5c5c]' : ''}`} />
+                                                        <span>Deals</span>
+                                                    </div>
+                                                    {newDealsCount > 0 && (
+                                                        <span className="bg-[#ff5c5c] text-white text-[9px] px-1.5 py-0.5 rounded-full ring-1 ring-white/10 group-hover/deals:scale-110 transition-transform">
+                                                            {newDealsCount > 9 ? '9+' : newDealsCount}
+                                                        </span>
+                                                    )}
                                                 </Link>
 
                                                 <div className="border-t border-[#2a2a35] my-1" />
@@ -264,10 +276,23 @@ function Navbar() {
                                     <span>My Profile</span>
                                 </Link>
 
-                                <Link to="/search" onClick={handleLinkClick}
+                                <Link to="/lists" onClick={handleLinkClick}
                                     className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
-                                    <Search size={16} strokeWidth={3} />
-                                    <span>Find Friends</span>
+                                    <ListChecks size={16} />
+                                    <span>My Lists</span>
+                                </Link>
+
+                                <Link to="/deals" onClick={handleDealsClick}
+                                    className="flex items-center justify-between py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
+                                    <div className="flex items-center gap-3">
+                                        <Flame size={16} className={newDealsCount > 0 ? 'text-[#ff5c5c]' : ''} />
+                                        <span>Deals</span>
+                                    </div>
+                                    {newDealsCount > 0 && (
+                                        <span className="bg-[#ff5c5c] text-white text-[10px] px-2 py-0.5 rounded-full">
+                                            {newDealsCount}
+                                        </span>
+                                    )}
                                 </Link>
 
                                 <div className="border-t border-[#2a2a35] my-1" />

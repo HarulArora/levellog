@@ -48,6 +48,9 @@ const userSchema = new mongoose.Schema(
 // Add case-insensitive unique index for fast username search
 userSchema.index({ username: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
 
+// 🚀 LEADERBOARD INDEX: Fast sorting for millions of users
+userSchema.index({ xp: -1, level: -1 });
+
 userSchema.pre('save', async function () {
     if (!this.isModified('password')) return
     if (!this.password) return

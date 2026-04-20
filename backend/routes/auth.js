@@ -534,6 +534,12 @@ router.post('/link-google', protect, async (req, res) => {
         const user = await User.findById(req.user._id)
         user.googleId = googleId
         if (!user.avatar && picture) user.avatar = picture
+        
+        // AUTO-VERIFY: Linking a Google account confirms identity
+        user.isEmailVerified = true
+        user.emailVerifyToken = null
+        user.emailVerifyExpires = null
+        
         await user.save()
 
         // Send confirmation email

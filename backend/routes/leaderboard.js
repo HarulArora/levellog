@@ -12,7 +12,7 @@ const router = express.Router()
  */
 const leaderboardCache = new LRUCache({
     max: 10,
-    ttl: 1000 * 60 * 10, // 10 minutes
+    ttl: 1000 * 10, // 10-second "heartbeat" cache for live feel
 })
 
 router.get('/top', async (req, res) => {
@@ -22,48 +22,24 @@ router.get('/top', async (req, res) => {
         }
 
         /**
-         * 🏆 QUALITY PROGRESS SCORING (Last 7 Days)
-         * We look for active progress in the last week.
+         * 🏆 GLOBAL XP LEADERS
+         * We rank users based on their total XP and Level.
          */
-        const sevenDaysAgo = new Date()
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-        // 1. Get all games updated/created in last 7 days
-        const activeGames = await Game.find({
-            updatedAt: { $gte: sevenDaysAgo }
-        }).select('userId status hours')
-
-        // 2. Aggregate scores per user
-        const scores = {}
-        activeGames.forEach(game => {
-            if (!game.userId) return
-            const uid = game.userId.toString()
-            if (!scores[uid]) scores[uid] = 0
-            
-            // Score Logic:
-            // - Every hour played = 1 pt
-            // - Completion bonus = 25 pts
-            scores[uid] += (game.hours || 0)
-            if (game.status === 'completed') scores[uid] += 25
-        })
-
-        // 3. Get user details for the top scorers
-        const sortedUids = Object.keys(scores).sort((a, b) => scores[b] - scores[a]).slice(0, 10)
-        
         const topUsers = await User.find({
-            _id: { $in: sortedUids }
-        }).select('username avatar level badge xp')
+            isEmailVerified: true,
+            xp: { $gt: 0 }
+        })
+        .sort({ xp: -1, level: -1 })
+        .limit(10)
+        .select('username avatar level badge xp')
 
-        // 4. Construct final leaderboard with rank and score
-        const leaderboard = sortedUids.map((id, index) => {
-            const user = topUsers.find(u => u._id.toString() === id)
-            if (!user) return null
+        // Construct final leaderboard with rank
+        const leaderboard = topUsers.map((user, index) => {
             return {
                 ...user.toObject(),
-                rank: index + 1,
-                weeklyScore: Math.round(scores[id])
+                rank: index + 1
             }
-        }).filter(Boolean)
+        })
 
         leaderboardCache.set('top10', leaderboard)
         res.json({ success: true, leaderboard })

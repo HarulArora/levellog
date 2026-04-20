@@ -11,10 +11,19 @@ import AddGameModal from '../components/library/AddGameModal'
 import Skeleton from '../components/ui/Skeleton'
 import Avatar from '../components/ui/Avatar'
 import { getIGDBImage, SIZES } from '../utils/igdb'
+import { useLeaderboard } from '../context/LeaderboardContext'
+import AvatarFrame from '../components/ui/AvatarFrame'
 
 // ── Single comment + replies ──
 const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) => {
     const navigate = useNavigate()
+    const { topUsers } = useLeaderboard()
+    
+    // Find rank dynamically
+    const userRankInfo = topUsers.find(u => u._id === comment.userId?._id || u._id === comment.userId?.id)
+    const rank = userRankInfo?.rank
+    const isTop4 = rank && rank <= 4
+
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [replyText, setReplyText] = useState('')
     const [submittingReply, setSubmittingReply] = useState(false)
@@ -24,6 +33,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     const [isEdited, setIsEdited] = useState(comment.edited || false)
     const [repliesVisible, setRepliesVisible] = useState(true)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [showBurst, setShowBurst] = useState(false)
 
     // ── Use likeCount/dislikeCount from new backend ──────────────────
     const [likes, setLikes] = useState(
@@ -84,6 +94,12 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         setDisliked(false)
         setLikes(prev => liked ? prev - 1 : prev + 1)
         if (disliked) setDislikes(prev => prev - 1)
+
+        // Trigger rank burst if it's a new like on a Top 4 user
+        if (!liked && isTop4) {
+            setShowBurst(true)
+            setTimeout(() => setShowBurst(false), 800)
+        }
 
         try {
             const res = await api.post(`/comments/${comment._id}/like`)
@@ -204,14 +220,27 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     return (
         <div className={indentClass}>
             <div className={depth > 0 ? 'border-l-2 border-[#2a2a35] pl-3 md:pl-4' : ''}>
-                <div className={`bg-[#111118] border rounded-lg p-3 md:p-4 transition-all ${isOwn ? 'border-[#c8ff57]/20 shadow-[0_0_15px_rgba(200,255,87,0.03)]' : 'border-[#2a2a35]'}`}>
+                <div className={`bg-[#111118] border rounded-lg p-3 md:p-4 transition-all 
+                    ${isOwn ? 'border-[#c8ff57]/20 shadow-[0_0_15px_rgba(200,255,87,0.03)]' : 'border-[#2a2a35]'}
+                    ${rank === 1 ? 'bg-yellow-400/8 border-yellow-400/40 border-l-[4px]' : ''}
+                    ${rank === 2 ? 'bg-[#B9F2FF]/8 border-[#B9F2FF]/40 border-l-[4px]' : ''}
+                    ${rank === 3 ? 'bg-[#cd7f32]/8 border-[#cd7f32]/40 border-l-[4px]' : ''}
+                    ${rank === 4 ? 'bg-[#94999c]/8 border-[#94999c]/40 border-l-[4px]' : ''}
+                `}>
                     
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-2">
                         <Link to={profilePath || '#'} className={`flex-shrink-0 ${!profilePath && 'pointer-events-none'}`}>
-                            <Avatar user={comment.userId} size="w-7 h-7 text-[10px]" />
+                            <AvatarFrame userId={comment.userId?._id || comment.userId?.id} src={comment.userId?.avatar} size={28} className="comment-avatar" />
                         </Link>
-                        <Link to={profilePath || '#'} className={`font-bold text-xs hover:underline ${isOwn ? 'text-[#c8ff57]' : 'text-white'} ${!profilePath && 'pointer-events-none'}`}>
+                        <Link to={profilePath || '#'} className={`font-bold text-xs hover:underline 
+                            ${rank === 1 ? 'text-yellow-400' : 
+                              rank === 2 ? 'text-[#B9F2FF]' : 
+                              rank === 3 ? 'text-[#cd7f32]' : 
+                              rank === 4 ? 'text-[#94999c]' : 
+                              isOwn ? 'text-[#c8ff57]' : 'text-white'} 
+                            ${!profilePath && 'pointer-events-none'}`}
+                        >
                             {username || 'User'}
                         </Link>
                         <div className="flex items-center gap-1.5 bg-[#18181f] rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm">
@@ -241,7 +270,12 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                     {/* Actions */}
                     {!isEditing && (
                         <div className="flex items-center gap-2 mt-3">
-                            <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm">
+                            <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm relative">
+                                {showBurst && (
+                                    <div className="rank-like-burst">
+                                        {rank === 1 ? '👑' : rank === 2 ? '🪽' : rank === 3 ? '⭐' : '⚔️'}
+                                    </div>
+                                )}
                                 <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg transition-all active:scale-95
                                     ${liked ? 'bg-[#c8ff57]/20 text-[#c8ff57]' : 'text-[#7a7a90] hover:bg-white/10 hover:text-white'}`}>
                                     <ThumbsUp size={12} strokeWidth={2.5} className={liked ? 'fill-current' : ''} /> {likes > 0 && <span>{likes}</span>}

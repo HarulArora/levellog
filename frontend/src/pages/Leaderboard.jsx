@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useLeaderboard } from '../context/LeaderboardContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
-import { Trophy, TrendingUp, Zap, Crown } from 'lucide-react'
+import { Trophy, Zap } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
 
 const RANK_UI = {
-    1: { label: 'GRAND CHAMPION', bgColor: 'bg-gradient-to-r from-[#ffd700]/20 to-transparent', textColor: 'text-[#ffd700]' },
-    2: { label: 'CHALLENGER', bgColor: 'bg-[#c0c0c0]/10', textColor: 'text-[#c0c0c0]' },
-    3: { label: 'ELITE', bgColor: 'bg-[#cd7f32]/10', textColor: 'text-[#cd7f32]' },
+    1: { label: 'KING', bgColor: 'bg-gradient-to-r from-[#ffd700]/30 to-transparent', textColor: 'text-[#ffd700]' },
+    2: { label: 'TOP CHALLENGER', bgColor: 'bg-gradient-to-r from-[#B9F2FF]/25 to-transparent', textColor: 'text-[#B9F2FF]' }, // Icy/Diamond tint
+    3: { label: 'ELITE HUNTER', bgColor: 'bg-gradient-to-r from-[#cd7f32]/25 to-transparent', textColor: 'text-[#cd7f32]' },
+    4: { label: 'IRON GUARD', bgColor: 'bg-gradient-to-r from-[#71797E]/30 to-transparent', textColor: 'text-[#94999c]' }, // Darker/Matte Iron
 }
 
 export default function Leaderboard() {
@@ -32,7 +33,7 @@ export default function Leaderboard() {
                         THE <span className="text-[#c8ff57]">THRONE</span>
                     </h1>
                     <p className="text-[#7a7a90] text-sm mt-4 font-medium max-w-md">
-                        Only the top 10 hunters who showed pure dedication this week earn a seat at the table. Crowns are awarded live.
+                        Only the top 10 hunters who showed pure dedication earn a seat at the table.
                     </p>
                 </div>
                 
@@ -41,7 +42,7 @@ export default function Leaderboard() {
                         <Zap size={20} className="fill-current" />
                     </div>
                     <div>
-                        <div className="text-[10px] font-bold text-[#7a7a90] uppercase tracking-widest">Next Refresh</div>
+                        <div className="text-[10px] font-bold text-[#7a7a90] uppercase tracking-widest">Global Rank</div>
                         <div className="text-white font-mono font-bold">LIVE</div>
                     </div>
                 </div>
@@ -53,17 +54,33 @@ export default function Leaderboard() {
                     {[2, 1, 3].map(pos => {
                         const user = topUsers.find(u => u.rank === pos)
                         if (!user) return null
+                        
+                        const podiumLabel = pos === 1 ? 'KING' : pos === 2 ? 'TOP CHALLENGER' : 'ELITE HUNTER'
+                        const podiumColor = pos === 1 ? 'bg-[#ffd700]' : pos === 2 ? 'bg-[#c0c0c0]' : 'bg-[#cd7f32]'
+
                         return (
-                            <div key={pos} className={`relative p-6 rounded-2xl border ${pos === 1 ? 'border-[#ffd700]/50 bg-[#ffd700]/5 order-first md:order-none scale-105 z-10' : 'border-[#2a2a35] bg-[#111118]'}`}>
-                                {pos === 1 && <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#ffd700] text-black text-[10px] font-black rounded-full shadow-lg">CURRENT KING</div>}
+                            <Link 
+                                to={`/user/${user.username}`} 
+                                key={pos} 
+                                className={`relative p-6 rounded-2xl border transition-all duration-300
+                                    ${pos === 1 
+                                        ? 'border-[#ffd700]/50 bg-[#ffd700]/5 order-first md:order-none scale-110 hover:scale-[1.15] z-10 shadow-[0_0_20px_rgba(255,215,0,0.1)] hover:shadow-[0_0_30px_rgba(255,215,0,0.2)]' 
+                                        : pos === 2
+                                        ? 'border-[#B9F2FF]/30 bg-[#B9F2FF]/5 hover:border-[#B9F2FF]/50 hover:scale-[1.05] z-0 hover:z-20'
+                                        : 'border-[#cd7f32]/30 bg-[#cd7f32]/5 hover:border-[#cd7f32]/50 hover:scale-[1.05] z-0 hover:z-20'
+                                    }`}
+                            >
+                                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 ${podiumColor} text-black text-[10px] font-black rounded-full shadow-lg whitespace-nowrap`}>
+                                    {podiumLabel}
+                                </div>
                                 <div className="flex flex-col items-center text-center gap-4">
-                                    <AvatarFrame userId={user._id} src={user.avatar} size={pos === 1 ? 100 : 80} />
+                                    <AvatarFrame userId={user._id} src={user.avatar} size={pos === 1 ? 110 : 90} className="podium-avatar" />
                                     <div>
-                                        <div className={`font-black text-2xl uppercase tracking-wider ${pos === 1 ? 'text-[#ffd700]' : 'text-white'}`}>{user.username}</div>
-                                        <div className="text-[#7a7a90] font-mono text-[10px] uppercase font-bold mt-1">LV.{user.level} · {user.weeklyScore} PTS</div>
+                                        <div className={`font-black text-2xl uppercase tracking-wider ${pos === 1 ? 'text-[#ffd700]' : pos === 2 ? 'text-[#B9F2FF]' : 'text-[#cd7f32]'}`}>{user.username}</div>
+                                        <div className="text-[#7a7a90] font-mono text-[10px] uppercase font-bold mt-1">LV.{user.level} · {user.xp.toLocaleString()} XP</div>
                                     </div>
                                 </div>
-                            </div>
+                            </Link>
                         )
                     })}
                 </div>
@@ -83,10 +100,10 @@ export default function Leaderboard() {
                     topUsers.map((user) => {
                         const style = RANK_UI[user.rank] || { bgColor: '', textColor: 'text-white' }
                         return (
-                            <div key={user._id} className={`grid grid-cols-[60px_1fr_100px] items-center px-6 py-4 border-b border-[#2a2a35]/50 last:border-0 hover:bg-[#c8ff57]/5 transition-colors group ${style.bgColor}`}>
+                            <Link to={`/user/${user.username}`} key={user._id} className={`grid grid-cols-[60px_1fr_100px] items-center px-6 py-4 border-b border-[#2a2a35]/50 last:border-0 hover:bg-[#c8ff57]/5 transition-all group ${style.bgColor}`}>
                                 <div className={`font-mono font-black text-xl ${style.textColor}`}>#{user.rank}</div>
                                 <div className="flex items-center gap-4">
-                                    <AvatarFrame userId={user._id} src={user.avatar} size={42} />
+                                    <AvatarFrame userId={user._id} src={user.avatar} size={42} className="leaderboard-list-avatar" />
                                     <div>
                                         <div className="text-white font-bold tracking-tight group-hover:text-[#c8ff57] transition-colors">{user.username}</div>
                                         <div className="text-[#7a7a90] text-[10px] font-medium uppercase tracking-widest flex items-center gap-2">
@@ -96,10 +113,10 @@ export default function Leaderboard() {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-white font-mono font-bold">{user.weeklyScore}</div>
-                                    <div className="text-[#7a7a90] text-[8px] font-black uppercase tracking-widest">Score</div>
+                                    <div className="text-white font-mono font-bold">{user.xp.toLocaleString()}</div>
+                                    <div className="text-[#7a7a90] text-[8px] font-black uppercase tracking-widest">XP</div>
                                 </div>
-                            </div>
+                            </Link>
                         )
                     })
                 )}

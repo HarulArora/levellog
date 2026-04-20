@@ -26,17 +26,17 @@ export function AuthProvider({ children }) {
         const initAuth = async () => {
             const token = localStorage.getItem('questduck_token')
             
-            // If we have a token in localStorage, set it as default. 
-            // If not, we still try /auth/me to see if an HttpOnly cookie exists.
-            if (token) {
-                api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+            if (!token) {
+                setLoading(false)
+                return
             }
+
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
             try {
                 const res = await api.get('/auth/me')
                 setUser(buildUser(res.data.user))
             } catch (err) {
-                // Clear if unauthorized (401) or forbidden/unverified (403)
                 if (err.response?.status === 401 || err.response?.status === 403) {
                     localStorage.removeItem('questduck_token')
                     delete api.defaults.headers.common['Authorization']

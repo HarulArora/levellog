@@ -304,6 +304,10 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
                             <input
 
+                                id="manual-game-title"
+
+                                name="manual-game-title"
+
                                 type="text"
 
                                 placeholder="e.g. Elden Ring"
@@ -340,6 +344,10 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
                         </label>
 
                         <select
+
+                            id="game-status"
+
+                            name="game-status"
 
                             value={formData.status}
 
@@ -383,6 +391,10 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
                         </label>
 
                         <input
+
+                            id="game-hours"
+
+                            name="game-hours"
 
                             type="number"
 
