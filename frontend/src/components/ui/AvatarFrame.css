@@ -2,13 +2,14 @@
     position: relative;
     border-radius: 50%;
     flex-shrink: 0;
+    margin-top: 5px; /* Reduced buffer */
 }
 
 .avatar-image {
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    object-cover: cover;
+    object-fit: cover;
     border: 2px solid #2a2a35;
     position: relative;
     z-index: 2;
@@ -36,35 +37,112 @@
     50% { transform: scale(1.1); opacity: 0.6; }
 }
 
-/* Crown Styles */
+/* Floating Symbol Styles */
 .rank-crown {
     position: absolute;
-    top: -12px;
+    top: -50%; /* Adjusted for a better "sweet spot" */
     left: 50%;
     transform: translateX(-50%);
-    font-size: 18px;
+    font-size: 1.2rem;
     z-index: 10;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-    animation: crownFloat 3s infinite ease-in-out;
+    animation: floatingSymbol 3s infinite ease-in-out;
+    pointer-events: none;
 }
 
-@keyframes crownFloat {
+/* Extra clearance for mini-avatars (Navbar/Search) */
+.avatar-frame-container[style*="width: 28px"] .rank-crown,
+.avatar-frame-container[style*="width: 24px"] .rank-crown {
+    top: -60%;
+}
+
+/* Leaderboard Podium Specific Offset (closer fit) */
+.podium-avatar .rank-crown {
+    top: -18%;
+}
+
+/* Home Stats Bar Specific Offset */
+.home-stats-avatar .rank-crown {
+    top: -45%;
+}
+
+/* Leaderboard List, Search & Comments Specific Offset (higher float for small circles) */
+.leaderboard-list-avatar .rank-crown,
+.search-avatar .rank-crown,
+.comment-avatar .rank-crown {
+    top: -45%;
+}
+
+/* Large Avatars (Profile, Stats Header, Suggestions) */
+.profile-avatar .rank-crown,
+.stats-header-avatar .rank-crown,
+.suggestion-avatar .rank-crown {
+    top: -22%;
+}
+
+/* Profile Page Specific Badge Scaling */
+.profile-avatar .rank-number-overlay,
+.stats-header-avatar .rank-number-overlay,
+.suggestion-avatar .rank-number-overlay {
+    font-size: 0.8rem;
+    padding: 2px 6px;
+    bottom: 2%;
+    right: 2%;
+    border-radius: 6px;
+}
+
+@keyframes floatingSymbol {
     0%, 100% { transform: translateX(-50%) translateY(0); }
     50% { transform: translateX(-50%) translateY(-3px); }
 }
 
-/* Badge for Ranks 5-10 */
-.rank-badge {
+/* Rank Number Overlay (Scalable and offset) */
+.rank-number-overlay {
     position: absolute;
-    bottom: -4px;
-    right: -4px;
-    background: #c8ff57;
-    color: #000;
-    font-size: 8px;
+    bottom: -2%;
+    right: -2%;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
     font-weight: 900;
     padding: 1px 4px;
     border-radius: 4px;
     z-index: 10;
-    border: 1px solid #000;
-    font-family: 'DM Mono', monospace;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+    pointer-events: none;
+    line-height: 1;
+    border: 1px solid rgba(0,0,0,0.2); /* Subtle edge definition */
+}
+
+/* Hide overlay if it's too small to read */
+.avatar-frame-container[style*="width: 28px"] .rank-number-overlay,
+.avatar-frame-container[style*="width: 24px"] .rank-number-overlay {
+    font-size: 0.5rem;
+    padding: 1px 2px;
+}
+
+/* Rank-Specific Like Burst Animation (X/Twitter style) */
+.rank-like-burst {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.5rem;
+    pointer-events: none;
+    z-index: 50;
+    animation: rankBurst 0.8s cubic-bezier(0.17, 0.89, 0.32, 1.49) forwards;
+}
+
+@keyframes rankBurst {
+    0% {
+        transform: translateX(-50%) translateY(10px) scale(0.5) rotate(-20deg);
+        opacity: 0;
+    }
+    30% {
+        transform: translateX(-50%) translateY(-10px) scale(1.4) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(-50%) translateY(-40px) scale(0.8) rotate(20deg);
+        opacity: 0;
+    }
 }

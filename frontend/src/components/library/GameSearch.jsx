@@ -65,6 +65,8 @@ function GameSearch({ onSelect }) {
 
       {/* Search Input */}
       <input
+        id="game-search-modal"
+        name="game-search-modal"
         type="text"
         placeholder="Search for a game..."
         value={query}

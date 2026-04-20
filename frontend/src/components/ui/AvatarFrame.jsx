@@ -3,9 +3,9 @@ import './AvatarFrame.css'
 
 const RANK_CONFIG = {
     1: { label: '👑', color: '#ffd700', name: 'Gold Crown' },
-    2: { label: '👑', color: '#c0c0c0', name: 'Silver Crown' },
-    3: { label: '👑', color: '#cd7f32', name: 'Bronze Crown' },
-    4: { label: '⚔️', color: '#8d9194', name: 'Iron Guard' },
+    2: { label: '🪽', color: '#B9F2FF', name: 'Silver Wings' },
+    3: { label: '⭐', color: '#cd7f32', name: 'Bronze Star' },
+    4: { label: '⚔️', color: '#94999c', name: 'Iron Guard' },
 }
 
 export default function AvatarFrame({ userId, src, size = 40, className = '' }) {
@@ -16,11 +16,11 @@ export default function AvatarFrame({ userId, src, size = 40, className = '' }) 
 
     const config = RANK_CONFIG[rank]
     const isTop10 = rank && rank <= 10
-    const hasSpecialCrown = rank && rank <= 4
+    const hasSpecialIcon = rank && rank <= 4
 
     return (
         <div 
-            className={`avatar-frame-container ${hasSpecialCrown ? 'has-crown' : ''} ${isTop10 ? 'is-top-10' : ''} ${className}`}
+            className={`avatar-frame-container ${hasSpecialIcon ? 'has-crown' : ''} ${isTop10 ? 'is-top-10' : ''} ${className}`}
             style={{ width: size, height: size }}
         >
             {/* The Actual Avatar */}
@@ -30,15 +30,22 @@ export default function AvatarFrame({ userId, src, size = 40, className = '' }) 
                 className="avatar-image"
             />
 
-            {/* Crown / Badge Overlay */}
-            {hasSpecialCrown && (
+            {/* Floating Symbol Overlay */}
+            {hasSpecialIcon && (
                 <div className="rank-crown" style={{ color: config.color }}>
                     {config.label}
                 </div>
             )}
 
-            {isTop10 && !hasSpecialCrown && (
-                <div className="rank-badge">
+            {/* Rank Number Overlay (Visible for all Top 10) */}
+            {isTop10 && (
+                <div 
+                    className="rank-number-overlay" 
+                    style={{ 
+                        backgroundColor: config?.color || '#c8ff57',
+                        color: (rank <= 2 || rank >= 5) ? '#000' : '#fff' // Dark text for bright tiers
+                    }}
+                >
                     #{rank}
                 </div>
             )}

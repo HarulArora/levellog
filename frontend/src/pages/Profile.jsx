@@ -6,8 +6,10 @@ import { useAuth } from '../context/AuthContext'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { invalidateCache } from '../utils/cache'
 import { useFollow } from '../context/FollowContext'
+import { useLeaderboard } from '../context/LeaderboardContext'
+import AvatarFrame from '../components/ui/AvatarFrame'
 import FollowListModal from '../components/profile/FollowListModal'
-import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List } from 'lucide-react'
+import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List, Trophy } from 'lucide-react'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
 function Profile() {
@@ -20,6 +22,7 @@ function Profile() {
     const [xpToast, setXpToast] = useState(null)
     const [activeTab, setActiveTab] = useState('games')
     const [selectedList, setSelectedList] = useState(null)
+    const { topUsers } = useLeaderboard()
 
     // ── CACHED FETCHES ──
     const { data: profileData, loading: profileLoading, error: profileError, refetch: refetchProfile } = useCachedFetch(
@@ -173,6 +176,17 @@ function Profile() {
         )
     }
 
+    const userRankInfo = topUsers.find(u => u._id === user?._id)
+    const rank = userRankInfo?.rank
+
+    const rankThemes = {
+        1: { border: 'border-[#ffd700]', bg: 'bg-gradient-to-r from-[#ffd700]/30 to-[#111118]', label: 'KING', color: '#ffd700' },
+        2: { border: 'border-[#B9F2FF]', bg: 'bg-gradient-to-r from-[#B9F2FF]/20 to-[#111118]', label: 'TOP CHALLENGER', color: '#B9F2FF' },
+        3: { border: 'border-[#ff9f5c]', bg: 'bg-gradient-to-r from-[#cd7f32]/25 to-[#111118]', label: 'ELITE HUNTER', color: '#cd7f32' },
+        4: { border: 'border-[#71797E]', bg: 'bg-gradient-to-r from-[#8d9194]/20 to-[#111118]', label: 'IRON GUARD', color: '#94999c' },
+    }
+    const theme = rankThemes[rank]
+
     return (
         <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10">
             <Helmet>
@@ -196,24 +210,22 @@ function Profile() {
             )}
 
             {/* ── Profile Header ── */}
-            <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6 md:p-8 mb-6">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+            <div className={`relative border rounded-lg p-6 md:p-8 mb-6 overflow-hidden transition-all duration-700
+                           ${theme ? `${theme.bg} ${theme.border} shadow-[0_0_30px_-10px_rgba(0,0,0,0.5)]` : 'bg-[#111118] border-[#2a2a35]'}`}>
+                
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10">
 
-                    {/* Avatar */}
-                    {user.avatar ? (
-                        <img src={user.avatar} alt={user.username}
-                            className="w-20 h-20 rounded-full object-cover flex-shrink-0 ring-2 ring-[#2a2a35]" />
-                    ) : (
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff]
-                                        flex items-center justify-center font-black text-3xl text-black flex-shrink-0"
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            {user.username.charAt(0).toUpperCase()}
-                        </div>
-                    )}
+                    {/* Avatar with Ranking System */}
+                    <AvatarFrame userId={user._id} src={user.avatar} size={100} className="profile-avatar" />
 
                     {/* Info */}
                     <div className="flex-1 text-center sm:text-left min-w-0 w-full">
-                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-2">
+                        {theme && (
+                            <div className="font-mono text-[10px] font-black tracking-[0.4em] mb-1 pl-1" style={{ color: theme.color }}>
+                                {theme.label}
+                            </div>
+                        )}
+                        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-1">
                             <h1 className="font-black text-3xl md:text-4xl tracking-widest text-white flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 min-w-0">
                                 <span className="break-all leading-tight">{user.username}</span>
                                 {user.followsMe && (
@@ -571,8 +583,8 @@ function Profile() {
                             </div>
                             {selectedList.games?.length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                    {selectedList.games.map(game => (
-                                        <Link key={game.igdbId} to={game.igdbId ? `/game/${game.igdbId}` : '#'}
+                                    {selectedList.games.map((game, i) => (
+                                        <Link key={`${game.igdbId}-${i}`} to={game.igdbId ? `/game/${game.igdbId}` : '#'}
                                             className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden hover:border-[#c8ff57]/50 transition-all group">
                                             {game.gameCover ? (
                                                 <img src={game.gameCover} alt={game.gameTitle}
@@ -625,12 +637,12 @@ function Profile() {
                                     </div>
                                     {list.games?.length > 0 && (
                                         <div className="px-4 pb-4 flex gap-2 flex-wrap">
-                                            {list.games.slice(0, 6).map(game => (
+                                            {list.games.slice(0, 6).map((game, i) => (
                                                 game.gameCover ? (
-                                                    <img key={game.igdbId} src={game.gameCover} alt={game.gameTitle}
+                                                    <img key={`${game.igdbId}-img-${i}`} src={game.gameCover} alt={game.gameTitle}
                                                         className="w-10 h-14 object-cover rounded hover:opacity-80 transition-all" />
                                                 ) : (
-                                                    <div key={game.igdbId} className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center">
+                                                    <div key={`${game.igdbId}-none-${i}`} className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center">
                                                         <Gamepad2 size={16} className="text-[#7a7a90]" />
                                                     </div>
                                                 )
