@@ -1,0 +1,19 @@
+# QuestDuck
+The ultimate gaming log, tracker, and community platform.
+
+## Summary
+QuestDuck is a comprehensive game tracking and discovery platform where gamers can log their progress, rate titles, manage backlogs, and discover deals. It supports all major platforms including PC, PlayStation, Xbox, and Nintendo Switch.
+
+## Features
+- **Gaming Diary**: Log hours, status (playing, completed, planned), and personal ratings.
+- **Backlog Management**: Organize your gaming library and "QuestPond."
+- **Leaderboards**: Compete with the community via gaming XP and levels.
+- **Deals Tracker**: Discover current discounts and gaming deals.
+- **Social Discovery**: Follow friends and see real-time gaming activity.
+
+## Key Links
+- [Library](https://questduck.com/library)
+- [Leaderboard](https://questduck.com/leaderboard)
+- [Discover](https://questduck.com/discover)
+- [Deals](https://questduck.com/deals)
+- [Activity](https://questduck.com/activity)

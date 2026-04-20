@@ -385,7 +385,7 @@ function Home() {
     return (
         <div className="min-h-screen">
             <Helmet>
-                <title>QuestDuck | The Ultimate Game Tracker & Community</title>
+                <title>QuestDuck | The Ultimate Gaming Log, Tracker & Community</title>
                 <meta name="description" content="Track your games across PC, PlayStation, Xbox, and Switch. Join the QuestDuck community, manage your backlog, find deals, and level up your gaming life." />
                 <link rel="canonical" href="https://questduck.com/" />
                 
@@ -467,7 +467,7 @@ function Home() {
                                 className="font-black uppercase leading-none tracking-wide text-white mb-6"
                                 style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                             >
-                                <span className="block text-sm font-mono text-[#c8ff57] mb-2 tracking-[0.3em]">QuestDuck: The Ultimate Game Tracker</span>
+                                <span className="block text-sm font-mono text-[#c8ff57] mb-2 tracking-[0.3em]">QuestDuck: The Ultimate Gaming Log & Tracker</span>
                                 Your Quest<br />
                                 <span className="text-[#c8ff57]">Pond.</span>
                             </h1>
