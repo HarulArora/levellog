@@ -12,12 +12,14 @@ import Skeleton from '../components/ui/Skeleton'
 import Avatar from '../components/ui/Avatar'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 import { useLeaderboard } from '../context/LeaderboardContext'
+import { useSound } from '../context/SoundContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
 
 // ── Single comment + replies ──
 const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) => {
     const navigate = useNavigate()
     const { topUsers } = useLeaderboard()
+    const { playSound } = useSound()
     
     // Find rank dynamically
     const userRankInfo = topUsers.find(u => u._id === comment.userId?._id || u._id === comment.userId?.id)
@@ -95,8 +97,9 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         setLikes(prev => liked ? prev - 1 : prev + 1)
         if (disliked) setDislikes(prev => prev - 1)
 
-        // Trigger burst animation on new like
+        // Trigger burst animation and sound on new like
         if (!liked) {
+            playSound('quack', 0.4)
             setShowBurst(true)
             setTimeout(() => setShowBurst(false), 800)
         }
@@ -355,6 +358,7 @@ function GameDetail() {
     const { igdbId } = useParams()
     const navigate = useNavigate()
     const { user } = useAuth()
+    const { playSound } = useSound()
     const { games: userGames, addGame, updateGame } = useGamesContext()
 
     const [activeTab, setActiveTab] = useState('overview')
@@ -424,9 +428,10 @@ function GameDetail() {
     }, [game])
 
     const showXpToast = useCallback((msg, type = 'gain') => {
+        if (type === 'gain') playSound('levelUp', 0.5)
         setXpToast({ msg, type })
         setTimeout(() => setXpToast(null), 3000)
-    }, [])
+    }, [playSound])
 
     const showListToast = useCallback((msg, type = 'success') => { 
         setListToast({ msg, type })
