@@ -81,18 +81,43 @@ const NavigationProgress = () => {
 
 function NotFound() {
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
-            <div className="font-black text-8xl text-[#c8ff57] mb-2"
-                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                404
+        <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4 relative overflow-hidden">
+            {/* Background Glow */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#c8ff57]/10 blur-[120px] pointer-events-none" />
+            
+            <div className="relative z-10">
+                <div className="font-black text-9xl text-[#c8ff57] mb-4 opacity-20"
+                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                    404
+                </div>
+                <h2 className="font-black text-4xl text-white uppercase mb-4 tracking-tight"
+                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                    You've Reached Dry Land!
+                </h2>
+                <p className="font-mono text-[#7a7a90] text-sm mb-8 max-w-sm mx-auto leading-relaxed">
+                    The page you're looking for has moved or doesn't exist in the QuestPond. Let's get you back to the game.
+                </p>
+                
+                <div className="flex flex-wrap justify-center gap-4">
+                    <Link to="/"
+                        className="px-6 py-3 bg-[#c8ff57] text-black font-bold text-sm rounded-lg hover:bg-[#d4ff6e] transition-all shadow-[0_0_20px_rgba(200,255,87,0.2)]">
+                        Back to Home
+                    </Link>
+                    <Link to="/discover"
+                        className="px-6 py-3 bg-[#1a1a25] text-[#7a7a90] font-bold text-sm rounded-lg border border-[#2a2a35] hover:border-[#c8ff57] hover:text-white transition-all">
+                        Discover Games
+                    </Link>
+                </div>
+
+                <div className="mt-12 flex flex-col items-center gap-3">
+                    <span className="font-mono text-[10px] text-[#3a3a4a] uppercase tracking-[0.3em]">Popular Destinations</span>
+                    <div className="flex gap-6">
+                        <Link to="/leaderboard" className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57]">LEADERBOARD</Link>
+                        <Link to="/library" className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57]">LIBRARY</Link>
+                        <Link to="/deals" className="font-mono text-[10px] text-[#7a7a90] hover:text-[#c8ff57]">DEALS</Link>
+                    </div>
+                </div>
             </div>
-            <p className="font-mono text-[#7a7a90] text-sm mb-6">
-                This page doesn't exist or was moved.
-            </p>
-            <a href="/"
-                className="px-5 py-2.5 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all">
-                Go Home
-            </a>
         </div>
     )
 }
