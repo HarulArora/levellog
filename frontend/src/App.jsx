@@ -114,7 +114,7 @@ function App() {
                         <Route path="/reset-password" element={<ResetPassword />} />
                         
                         {/* Main Layout Routes */}
-                        <Route element={<><Navbar /><main className="flex-1 flex flex-col"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></main><Footer /></>}>
+                        <Route element={<><Navbar /><main className="flex-1 flex flex-col w-full"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></main><Footer /></>}>
                             <Route path="/" element={<Home />} />
                             <Route path="/library" element={<Library />} />
                             <Route path="/lists" element={<Lists />} />
