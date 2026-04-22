@@ -337,6 +337,7 @@ function Activity() {
                                                     )}
                                                 </div>
                                             </div>
+                                        </div>
 
                                             {/* Ratings column — stacks on mobile, row on desktop */}
                                             <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 md:gap-1 flex-shrink-0 pt-2 sm:pt-0 border-t border-[#2a2a35]/40 sm:border-t-0">
