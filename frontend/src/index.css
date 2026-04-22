@@ -61,12 +61,13 @@
 
 /* 🎨 Mobile Performance Optimizations */
 @media (max-width: 768px) {
-    /* Backdrop blur is extremely heavy on mobile GPUs */
+    /* Backdrop blur is extremely heavy on mobile GPUs - disabling for speed */
     .backdrop-blur-md, 
     .backdrop-blur-xl, 
     .backdrop-blur-2xl {
-        backdrop-filter: blur(4px) !important; /* Significantly reduced for speed */
-        -webkit-backdrop-filter: blur(4px) !important;
+        backdrop-filter: none !important; 
+        -webkit-backdrop-filter: none !important;
+        background-color: rgba(10, 10, 15, 0.95) !important; /* Solid fallback */
     }
 
     /* Disable some of the heavier hover shadows on mobile */

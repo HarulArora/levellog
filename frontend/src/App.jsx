@@ -26,8 +26,8 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
 const PageLoader = () => (
-    <div className="fixed inset-0 bg-[#0a0a0f] z-[9999] flex flex-col items-center justify-center pointer-events-none gap-6">
-        <div className="font-black text-6xl tracking-[0.2em] text-[#c8ff57] animate-pulse" 
+    <div className="fixed inset-0 bg-[#0a0a0f] z-[9999] flex flex-col items-center justify-center pointer-events-none">
+        <div className="font-black text-5xl tracking-[0.2em] text-[#c8ff57] opacity-20" 
              style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
             QUEST<span className="text-white">DUCK</span>
         </div>
@@ -139,7 +139,7 @@ function App() {
                         <Route path="/reset-password" element={<ResetPassword />} />
                         
                         {/* Main Layout Routes */}
-                        <Route element={<><Navbar /><main className="flex-1 flex flex-col w-full"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></main><Footer /></>}>
+                        <Route element={<><Navbar /><main className="flex-1 flex flex-col w-full min-h-[90vh] bg-[#0a0a0f]"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></main><Footer /></>}>
                             <Route path="/" element={<Home />} />
                             <Route path="/library" element={<Library />} />
                             <Route path="/lists" element={<Lists />} />

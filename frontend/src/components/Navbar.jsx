@@ -96,7 +96,7 @@ function Navbar() {
                                     to={link.path}
                                     onClick={isDeals ? handleDealsClick : handleLinkClick}
                                     className={`text-xs font-semibold tracking-widest uppercase transition-colors
-                                               ${isActive ? 'text-[#c8ff57]' : 'text-[#7a7a90] hover:text-[#c8ff57]'}`}
+                                               ${isActive ? 'text-[#c8ff57]' : 'text-[#94a3b8] hover:text-[#c8ff57]'}`}
                                 >
                                     {link.name}
                                 </Link>
@@ -208,10 +208,14 @@ function Navbar() {
                 </div>
 
                 {/* Hamburger */}
-                <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden flex flex-col gap-[5px] p-2">
-                    <span className={`block w-5 h-[2px] bg-white transition-all duration-200 ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
-                    <span className={`block w-5 h-[2px] bg-white transition-all duration-200 ${menuOpen ? 'opacity-0' : ''}`} />
-                    <span className={`block w-5 h-[2px] bg-white transition-all duration-200 ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
+                <button 
+                    onClick={() => setMenuOpen(!menuOpen)} 
+                    className="md:hidden flex flex-col items-center justify-center gap-[5px] w-12 h-12 -mr-2" 
+                    aria-label={menuOpen ? "Close menu" : "Open menu"}
+                >
+                    <span className={`block w-6 h-[2px] bg-white transition-all duration-200 ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
+                    <span className={`block w-6 h-[2px] bg-white transition-all duration-200 ${menuOpen ? 'opacity-0' : ''}`} />
+                    <span className={`block w-6 h-[2px] bg-white transition-all duration-200 ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
                 </button>
             </div>
 
@@ -227,7 +231,7 @@ function Navbar() {
                                 to={link.path}
                                 onClick={isDeals ? handleDealsClick : handleLinkClick}
                                 className={`text-sm font-semibold tracking-widest uppercase flex items-center gap-2
-                                           ${location.pathname === link.path ? 'text-[#c8ff57]' : 'text-[#7a7a90]'}`}
+                                           ${location.pathname === link.path ? 'text-[#c8ff57]' : 'text-[#94a3b8]'}`}
                             >
                                 {link.name}
                                 {isDeals && newDealsCount > 0 && (
@@ -241,7 +245,7 @@ function Navbar() {
 
                     {user && (
                         <Link to="/notifications" onClick={handleNotificationClick}
-                            className="text-sm font-semibold tracking-widest uppercase text-[#7a7a90] flex items-center gap-3 py-1">
+                            className="text-sm font-semibold tracking-widest uppercase text-[#94a3b8] flex items-center gap-3 py-1">
                             <Bell size={18} />
                             <span>Notifications</span>
                             {unreadCount > 0 && (
