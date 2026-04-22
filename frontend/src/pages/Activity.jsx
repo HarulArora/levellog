@@ -192,7 +192,7 @@ function Activity() {
     }
 
     return (
-        <div className="max-w-[800px] mx-auto px-5 md:px-10 py-8 md:py-10">
+        <div className="max-w-[800px] mx-auto px-2 sm:px-6 md:px-10 py-6 md:py-10">
 
             {/* Header */}
             <div className="flex items-baseline gap-4 mb-6 pb-4 border-b border-[#2a2a35]">
@@ -205,7 +205,7 @@ function Activity() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 mb-6">
+            <div className="flex flex-wrap gap-1.5 mb-5">
                 <button
                     onClick={() => setActiveTab('mine')}
                     className={`px-4 py-2 rounded font-mono text-xs uppercase
@@ -241,7 +241,7 @@ function Activity() {
                                 return (
                                     <div
                                         key={index}
-                                        className="flex items-center gap-4 px-5 py-4 bg-[#111118]
+                                        className="flex items-center gap-2 md:gap-4 px-2 md:px-5 py-3 md:py-4 bg-[#111118]
                                hover:bg-[#18181f] transition-all"
                                     >
                                         <div className={`w-9 h-9 rounded-lg flex items-center
@@ -249,7 +249,7 @@ function Activity() {
                                      ${config.bg}`}>
                                             {config.icon}
                                         </div>
-                                        <div className="flex-1 text-sm text-[#7a7a90]">
+                                        <div className="flex-1 text-[13px] md:text-sm text-[#7a7a90]">
                                             {config.getText(item)}
                                         </div>
                                         <div className="font-mono text-[10px] text-[#7a7a90] flex-shrink-0">
@@ -292,13 +292,13 @@ function Activity() {
                                         className="bg-[#111118] border border-[#2a2a35] rounded-lg
                                overflow-hidden hover:border-[#c8ff57]/30 transition-all"
                                     >
-                                        <div className="flex items-center gap-4 p-4">
+                                        <div className="flex items-center gap-2 md:gap-4 p-2 md:p-4">
 
                                             {/* Cover — clickable if igdbId */}
                                             <div
                                                 onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
-                                                className={`w-16 h-12 bg-cover bg-center bg-[#18181f]
-                                   rounded flex-shrink-0
+                                                className={`w-10 h-7.5 md:w-16 md:h-12 bg-cover bg-center bg-[#18181f]
+                                   rounded-sm flex-shrink-0
                                    ${game.igdbId ? 'cursor-pointer' : ''}`}
                                                 style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}
                                             >
@@ -312,7 +312,7 @@ function Activity() {
                                             <div className="flex-1 min-w-0">
                                                 <div
                                                     onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
-                                                    className={`text-white font-semibold text-sm truncate mb-1
+                                                    className={`text-white font-semibold text-[13px] md:text-sm truncate mb-1
                                       ${game.igdbId ? 'cursor-pointer hover:text-[#c8ff57] transition-colors' : ''}`}
                                                 >
                                                     {game.title}
@@ -324,11 +324,11 @@ function Activity() {
                                                         {sc.label}
                                                     </span>
                                                     {game.userId?.username && (
-                                                        <span className="font-mono text-[10px] text-[#7a7a90]">
+                                                        <span className="font-mono text-[9px] md:text-[10px] text-[#7a7a90]">
                                                             by{' '}
                                                             <Link
                                                                 to={`/user/${game.userId.username}`}
-                                                                className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors"
+                                                                className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors truncate max-w-[40px] md:max-w-none inline-block align-bottom"
                                                             >
                                                                 {game.userId.username}
                                                             </Link>
@@ -343,18 +343,18 @@ function Activity() {
                                                 {/* Friend's rating — BLUE */}
                                                 {game.rating > 0 && (
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="font-mono text-[9px] text-[#7a7a90]
-                                             uppercase tracking-wider">
+                                                        <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90]
+                                             uppercase tracking-wider max-w-[60px] md:max-w-none truncate text-right">
                                                             {game.userId?.username
                                                                 ? `${game.userId.username}'s`
                                                                 : "friend's"}
                                                         </span>
                                                         <div
-                                                            className="font-black text-xl text-[#5c9fff]"
+                                                            className="font-black text-sm md:text-xl text-[#5c9fff] leading-none"
                                                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                                         >
                                                             {game.rating}
-                                                            <small className="font-mono text-[9px] text-[#7a7a90] font-normal">
+                                                            <small className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] font-normal">
                                                                 /10
                                                             </small>
                                                         </div>
@@ -364,22 +364,22 @@ function Activity() {
                                                 {/* My rating — GREEN */}
                                                 {myRating ? (
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="font-mono text-[9px] text-[#7a7a90]
+                                                        <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90]
                                              uppercase tracking-wider">
                                                             my rating
                                                         </span>
                                                         <div
-                                                            className="font-black text-xl text-[#c8ff57]"
+                                                            className="font-black text-sm md:text-xl text-[#c8ff57] leading-none"
                                                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                                         >
                                                             {myRating}
-                                                            <small className="font-mono text-[9px] text-[#7a7a90] font-normal">
+                                                            <small className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] font-normal">
                                                                 /10
                                                             </small>
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="font-mono text-[9px] text-[#2a2a35]
+                                                    <div className="font-mono text-[8px] md:text-[9px] text-[#2a2a35]
                                           uppercase tracking-wider">
                                                         not rated
                                                     </div>
@@ -399,36 +399,36 @@ function Activity() {
 
                                         {/* Comparison bars — only if both rated */}
                                         {game.rating > 0 && myRating && (
-                                            <div className="px-4 pb-3 flex flex-col gap-1">
+                                            <div className="px-3 md:px-4 pb-3 flex flex-col gap-1">
 
                                                 {/* Friend bar — BLUE */}
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-[9px] text-[#7a7a90] w-14 text-right truncate">
+                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] w-10 md:w-14 text-right truncate">
                                                         {game.userId?.username?.slice(0, 8) || 'friend'}
                                                     </span>
-                                                    <div className="flex-1 relative h-1.5 bg-[#2a2a35] rounded-full">
+                                                    <div className="flex-1 relative h-1 md:h-1.5 bg-[#2a2a35] rounded-full">
                                                         <div
                                                             className="absolute left-0 top-0 h-full rounded-full bg-[#5c9fff]"
                                                             style={{ width: `${(game.rating / 10) * 100}%` }}
                                                         />
                                                     </div>
-                                                    <span className="font-mono text-[9px] text-[#5c9fff] w-4 text-right">
+                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#5c9fff] w-4 text-right">
                                                         {game.rating}
                                                     </span>
                                                 </div>
 
                                                 {/* My bar — GREEN */}
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-[9px] text-[#7a7a90] w-14 text-right">
+                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] w-10 md:w-14 text-right">
                                                         you
                                                     </span>
-                                                    <div className="flex-1 relative h-1.5 bg-[#2a2a35] rounded-full">
+                                                    <div className="flex-1 relative h-1 md:h-1.5 bg-[#2a2a35] rounded-full">
                                                         <div
                                                             className="absolute left-0 top-0 h-full rounded-full bg-[#c8ff57]"
                                                             style={{ width: `${(myRating / 10) * 100}%` }}
                                                         />
                                                     </div>
-                                                    <span className="font-mono text-[9px] text-[#c8ff57] w-4 text-right">
+                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#c8ff57] w-3 md:w-4 text-right">
                                                         {myRating}
                                                     </span>
                                                 </div>
