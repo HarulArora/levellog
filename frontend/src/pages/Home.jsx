@@ -525,7 +525,7 @@ function Home() {
                                                 Login →
                                             </button>
                                         </Link>
-                                    </>
+                                    </div>
                                 )}
                             </div>
 
