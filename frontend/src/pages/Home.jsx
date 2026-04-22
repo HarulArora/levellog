@@ -839,10 +839,10 @@ function Home() {
                                 <div className="relative">
                                     {game.cover ? (
                                         <img 
-                                            src={getIGDBImage(game.cover, SIZES.COVER_SMALL)} 
+                                            src={getIGDBImage(game.cover, SIZES.COVER_BIG)} 
                                             alt={game.title} 
-                                            width={180}
-                                            height={240}
+                                            width={264}
+                                            height={352}
                                             loading="lazy"
                                             className="w-full h-[160px] object-cover" 
                                         />
