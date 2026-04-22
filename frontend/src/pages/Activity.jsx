@@ -340,7 +340,8 @@ function Activity() {
                                         </div>
 
                                             {/* Ratings column — stacks on mobile, row on desktop */}
-                                            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 md:gap-1 flex-shrink-0 pt-2 sm:pt-0 border-t border-[#2a2a35]/40 sm:border-t-0">
+                                                                                        {!(game.rating > 0 && myRating) && (
+                                                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 md:gap-1 flex-shrink-0 pt-2 sm:pt-0 border-t border-[#2a2a35]/40 sm:border-t-0">
 
                                                 {/* Friend's rating — BLUE */}
                                                 {game.rating > 0 && (
@@ -387,7 +388,8 @@ function Activity() {
                                                     </div>
                                                 )}
 
-                                            </div>
+                                                </div>
+                                            )}
 
                                             {/* Date */}
                                             <div className="font-mono text-[10px] text-[#7a7a90]
