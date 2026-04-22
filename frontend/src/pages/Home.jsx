@@ -392,13 +392,13 @@ function Home() {
         dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
     }), [])
-
     const getMyRating = (igdbId) => {
         if (!igdbId || !user) return null
         const match = games.find(g => g.igdbId && Number(g.igdbId) === Number(igdbId))
         return match?.rating > 0 ? match.rating : null
     }
 
+    const allGames = useMemo(() => [...trending, ...topRated, ...comingSoon], [trending, topRated, comingSoon])
 
     return (
         <div className="min-h-screen">
@@ -453,7 +453,7 @@ function Home() {
                     `}
                 </script>
             </Helmet>
-
+ 
             {/* Mobile search bar — sticky just below navbar, hidden on desktop */}
             <div className="md:hidden sticky top-[57px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center">
                 <div className="w-full">
