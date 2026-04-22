@@ -192,7 +192,7 @@ function Activity() {
     }
 
     return (
-        <div className="max-w-[800px] mx-auto px-2 sm:px-6 md:px-10 py-6 md:py-10">
+        <div className="w-full max-w-[800px] mx-auto px-3 sm:px-6 md:px-10 py-6 md:py-10 overflow-x-hidden">
 
             {/* Header */}
             <div className="flex items-baseline gap-4 mb-6 pb-4 border-b border-[#2a2a35]">
@@ -290,9 +290,10 @@ function Activity() {
                                     <div
                                         key={game._id}
                                         className="bg-[#111118] border border-[#2a2a35] rounded-lg
-                               overflow-hidden hover:border-[#c8ff57]/30 transition-all"
+                               overflow-hidden hover:border-[#c8ff57]/30 transition-all w-full"
                                     >
-                                        <div className="flex items-center gap-2 md:gap-4 p-2 md:p-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4 p-3 md:p-4">
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
 
                                             {/* Cover — clickable if igdbId */}
                                             <div
@@ -337,8 +338,8 @@ function Activity() {
                                                 </div>
                                             </div>
 
-                                            {/* Ratings column */}
-                                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                            {/* Ratings column — stacks on mobile, row on desktop */}
+                                            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 md:gap-1 flex-shrink-0 pt-2 sm:pt-0 border-t border-[#2a2a35]/40 sm:border-t-0">
 
                                                 {/* Friend's rating — BLUE */}
                                                 {game.rating > 0 && (
@@ -428,7 +429,7 @@ function Activity() {
                                                             style={{ width: `${(myRating / 10) * 100}%` }}
                                                         />
                                                     </div>
-                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#c8ff57] w-3 md:w-4 text-right">
+                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#c8ff57] w-3 md:w-4 text-right flex-shrink-0">
                                                         {myRating}
                                                     </span>
                                                 </div>
