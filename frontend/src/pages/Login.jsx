@@ -40,7 +40,7 @@ function Login() {
         const result = await login(formData.identifier, formData.password)
         setLoading(false)
         if (result.success) {
-            navigate('/library')
+            navigate('/')
         } else {
             if (result.requiresVerification) {
                 navigate(`/verify-email?email=${encodeURIComponent(result.email)}`)
@@ -56,7 +56,7 @@ function Login() {
             try {
                 const result = await loginWithGoogle(tokenResponse.access_token)
                 if (result.success) {
-                    navigate('/library')
+                    navigate('/')
                 } else {
                     setError(result.message)
                 }

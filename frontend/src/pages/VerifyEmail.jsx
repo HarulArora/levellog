@@ -36,7 +36,7 @@ function VerifyEmail() {
         const result = await verifyEmail(email, code)
         setLoading(false)
         if (result.success) {
-            navigate('/library')
+            navigate('/')
         } else {
             setError(result.message)
         }

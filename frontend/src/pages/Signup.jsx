@@ -113,7 +113,7 @@ function Signup() {
             if (result.requiresVerification) {
                 navigate(`/verify-email?email=${encodeURIComponent(formData.email)}&username=${encodeURIComponent(formData.username)}`)
             } else {
-                navigate('/library')
+                navigate('/')
             }
         } else {
             if (result.field) {
@@ -130,7 +130,7 @@ function Signup() {
             try {
                 const result = await loginWithGoogle(tokenResponse.access_token)
                 if (result.success) {
-                    navigate('/library')
+                    navigate('/')
                 } else {
                     setError(result.message)
                 }
