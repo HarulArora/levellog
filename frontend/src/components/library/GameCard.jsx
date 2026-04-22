@@ -30,7 +30,7 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
     const sc = statusConfig[game.status] || statusConfig.planned
 
     // ── IMAGE URL ──
-    const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_BIG)
+    const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_SMALL)
 
     // ── Navigate to game detail page if igdbId exists ──
     const handleCardClick = () => {
@@ -112,7 +112,7 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
 
                 {/* Bottom row — genre left, rating right */}
                 <div className="mt-auto flex justify-between items-end pb-2">
-                    <span className="text-[#7a7a90] font-mono text-[10px] uppercase tracking-wider">
+                    <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider">
                         {game.genre}
                     </span>
 
@@ -132,7 +132,7 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                 </div>
 
                 {/* Hours tracked */}
-                <div className="pt-2 border-t border-[#2a2a35] text-[#7a7a90] font-mono text-[10px]">
+                <div className="pt-2 border-t border-[#2a2a35] text-[#94a3b8] font-mono text-[10px]">
                     {game.hours > 0 ? `⏱ ${game.hours}h tracked` : String.fromCharCode(160)}
                 </div>
 

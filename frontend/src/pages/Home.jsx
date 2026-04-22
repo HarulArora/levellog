@@ -27,19 +27,19 @@ const RatingDisplay = memo(({ myRating, platformAvg, hasUser }) => {
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
             {myRating ? (
                 <div className="flex items-center gap-1">
-                    <span className="font-mono text-[8px] text-[#7a7a90] uppercase tracking-wider">me</span>
+                    <span className="font-mono text-[9px] text-[#94a3b8] uppercase tracking-wider">me</span>
                     <div className="font-black text-lg text-[#c8ff57] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        {myRating}<small className="font-mono text-[8px] text-[#7a7a90] font-normal">/10</small>
+                        {myRating}<small className="font-mono text-[9px] text-[#94a3b8] font-normal">/10</small>
                     </div>
                 </div>
             ) : hasUser ? (
-                <div className="font-mono text-[8px] text-[#2a2a35] uppercase tracking-wider">not rated</div>
+                <div className="font-mono text-[9px] text-[#3a3a4a] uppercase tracking-wider">not rated</div>
             ) : null}
             {platformAvg ? (
                 <div className="flex items-center gap-1">
-                    <span className="font-mono text-[8px] text-[#7a7a90] uppercase tracking-wider">avg</span>
+                    <span className="font-mono text-[9px] text-[#94a3b8] uppercase tracking-wider">avg</span>
                     <div className="font-black text-lg text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        {platformAvg}<small className="font-mono text-[8px] text-[#7a7a90] font-normal">/10</small>
+                        {platformAvg}<small className="font-mono text-[9px] text-[#94a3b8] font-normal">/10</small>
                     </div>
                 </div>
             ) : null}
@@ -132,14 +132,32 @@ const HeroBanner = memo(({ games }) => {
             <div className="absolute top-0 left-0 right-0 h-[55%] flex items-end gap-3 pb-2">
                 <div className="flex gap-3 items-end will-change-transform" style={{ animation: `mosaicLeft ${isMobile ? '25s' : '40s'} linear infinite`, width: 'max-content' }}>
                     {[...row1Tiles, ...row1Tiles].map((tile, i) => (
-                        <img key={i} src={getIGDBImage(tile.img, SIZES.COVER_BIG)} alt="Game Cover Mosaic" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
+                        <img 
+                            key={i} 
+                            src={getIGDBImage(tile.img, SIZES.COVER_BIG)} 
+                            alt="Game Cover Mosaic" 
+                            width={tile.w.match(/\d+/)[0]}
+                            height={tile.h.match(/\d+/)[0]}
+                            fetchPriority={i < 4 ? "high" : "low"}
+                            decoding="async"
+                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} 
+                        />
                     ))}
                 </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-[55%] flex items-start gap-3 pt-2">
                 <div className="flex gap-3 items-start will-change-transform" style={{ animation: `mosaicRight ${isMobile ? '20s' : '32s'} linear infinite`, width: 'max-content' }}>
                     {[...row2Tiles, ...row2Tiles].map((tile, i) => (
-                        <img key={i} src={getIGDBImage(tile.img, SIZES.COVER_BIG)} alt="Trending Game Collection" className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} />
+                        <img 
+                            key={i} 
+                            src={getIGDBImage(tile.img, SIZES.COVER_BIG)} 
+                            alt="Trending Game Collection" 
+                            width={tile.w.match(/\d+/)[0]}
+                            height={tile.h.match(/\d+/)[0]}
+                            decoding="async"
+                            loading="lazy"
+                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} 
+                        />
                     ))}
                 </div>
             </div>
@@ -233,9 +251,9 @@ function GameSearchBar({ id = 'game-search' }) {
                     onKeyDown={handleKeyDown}
                     onFocus={() => results.length > 0 && setOpen(true)}
                     className="w-full bg-[#111118] border border-[#2a2a35] rounded-lg
-                               pl-11 pr-24 py-3 text-white text-sm
+                               pl-11 pr-24 py-3.5 text-white text-sm
                                focus:outline-none focus:border-[#c8ff57]
-                               placeholder:text-[#7a7a90] transition-all"
+                               placeholder:text-[#94999c] transition-all"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#a0a0b8] pointer-events-none">
                     {loading ? <span className="text-[#c8ff57] animate-pulse font-bold">searching…</span> : 'QuestDuck'}
@@ -276,7 +294,7 @@ function GameSearchBar({ id = 'game-search' }) {
                                                     <span className="font-mono text-[10px] text-[#7a7a90]">{game.releaseYear}</span>
                                                 )}
                                                 {game.genre && (
-                                                    <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#2a2a35] text-[#7a7a90]">
+                                                    <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#2a2a35] text-[#94999c]">
                                                         {game.genre}
                                                     </span>
                                                 )}
@@ -446,9 +464,9 @@ function Home() {
             {/* ══════════════════════════
                 HERO
             ══════════════════════════ */}
-            <section className="relative py-12 md:py-20 overflow-hidden">
-                {(trending.length > 0 || (!loading && trending.length > 0)) && (
-                    <HeroBanner games={[...trending, ...topRated, ...comingSoon]} />
+            <section className="relative py-16 md:py-24 overflow-hidden min-h-[500px] flex items-center">
+                {(allGames.length > 0 || !loading) && (
+                    <HeroBanner games={allGames} />
                 )}
 
                 <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10">
@@ -477,7 +495,7 @@ function Home() {
                                 <span className="text-[#c8ff57]">Pond.</span>
                             </h2>
 
-                            <p className="text-[#7a7a90] text-sm leading-relaxed mb-6 max-w-md">
+                            <p className="text-[#a0a0b8] text-sm leading-relaxed mb-8 max-w-md">
                                 Track every game across PC, PlayStation, Xbox, Switch,
                                 Mobile and more. Rate them, manage your backlog, find
                                 deals, and discover what to play next.
@@ -496,10 +514,10 @@ function Home() {
                                         </button>
                                     </>
                                 ) : (
-                                    <>
-                                        <Link to="/signup">
-                                            <button className="btn-apple btn-apple-primary px-6 py-3">
-                                                Get Started Free
+                                    <div className="flex flex-col sm:flex-row gap-4">
+                                        <Link to={user ? "/library" : "/signup"}>
+                                            <button className="btn-apple btn-apple-primary px-8 py-4 w-full sm:w-auto text-sm">
+                                                {user ? "View My Pond" : "Get Started Free"}
                                             </button>
                                         </Link>
                                         <Link to="/login">
@@ -563,7 +581,7 @@ function Home() {
                                     {recentGames.map(game => {
                                         const sc = statusConfig[game.status] || statusConfig.planned
                                         const imageUrl = game.cover
-                                            ? game.cover
+                                            ? getIGDBImage(game.cover, SIZES.COVER_SMALL)
                                             : game.steamId
                                                 ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
                                                 : null
@@ -580,9 +598,9 @@ function Home() {
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-white font-semibold text-sm truncate">{game.title}</div>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm ${sc.bg} ${sc.color}`}>{sc.label}</span>
+                                                        <span className={`font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm ${sc.bg} ${sc.color}`}>{sc.label}</span>
                                                         {game.platforms?.slice(0, 2).map(p => (
-                                                            <span key={p} className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#2a2a35] text-[#7a7a90]">{p}</span>
+                                                            <span key={p} className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#2a2a35] text-[#94999c]">{p}</span>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -683,7 +701,7 @@ function Home() {
                             </div>
                             <div className="sm:ml-auto">
                                 <Link to="/stats">
-                                    <button className="font-mono text-xs text-[#7a7a90] hover:text-[#c8ff57] transition-colors">View Full Stats →</button>
+                                    <button className="font-mono text-xs text-[#94a3b8] hover:text-[#c8ff57] transition-colors">View Full Stats →</button>
                                 </Link>
                             </div>
                         </div>
@@ -698,7 +716,7 @@ function Home() {
                 <div className="flex items-center gap-3 mb-6">
                     <span className="text-2xl"><Flame className="text-[#ff5c5c] fill-current" size={24} /></span>
                     <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Trending Now</h2>
-                    <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Most ponded this week</span>
+                    <span className="font-mono text-xs text-[#94a3b8] hidden sm:block">Most ponded this week</span>
                 </div>
                 {loading && trending.length === 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -735,19 +753,26 @@ function Home() {
                             {trending.map((game, index) => (
                                 <div key={game.id} onClick={() => navigate(`/game/${game.id}`)}
                                     className="flex items-center gap-4 p-3 rounded-lg border border-[#2a2a35] bg-[#111118] hover:border-[#c8ff57]/30 transition-all cursor-pointer">
-                                    <div className="font-black text-2xl text-[#2a2a35] w-6 text-center flex-shrink-0" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{index + 1}</div>
+                                    <div className="font-black text-2xl text-[#4a4a5e] w-6 text-center flex-shrink-0" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{index + 1}</div>
                                     {game.cover ? (
-                                        <img src={game.cover} alt={game.title} className="w-10 h-14 object-cover rounded flex-shrink-0" />
+                                        <img 
+                                            src={getIGDBImage(game.cover, SIZES.COVER_SMALL)} 
+                                            alt={game.title} 
+                                            width={40}
+                                            height={56}
+                                            loading="lazy"
+                                            className="w-10 h-14 object-cover rounded flex-shrink-0" 
+                                        />
                                     ) : (
                                         <div className="w-10 h-14 bg-[#2a2a35] rounded flex-shrink-0 flex items-center justify-center text-sm">🎮</div>
                                     )}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-white font-semibold text-sm truncate">{game.title}</div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#2a2a35] text-[#7a7a90]">{game.genre}</span>
-                                            {index < 2 && <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#ff5c5c]/15 text-[#ff5c5c]">HOT</span>}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-white font-semibold text-sm truncate">{game.title}</div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#2a2a35] text-[#d1d5db]">{game.genre}</span>
+                                                {index < 2 && <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#ff5c5c]/15 text-[#ff7a7a]">HOT</span>}
+                                            </div>
                                         </div>
-                                    </div>
                                     <RatingDisplay 
                                         myRating={getMyRating(game.id)} 
                                         platformAvg={gameStats[game.id]?.avgRating}
@@ -757,21 +782,28 @@ function Home() {
                             ))}
                         </div>
                         <div>
-                            <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">Top Rated This Month</div>
+                            <div className="font-mono text-xs text-[#94a3b8] uppercase tracking-widest mb-4">Top Rated This Month</div>
                             <div className="flex flex-col gap-2">
                                 {topRated.map((game, index) => (
                                     <div key={game.id} onClick={() => navigate(`/game/${game.id}`)}
                                         className="flex items-center gap-4 p-3 rounded-lg border border-[#2a2a35] bg-[#111118] hover:border-[#c8ff57]/30 transition-all cursor-pointer">
-                                        <div className="font-black text-2xl text-[#2a2a35] w-6 text-center flex-shrink-0" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{index + 1}</div>
+                                        <div className="font-black text-2xl text-[#4a4a5e] w-6 text-center flex-shrink-0" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{index + 1}</div>
                                         {game.cover ? (
-                                            <img src={game.cover} alt={game.title} className="w-10 h-14 object-cover rounded flex-shrink-0" />
+                                            <img 
+                                                src={getIGDBImage(game.cover, SIZES.COVER_SMALL)} 
+                                                alt={game.title} 
+                                                width={40}
+                                                height={56}
+                                                loading="lazy"
+                                                className="w-10 h-14 object-cover rounded flex-shrink-0" 
+                                            />
                                         ) : (
                                             <div className="w-10 h-14 bg-[#2a2a35] rounded flex-shrink-0 flex items-center justify-center text-sm">🎮</div>
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <div className="text-white font-semibold text-sm truncate">{game.title}</div>
                                             <div className="mt-1">
-                                                <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#2a2a35] text-[#7a7a90]">{game.genre}</span>
+                                                <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#2a2a35] text-[#d1d5db]">{game.genre}</span>
                                             </div>
                                         </div>
                                         <RatingDisplay 
@@ -793,7 +825,7 @@ function Home() {
             <section className="max-w-[1200px] mx-auto px-5 md:px-10 py-12 border-t border-[#2a2a35]">
                 <div className="flex items-center gap-3 mb-6">
                     <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Coming Soon</h2>
-                    <span className="font-mono text-xs text-[#7a7a90] hidden sm:block">Upcoming &amp; announced</span>
+                    <span className="font-mono text-xs text-[#94a3b8] hidden sm:block">Upcoming &amp; announced</span>
                 </div>
                 {loading && comingSoon.length === 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -806,7 +838,14 @@ function Home() {
                                 className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden hover:border-[#c8ff57]/50 transition-all cursor-pointer">
                                 <div className="relative">
                                     {game.cover ? (
-                                        <img src={game.cover} alt={game.title} className="w-full h-[160px] object-cover" />
+                                        <img 
+                                            src={getIGDBImage(game.cover, SIZES.COVER_SMALL)} 
+                                            alt={game.title} 
+                                            width={180}
+                                            height={240}
+                                            loading="lazy"
+                                            className="w-full h-[160px] object-cover" 
+                                        />
                                     ) : (
                                         <div className="w-full h-[160px] bg-[#18181f] flex items-center justify-center text-3xl">🎮</div>
                                     )}

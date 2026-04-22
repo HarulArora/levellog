@@ -69,7 +69,7 @@
 }
 
 .brand-description {
-    color: #7a7a90;
+    color: #a0a0b8;
     font-size: 0.85rem;
     line-height: 1.5;
     max-width: 280px;
@@ -85,12 +85,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
     background: rgba(42, 42, 53, 0.4);
     border: 1px solid rgba(42, 42, 53, 0.6);
-    color: #7a7a90;
+    color: #94999c;
     transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
@@ -183,13 +183,14 @@
 }
 
 .col-links li a {
-    color: #7a7a90;
+    color: #94999c;
     text-decoration: none;
     font-size: 0.9rem;
     font-weight: 500;
     display: flex;
     align-items: center;
     gap: 0.6rem;
+    padding: 0.25rem 0;
     transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
     font-family: 'DM Sans', sans-serif;
 }
@@ -226,7 +227,7 @@
 }
 
 .built-with {
-    color: #7a7a90;
+    color: #94999c;
     font-size: 0.8rem;
     display: flex;
     align-items: center;

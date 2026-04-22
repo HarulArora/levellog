@@ -9,4 +9,9 @@ export default defineConfig({
     ],
     // This fixes blank page on refresh in production
     base: '/',
+    server: {
+        headers: {
+            'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+        }
+    }
 })

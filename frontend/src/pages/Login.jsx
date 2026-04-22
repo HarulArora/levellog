@@ -51,6 +51,7 @@ function Login() {
     }
 
     const googleLogin = useGoogleLogin({
+        flow: 'implicit',
         onSuccess: async (tokenResponse) => {
             setGoogleLoading(true)
             try {
@@ -60,13 +61,17 @@ function Login() {
                 } else {
                     setError(result.message)
                 }
-            } catch {
+            } catch (err) {
+                console.error('Google login error:', err)
                 setError('Google sign-in failed. Please try again.')
             } finally {
                 setGoogleLoading(false)
             }
         },
-        onError: () => setError('Google sign-in was cancelled or failed'),
+        onError: (error) => {
+            console.error('Google Login Error:', error)
+            setError('Google sign-in was cancelled or failed. Please check if popups are blocked.')
+        },
     })
 
     return (
