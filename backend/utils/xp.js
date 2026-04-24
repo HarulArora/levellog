@@ -24,25 +24,51 @@ export const getLevelInfo = (xp) => {
 }
 
 export const awardXP = async (userId, amount = 1) => {
-    const user = await User.findById(userId)
+    // Atomic increment to prevent race conditions
+    const user = await User.findByIdAndUpdate(
+        userId,
+        { $inc: { xp: amount } },
+        { returnDocument: 'after' }
+    )
     if (!user) return
-    user.xp = (user.xp || 0) + amount
+
+    // Ensure level and badge are in sync
     const { current } = getLevelInfo(user.xp)
-    user.level = current.level
-    user.badge = current.badge
-    await user.save()
+    if (user.level !== current.level || user.badge !== current.badge) {
+        // Use updateOne to bypass full document validation (avoids legacy data validation errors)
+        await User.updateOne(
+            { _id: userId },
+            { $set: { level: current.level, badge: current.badge } }
+        )
+        user.level = current.level
+        user.badge = current.badge
+    }
     return user
 }
 
 // XP never goes below 0. Level recalculates automatically.
 // Unlocked content is preserved in DB but locked in route-level checks.
 export const deductXP = async (userId, amount = 1) => {
+    // We fetch first to ensure we don't go below 0
     const user = await User.findById(userId)
     if (!user) return
-    user.xp = Math.max(0, (user.xp || 0) - amount)
-    const { current } = getLevelInfo(user.xp)
+
+    const newXP = Math.max(0, (user.xp || 0) - amount)
+    
+    // Update atomically
+    await User.updateOne({ _id: userId }, { $set: { xp: newXP } })
+    
+    const { current } = getLevelInfo(newXP)
+    if (user.level !== current.level || user.badge !== current.badge) {
+        await User.updateOne(
+            { _id: userId },
+            { $set: { level: current.level, badge: current.badge } }
+        )
+    }
+    
+    // Return updated user (minimal)
+    user.xp = newXP
     user.level = current.level
     user.badge = current.badge
-    await user.save()
     return user
 }

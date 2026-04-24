@@ -669,6 +669,19 @@ router.get('/profile/:username', async (req, res) => {
         userObj.isRequestedByMe = isRequestedByMe
         userObj.followsMe = followsMe
 
+        // 🛡️ Self-Healing: If XP is lower than followerCount, it means some XP was lost (e.g. race conditions)
+        // We also sync the cached followerCount in the User document.
+        if (user.xp < followerCount || user.followerCount !== followerCount) {
+            const missingXP = Math.max(0, followerCount - user.xp)
+            if (missingXP > 0) {
+                await awardXP(user._id, missingXP)
+                userObj.xp = (user.xp || 0) + missingXP
+            }
+            if (user.followerCount !== followerCount) {
+                await User.findByIdAndUpdate(user._id, { $set: { followerCount } })
+            }
+        }
+
         res.json({ success: true, user: userObj })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch profile', error: error.message })
