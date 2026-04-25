@@ -116,7 +116,7 @@ const GifPicker = ({ onSelect, onClose }) => {
 
         searchTimeoutRef.current = setTimeout(() => {
             fetchGifs(search)
-        }, 400)
+        }, 600)
 
         return () => {
             if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
