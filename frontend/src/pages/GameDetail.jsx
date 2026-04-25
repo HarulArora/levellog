@@ -13,6 +13,35 @@ import Avatar from '../components/ui/Avatar'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 import { useLeaderboard } from '../context/LeaderboardContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
+import GifPicker from '../components/ui/GifPicker'
+import { Image, Video } from 'lucide-react'
+
+const GifIcon = ({ size = 16, className = "" }) => (
+    <svg 
+        width={size} 
+        height={size} 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2.5" 
+        strokeLinecap="round" 
+        strokeLinejoin="round" 
+        className={className}
+    >
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+        <text 
+            x="50%" 
+            y="50%" 
+            fontSize="9" 
+            fontWeight="900" 
+            fontFamily="system-ui" 
+            textAnchor="middle" 
+            dy=".3em" 
+            fill="currentColor" 
+            stroke="none"
+        >GIF</text>
+    </svg>
+)
 
 const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) => {
     const navigate = useNavigate()
@@ -24,6 +53,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     const isTop4 = rank && rank <= 4
 
     const [showReplyBox, setShowReplyBox] = useState(false)
+    const [showGifPicker, setShowGifPicker] = useState(false)
     const [replyText, setReplyText] = useState('')
     const [submittingReply, setSubmittingReply] = useState(false)
     const [editingText, setEditingText] = useState('')
@@ -205,12 +235,37 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
 
     const renderText = (text) => {
         if (!text) return null
-        const parts = text.split(/(@\w+)/g)
-        return parts.map((part, i) =>
-            part.startsWith('@')
-                ? <Link key={i} to={`/user/${part.slice(1)}`} className="text-[#c8ff57] font-semibold hover:underline">{part}</Link>
-                : <span key={i}>{part}</span>
-        )
+        
+        // Match mentions (@username) and URLs (http/https)
+        const parts = text.split(/(@\w+)|(https?:\/\/[^\s]+)/g)
+        
+        return parts.map((part, i) => {
+            if (!part) return null
+            
+            if (part.startsWith('@')) {
+                return <Link key={i} to={`/user/${part.slice(1)}`} className="text-[#c8ff57] font-semibold hover:underline">{part}</Link>
+            }
+            
+            if (part.startsWith('http')) {
+                // Check if it's an image/gif
+                const isImage = /\.(jpg|jpeg|png|webp|gif)$|giphy\.com\/media/i.test(part)
+                if (isImage) {
+                    return (
+                        <div key={i} className="mt-2 mb-1 max-w-full">
+                            <img 
+                                src={part} 
+                                alt="GIF" 
+                                loading="lazy"
+                                className="rounded-lg max-h-64 object-contain border border-[#2a2a35] hover:border-[#c8ff57]/50 transition-all" 
+                            />
+                        </div>
+                    )
+                }
+                return <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-[#5c9fff] hover:underline break-all">{part}</a>
+            }
+            
+            return <span key={i}>{part}</span>
+        })
     }
 
     const username = comment.userId?.username
@@ -347,8 +402,25 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                                 </div>
                             </div>
                             <div className="flex flex-col gap-1">
-                                <button onClick={handleReply} disabled={!replyText.trim() || submittingReply} className="px-3 py-1.5 bg-[#c8ff57] text-black font-bold text-[10px] rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-50 h-full">Post</button>
-                                <button onClick={() => { setShowReplyBox(false); setReplyText('') }} className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:bg-white/5 transition-all">✕</button>
+                                <div className="flex gap-1">
+                                    <button onClick={handleReply} disabled={!replyText.trim() || submittingReply} className="px-3 py-1.5 bg-[#c8ff57] text-black font-bold text-[10px] rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-50 h-full">Post</button>
+                                    <div className="relative">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setShowGifPicker(!showGifPicker) }} 
+                                            className={`p-1.5 border rounded hover:bg-white/5 transition-all h-full flex items-center justify-center ${showGifPicker ? 'border-[#c8ff57] text-[#c8ff57]' : 'border-[#2a2a35] text-[#7a7a90]'}`}
+                                            title="Add GIF"
+                                        >
+                                            <GifIcon size={14} />
+                                        </button>
+                                        {showGifPicker && (
+                                            <GifPicker 
+                                                onSelect={(url) => { setReplyText(prev => prev + (prev ? ' ' : '') + url); setShowGifPicker(false) }} 
+                                                onClose={() => setShowGifPicker(false)} 
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                                <button onClick={() => { setShowReplyBox(false); setReplyText(''); setShowGifPicker(false) }} className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:bg-white/5 transition-all">✕</button>
                             </div>
                         </div>
                     </div>
@@ -390,6 +462,7 @@ function GameDetail() {
     const [wishing, setWishing] = useState(false)
 
     const [commentText, setCommentText] = useState('')
+    const [showGifPicker, setShowGifPicker] = useState(false)
     const [submittingComment, setSubmittingComment] = useState(false)
     const [xpToast, setXpToast] = useState(null)
     const [lightboxIndex, setLightboxIndex] = useState(null)
@@ -1037,12 +1110,29 @@ function GameDetail() {
                                                         <span className="font-mono text-[9px] text-[#505060]">{commentText.length}/1000</span>
                                                         <span className="font-mono text-[9px] text-[#7a7a90]">Ctrl+Enter to post</span>
                                                     </div>
-                                                    <button onClick={handlePostComment}
-                                                        disabled={!commentText.trim() || submittingComment}
-                                                        className="px-4 py-1.5 bg-[#c8ff57] text-black font-bold text-xs rounded
-                                                                   hover:bg-[#d4ff6e] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                                                        {submittingComment ? 'Posting...' : 'Post'}
-                                                    </button>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="relative">
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); setShowGifPicker(!showGifPicker) }}
+                                                                className={`p-1.5 border rounded hover:bg-white/5 transition-all flex items-center justify-center ${showGifPicker ? 'border-[#c8ff57] text-[#c8ff57]' : 'border-[#2a2a35] text-[#7a7a90]'}`}
+                                                                title="Add GIF"
+                                                            >
+                                                                <GifIcon size={16} />
+                                                            </button>
+                                                            {showGifPicker && (
+                                                                <GifPicker 
+                                                                    onSelect={(url) => { setCommentText(prev => prev + (prev ? ' ' : '') + url); setShowGifPicker(false) }} 
+                                                                    onClose={() => setShowGifPicker(false)} 
+                                                                />
+                                                            )}
+                                                        </div>
+                                                        <button onClick={handlePostComment}
+                                                            disabled={!commentText.trim() || submittingComment}
+                                                            className="px-4 py-1.5 bg-[#c8ff57] text-black font-bold text-xs rounded
+                                                                       hover:bg-[#d4ff6e] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                                                            {submittingComment ? 'Posting...' : 'Post'}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
