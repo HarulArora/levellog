@@ -1,4 +1,5 @@
 import express from 'express'
+import mongoose from 'mongoose'
 import Comment from '../models/Comment.js'
 import CommentLike from '../models/CommentLike.js'
 import Notification from '../models/Notification.js'
@@ -132,6 +133,9 @@ router.delete('/:id', protect, async (req, res) => {
 router.post('/:id/like', protect, async (req, res) => {
     try {
         const commentId = req.params.id
+        if (!mongoose.Types.ObjectId.isValid(commentId)) {
+            return res.status(400).json({ success: false, message: 'Invalid comment ID' })
+        }
         const userId = req.user._id
 
         const existing = await CommentLike.findOne({ commentId, userId })
@@ -141,18 +145,15 @@ router.post('/:id/like', protect, async (req, res) => {
         let finalStatus = { liked: false, disliked: false }
 
         if (existing?.type === 'like') {
-            // Un-like
             await existing.deleteOne()
             likeDiff = -1
         } else if (existing?.type === 'dislike') {
-            // Dislike -> Like
             existing.type = 'like'
             await existing.save()
             likeDiff = 1
             dislikeDiff = -1
             finalStatus.liked = true
         } else {
-            // New Like
             await CommentLike.create({ commentId, userId, type: 'like' })
             likeDiff = 1
             finalStatus.liked = true
@@ -163,6 +164,8 @@ router.post('/:id/like', protect, async (req, res) => {
             { $inc: { likeCount: likeDiff, dislikeCount: dislikeDiff } },
             { returnDocument: 'after' }
         )
+
+        if (!updatedComment) return res.status(404).json({ success: false, message: 'Comment not found' })
 
         res.json({
             success: true,
@@ -179,6 +182,9 @@ router.post('/:id/like', protect, async (req, res) => {
 router.post('/:id/dislike', protect, async (req, res) => {
     try {
         const commentId = req.params.id
+        if (!mongoose.Types.ObjectId.isValid(commentId)) {
+            return res.status(400).json({ success: false, message: 'Invalid comment ID' })
+        }
         const userId = req.user._id
 
         const existing = await CommentLike.findOne({ commentId, userId })
@@ -188,18 +194,15 @@ router.post('/:id/dislike', protect, async (req, res) => {
         let finalStatus = { liked: false, disliked: false }
 
         if (existing?.type === 'dislike') {
-            // Un-dislike
             await existing.deleteOne()
             dislikeDiff = -1
         } else if (existing?.type === 'like') {
-            // Like -> Dislike
             existing.type = 'dislike'
             await existing.save()
             likeDiff = -1
             dislikeDiff = 1
             finalStatus.disliked = true
         } else {
-            // New Dislike
             await CommentLike.create({ commentId, userId, type: 'dislike' })
             dislikeDiff = 1
             finalStatus.disliked = true
@@ -210,6 +213,8 @@ router.post('/:id/dislike', protect, async (req, res) => {
             { $inc: { likeCount: likeDiff, dislikeCount: dislikeDiff } },
             { returnDocument: 'after' }
         )
+
+        if (!updatedComment) return res.status(404).json({ success: false, message: 'Comment not found' })
 
         res.json({
             success: true,
@@ -226,8 +231,12 @@ router.post('/:id/dislike', protect, async (req, res) => {
 // ── GET /api/comments/:id/like-status ─────────────────────────────────────────
 router.get('/:id/like-status', protect, async (req, res) => {
     try {
+        const commentId = req.params.id
+        if (!mongoose.Types.ObjectId.isValid(commentId)) {
+            return res.status(400).json({ success: false, message: 'Invalid comment ID' })
+        }
         const existing = await CommentLike.findOne({
-            commentId: req.params.id,
+            commentId,
             userId: req.user._id
         }).lean()
         res.json({
