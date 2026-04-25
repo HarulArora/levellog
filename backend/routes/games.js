@@ -4,7 +4,7 @@ import GameLike from '../models/GameLike.js'
 import Wishlist from '../models/Wishlist.js'
 import { protect, protectOptional } from '../middleware/auth.js'
 import { awardXP, deductXP } from '../utils/xp.js'
-import { updateGlobalStats } from '../utils/stats.js'
+import { updateGlobalStats, syncGlobalStats } from '../utils/stats.js'
 import { updateUserStats } from '../utils/userStats.js'
 import GlobalStats from '../models/GlobalStats.js'
 import { fetchGameDetailById } from './igdb.js'
@@ -82,31 +82,9 @@ router.get('/stats/:igdbId', async (req, res) => {
         
         // ── Self-Healing Strategy ──
         // If stats are missing, negative, or clearly inconsistent, trigger a recalculation.
-        if (stats && (stats.loggedCount < 0 || stats.wishlistCount < 0 || stats.likeCount < 0 || stats.ratingCount < 0)) {
-            const [realLogged, realLikes, realWishlist, ratingData] = await Promise.all([
-                Game.countDocuments({ igdbId }),
-                GameLike.countDocuments({ igdbId }),
-                Wishlist.countDocuments({ igdbId }),
-                Game.aggregate([
-                    { $match: { igdbId, rating: { $gt: 0 } } },
-                    { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 }, sum: { $sum: '$rating' } } }
-                ])
-            ])
-
-            const r = ratingData[0] || { avg: 0, count: 0, sum: 0 }
-            
-            stats = await GlobalStats.findOneAndUpdate(
-                { igdbId },
-                { 
-                    loggedCount: realLogged,
-                    likeCount: realLikes,
-                    wishlistCount: realWishlist,
-                    ratingCount: r.count,
-                    totalRatingSum: r.sum,
-                    avgRating: parseFloat(r.avg.toFixed(1))
-                },
-                { returnDocument: 'after', upsert: true }
-            )
+        if (!stats || stats.loggedCount < 0 || stats.wishlistCount < 0 || stats.likeCount < 0 || stats.ratingCount < 0) {
+            await syncGlobalStats(igdbId);
+            stats = await GlobalStats.findOne({ igdbId });
         }
 
         res.json({ 
@@ -139,6 +117,21 @@ router.get('/context/:igdbId', protectOptional, async (req, res) => {
             userId ? GameLike.findOne({ userId, igdbId }) : null,
             userId ? Wishlist.findOne({ userId, igdbId }) : null
         ])
+
+        // ── Real-time Inconsistency Check ──
+        // If the user has a record (liked/wishlisted) but the global count is 0, trigger a sync.
+        // This handles cases where server restarts or crashes caused a mismatch.
+        if ((like && stats?.likeCount === 0) || (wish && stats?.wishlistCount === 0)) {
+            await syncGlobalStats(igdbId);
+            const updatedStats = await GlobalStats.findOne({ igdbId });
+            if (updatedStats) {
+                stats.likeCount = updatedStats.likeCount;
+                stats.wishlistCount = updatedStats.wishlistCount;
+                stats.loggedCount = updatedStats.loggedCount;
+                stats.avgRating = updatedStats.avgRating;
+                stats.ratingCount = updatedStats.ratingCount;
+            }
+        }
 
         const cleanAvgRating = stats?.avgRating && stats.avgRating > 0 ? stats.avgRating : null;
 
