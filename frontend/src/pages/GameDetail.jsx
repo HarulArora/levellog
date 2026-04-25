@@ -255,15 +255,23 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                     {/* Body */}
                     {isEditing ? (
                         <div className="mt-2">
-                            <textarea value={editingText} onChange={e => setEditingText(e.target.value)} rows={2}
-                                className="w-full bg-[#18181f] border border-[#c8ff57]/30 rounded px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] transition-colors" />
-                            <div className="flex gap-2 mt-2">
-                                <button onClick={handleEdit} disabled={submittingEdit || !editingText.trim()} className="px-3 py-1 bg-[#c8ff57] text-black font-bold text-[10px] rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-50">Save</button>
-                                <button onClick={() => setIsEditing(false)} className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:border-white hover:text-white transition-all">Cancel</button>
+                            <textarea 
+                                value={editingText} 
+                                onChange={e => setEditingText(e.target.value)} 
+                                rows={2}
+                                maxLength={1000}
+                                className="w-full bg-[#18181f] border border-[#c8ff57]/30 rounded px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] transition-colors" 
+                            />
+                            <div className="flex justify-between items-center mt-1">
+                                <span className="text-[10px] text-[#505060] font-mono">{editingText.length}/1000</span>
+                                <div className="flex gap-2">
+                                    <button onClick={handleEdit} disabled={submittingEdit || !editingText.trim()} className="px-3 py-1 bg-[#c8ff57] text-black font-bold text-[10px] rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-50">Save</button>
+                                    <button onClick={() => setIsEditing(false)} className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:border-white hover:text-white transition-all">Cancel</button>
+                                </div>
                             </div>
                         </div>
                     ) : (
-                        <p className="text-[#c8c8d8] text-sm leading-relaxed break-words">{renderText(comment.text)}</p>
+                        <p className="text-[#c8c8d8] text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{renderText(comment.text)}</p>
                     )}
 
                     {/* Actions */}
@@ -323,9 +331,21 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                 {showReplyBox && (
                     <div className="mt-2 ml-2 animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="flex gap-2">
-                            <textarea value={replyText} onChange={e => setReplyText(e.target.value)} placeholder={`Reply to @${comment.userId?.username}...`} rows={2} autoFocus
-                                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleReply() }}
-                                className="flex-1 bg-[#18181f] border border-[#2a2a35] rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors shadow-inner" />
+                            <div className="flex-1 flex flex-col gap-1">
+                                <textarea 
+                                    value={replyText} 
+                                    onChange={e => setReplyText(e.target.value)} 
+                                    placeholder={`Reply to @${comment.userId?.username}...`} 
+                                    rows={2} 
+                                    autoFocus
+                                    maxLength={1000}
+                                    onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleReply() }}
+                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors shadow-inner" 
+                                />
+                                <div className="flex justify-end">
+                                    <span className="text-[9px] text-[#505060] font-mono">{replyText.length}/1000</span>
+                                </div>
+                            </div>
                             <div className="flex flex-col gap-1">
                                 <button onClick={handleReply} disabled={!replyText.trim() || submittingReply} className="px-3 py-1.5 bg-[#c8ff57] text-black font-bold text-[10px] rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-50 h-full">Post</button>
                                 <button onClick={() => { setShowReplyBox(false); setReplyText('') }} className="px-3 py-1 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:bg-white/5 transition-all">✕</button>
@@ -1001,15 +1021,22 @@ function GameDetail() {
                                                 </div>
                                             )}
                                             <div className="flex-1">
-                                                <textarea value={commentText} onChange={e => setCommentText(e.target.value)}
+                                                <textarea 
+                                                    value={commentText} 
+                                                    onChange={e => setCommentText(e.target.value)}
                                                     placeholder="Share your thoughts..."
                                                     rows={3}
+                                                    maxLength={1000}
                                                     onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handlePostComment() }}
                                                     className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2.5
                                                                text-sm text-white resize-none focus:outline-none focus:border-[#c8ff57]
-                                                               placeholder:text-[#7a7a90] transition-colors" />
+                                                               placeholder:text-[#7a7a90] transition-colors" 
+                                                />
                                                 <div className="flex items-center justify-between mt-2">
-                                                    <span className="font-mono text-[9px] text-[#7a7a90]">Ctrl+Enter to post</span>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-mono text-[9px] text-[#505060]">{commentText.length}/1000</span>
+                                                        <span className="font-mono text-[9px] text-[#7a7a90]">Ctrl+Enter to post</span>
+                                                    </div>
                                                     <button onClick={handlePostComment}
                                                         disabled={!commentText.trim() || submittingComment}
                                                         className="px-4 py-1.5 bg-[#c8ff57] text-black font-bold text-xs rounded
