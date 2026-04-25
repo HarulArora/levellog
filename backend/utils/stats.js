@@ -57,3 +57,47 @@ export const updateGlobalStats = async (igdbId, updates = {}) => {
         console.error(`[Stats] Error updating global stats for ${igdbId}:`, err)
     }
 }
+
+/**
+ * Perform a full recalculation of stats for a single game.
+ * Useful for self-healing when inconsistencies are detected.
+ * @param {number} igdbId 
+ */
+export const syncGlobalStats = async (igdbId) => {
+    if (!igdbId) return;
+    
+    // Dynamic imports to avoid circular dependencies if any
+    const Game = (await import('../models/Game.js')).default;
+    const GameLike = (await import('../models/GameLike.js')).default;
+    const Wishlist = (await import('../models/Wishlist.js')).default;
+
+    try {
+        const [realLogged, realLikes, realWishlist, ratingData] = await Promise.all([
+            Game.countDocuments({ igdbId }),
+            GameLike.countDocuments({ igdbId }),
+            Wishlist.countDocuments({ igdbId }),
+            Game.aggregate([
+                { $match: { igdbId, rating: { $gt: 0 } } },
+                { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 }, sum: { $sum: '$rating' } } }
+            ])
+        ]);
+
+        const r = ratingData[0] || { avg: 0, count: 0, sum: 0 };
+        const newAvg = r.count > 0 ? parseFloat(r.avg.toFixed(1)) : null;
+
+        await GlobalStats.findOneAndUpdate(
+            { igdbId: Number(igdbId) },
+            { 
+                loggedCount: realLogged,
+                likeCount: realLikes,
+                wishlistCount: realWishlist,
+                ratingCount: r.count,
+                totalRatingSum: r.sum,
+                avgRating: newAvg
+            },
+            { upsert: true }
+        );
+    } catch (err) {
+        console.error(`[Stats] Error syncing global stats for ${igdbId}:`, err);
+    }
+};
