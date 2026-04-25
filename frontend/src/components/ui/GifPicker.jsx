@@ -58,18 +58,24 @@ const GifPicker = ({ onSelect, onClose }) => {
         }
 
         try {
-            const res = await fetch(`https://api.giphy.com/v1/gifs/${endpoint}?${params.toString()}`, {
+            const response = await fetch(`https://api.giphy.com/v1/gifs/${endpoint}?${params.toString()}`, {
                 signal: abortControllerRef.current.signal
             })
             
-            if (res.status === 429) {
-                setError('Rate limit reached. Try again in a bit.')
+            if (response.status === 429) {
+                console.error('🚫 GIPHY API: Rate limit reached! (429)');
+                setError('GIPHY Rate Limit reached. Please wait a moment.')
+                setLoading(false)
                 return
             }
 
-            if (!res.ok) throw new Error('Giphy API error')
+            if (!response.ok) {
+                console.error(`❌ GIPHY API: Error ${response.status}`);
+                throw new Error(`Giphy API error: ${response.status}`)
+            }
             
-            const data = await res.json()
+            const data = await response.json()
+            console.log(`✅ GIPHY API: Successfully fetched ${data.data?.length || 0} GIFs`);
             const results = data.data || []
             
             if (results.length < 40) setHasMore(false)
