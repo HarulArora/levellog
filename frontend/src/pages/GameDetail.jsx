@@ -326,7 +326,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                             </div>
                         </div>
                     ) : (
-                        <p className="text-[#c8c8d8] text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{renderText(comment.text)}</p>
+                        <div className="text-[#c8c8d8] text-sm leading-relaxed break-words whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{renderText(comment.text)}</div>
                     )}
 
                     {/* Actions */}
