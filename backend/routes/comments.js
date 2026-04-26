@@ -124,8 +124,19 @@ router.put('/:id', protect, async (req, res) => {
 // ── DELETE /api/comments/:id ──────────────────────────────────────────────────
 router.delete('/:id', protect, async (req, res) => {
     try {
-        const comment = await Comment.findOne({ _id: req.params.id, userId: req.user._id })
-        if (!comment) return res.status(404).json({ success: false, message: 'Comment not found or not authorized' })
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid comment ID format' })
+        }
+
+        const comment = await Comment.findById(req.params.id)
+        
+        if (!comment) {
+            return res.status(404).json({ success: false, message: 'Comment not found (it may have been already deleted)' })
+        }
+
+        if (comment.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized to delete this comment' })
+        }
 
         if (!comment.parentId) {
             const replies = await Comment.find({ parentId: comment._id })
