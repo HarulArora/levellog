@@ -134,7 +134,7 @@ const HeroBanner = memo(({ games }) => {
                     {[...row1Tiles, ...row1Tiles].map((tile, i) => (
                         <img 
                             key={i} 
-                            src={getIGDBImage(tile.img, SIZES.COVER_BIG)} 
+                            src={getIGDBImage(tile.img, SIZES.COVER_SMALL)} 
                             alt="Game Cover Mosaic" 
                             width={tile.w.match(/\d+/)[0]}
                             height={tile.h.match(/\d+/)[0]}
@@ -150,7 +150,7 @@ const HeroBanner = memo(({ games }) => {
                     {[...row2Tiles, ...row2Tiles].map((tile, i) => (
                         <img 
                             key={i} 
-                            src={getIGDBImage(tile.img, SIZES.COVER_BIG)} 
+                            src={getIGDBImage(tile.img, SIZES.COVER_SMALL)} 
                             alt="Trending Game Collection" 
                             width={tile.w.match(/\d+/)[0]}
                             height={tile.h.match(/\d+/)[0]}

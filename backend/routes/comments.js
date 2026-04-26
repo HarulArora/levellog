@@ -13,21 +13,45 @@ const router = express.Router()
 router.get('/:igdbId', async (req, res) => {
     try {
         const igdbId = Number(req.params.igdbId)
-        const [topLevel, replies] = await Promise.all([
+        const page = Math.max(1, parseInt(req.query.page) || 1)
+        const limit = Math.min(50, parseInt(req.query.limit) || 15)
+        const skip = (page - 1) * limit
+
+        const [topLevel, total] = await Promise.all([
             Comment.find({ igdbId, parentId: null })
                 .populate('userId', 'username avatar badge level')
                 .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
                 .lean(),
-            Comment.find({ igdbId, parentId: { $ne: null } })
-                .populate('userId', 'username avatar badge level')
-                .sort({ createdAt: 1 })
-                .lean(),
+            Comment.countDocuments({ igdbId, parentId: null })
         ])
+
+        const topLevelIds = topLevel.map(c => c._id)
+        const replies = await Comment.find({ 
+            igdbId, 
+            parentId: { $in: topLevelIds } 
+        })
+        .populate('userId', 'username avatar badge level')
+        .sort({ createdAt: 1 })
+        .lean()
+
         const comments = topLevel.map(comment => ({
             ...comment,
             replies: replies.filter(r => r.parentId?.toString() === comment._id.toString())
         }))
-        res.json({ success: true, comments })
+
+        res.json({ 
+            success: true, 
+            comments,
+            pagination: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit),
+                hasMore: page * limit < total
+            }
+        })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }

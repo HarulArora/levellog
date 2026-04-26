@@ -150,7 +150,7 @@ const GifPicker = ({ onSelect, onClose }) => {
     return (
         <div 
             ref={containerRef}
-            className="gif-picker-container absolute bottom-full mb-3 right-0 w-80 bg-[#0d0d12] border border-[#2a2a35] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[100] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300"
+            className="gif-picker-container fixed md:absolute bottom-20 md:bottom-full left-4 right-4 md:left-auto md:right-0 md:w-80 bg-[#0d0d12] border border-[#2a2a35] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[1000] overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300"
         >
             {/* Header / Search */}
             <div className="p-4 border-b border-[#2a2a35] bg-[#111118]/80 backdrop-blur-md sticky top-0 z-10">
