@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, X, Loader2 } from 'lucide-react'
 
 // Using a more reliable way to handle the API key
-const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY || 'dc6zaTOxFJmzC'
+const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY
 
 const GifPicker = ({ onSelect, onClose }) => {
     const [search, setSearch] = useState('')
@@ -122,7 +122,7 @@ const GifPicker = ({ onSelect, onClose }) => {
 
         searchTimeoutRef.current = setTimeout(() => {
             fetchGifs(search)
-        }, 400)
+        }, 600)
 
         return () => {
             if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)

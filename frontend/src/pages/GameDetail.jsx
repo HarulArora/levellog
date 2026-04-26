@@ -77,7 +77,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     const hasInteracted = useRef(false)
 
     useEffect(() => {
-        if (!currentUser) return
+        if (!currentUser || comment._id.toString().startsWith('temp_')) return
         const fetchLikeState = async () => {
             try {
                 const res = await api.get(`/comments/${comment._id}/like-status`)
