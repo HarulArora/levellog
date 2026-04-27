@@ -14,7 +14,6 @@ import { getIGDBImage, SIZES } from '../utils/igdb'
 import { useLeaderboard } from '../context/LeaderboardContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import GifPicker from '../components/ui/GifPicker'
-import { Image, Video } from 'lucide-react'
 
 const GifIcon = ({ size = 16, className = "" }) => (
     <svg 
@@ -43,7 +42,7 @@ const GifIcon = ({ size = 16, className = "" }) => (
     </svg>
 )
 
-const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, depth = 0, gameTitle = '' }) => {
+const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, setAllComments, depth = 0, gameTitle = '' }) => {
     const navigate = useNavigate()
     const { topUsers } = useLeaderboard()
     
@@ -112,37 +111,35 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         if (!currentUser) { navigate('/login'); return }
         hasInteracted.current = true
 
-        // Capture current state for potential revert
         const prevLiked = liked
         const prevDisliked = disliked
         const prevLikes = likes
         const prevDislikes = dislikes
 
-        // Use functional updates to ensure we are using the most recent state in case of rapid clicks
-        setLiked(prev => !prev)
-        setDisliked(false)
-        setLikes(prev => liked ? prev - 1 : prev + 1)
-        if (disliked) setDislikes(prev => prev - 1)
-
-        // Trigger burst animation on new like
-        if (!liked) {
-            setShowBurst(true)
-            setTimeout(() => setShowBurst(false), 800)
-        }
+        // Truly instant optimistic update
+        setLiked(prev => {
+            const nowLiked = !prev
+            setLikes(l => nowLiked ? l + 1 : l - 1)
+            if (nowLiked && prevDisliked) {
+                setDisliked(false)
+                setDislikes(d => d - 1)
+            }
+            if (nowLiked) {
+                setShowBurst(true)
+                setTimeout(() => setShowBurst(false), 800)
+            }
+            return nowLiked
+        })
 
         try {
             const res = await api.post(`/comments/${comment._id}/like`)
-            // Sync with final server state
             setLikes(res.data.likes)
             setDislikes(res.data.dislikes)
             setLiked(res.data.liked)
             setDisliked(res.data.disliked)
         } catch (err) {
-            // Revert on error
-            setLiked(prevLiked)
-            setDisliked(prevDisliked)
-            setLikes(prevLikes)
-            setDislikes(prevDislikes)
+            setLiked(prevLiked); setDisliked(prevDisliked)
+            setLikes(prevLikes); setDislikes(prevDislikes)
             console.error('Like error:', err)
         }
     }
@@ -151,30 +148,30 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         if (!currentUser) { navigate('/login'); return }
         hasInteracted.current = true
 
-        // Capture current state for potential revert
         const prevLiked = liked
         const prevDisliked = disliked
         const prevLikes = likes
         const prevDislikes = dislikes
 
-        setDisliked(prev => !prev)
-        setLiked(false)
-        setDislikes(prev => disliked ? prev - 1 : prev + 1)
-        if (liked) setLikes(prev => prev - 1)
+        setDisliked(prev => {
+            const nowDisliked = !prev
+            setDislikes(d => nowDisliked ? d + 1 : d - 1)
+            if (nowDisliked && prevLiked) {
+                setLiked(false)
+                setLikes(l => l - 1)
+            }
+            return nowDisliked
+        })
 
         try {
             const res = await api.post(`/comments/${comment._id}/dislike`)
-            // Sync with final server state
             setLikes(res.data.likes)
             setDislikes(res.data.dislikes)
             setLiked(res.data.liked)
             setDisliked(res.data.disliked)
         } catch (err) {
-            // Revert on error
-            setLiked(prevLiked)
-            setDisliked(prevDisliked)
-            setLikes(prevLikes)
-            setDislikes(prevDislikes)
+            setLiked(prevLiked); setDisliked(prevDisliked)
+            setLikes(prevLikes); setDislikes(prevDislikes)
             console.error('Dislike error:', err)
         }
     }
@@ -203,6 +200,39 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         if (!replyText.trim() || submittingReply) return
         
         const text = replyText.trim()
+        const tempId = 'temp-' + Date.now()
+        const tempReply = {
+            _id: tempId,
+            text,
+            userId: currentUser,
+            createdAt: new Date().toISOString(),
+            likes: [],
+            dislikes: [],
+            likeCount: 0,
+            dislikeCount: 0,
+            replies: [],
+            isOptimistic: true
+        }
+
+        // Optimistic update for replies
+        setAllComments(prev => {
+            const updateReplies = (comments) => {
+                return comments.map(c => {
+                    if (c._id === comment._id) {
+                        return { ...c, replies: [...(c.replies || []), tempReply] }
+                    }
+                    if (c.replies && c.replies.length > 0) {
+                        return { ...c, replies: updateReplies(c.replies) }
+                    }
+                    return c
+                })
+            }
+            return updateReplies(prev)
+        })
+
+        setReplyText('')
+        setShowReplyBox(false)
+        setRepliesVisible(true)
         setSubmittingReply(true)
         
         try {
@@ -211,11 +241,40 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                 text, parentId: topParentId, replyToId: comment._id,
                 replyToUserId: comment.userId?._id, gameTitle,
             })
+            
+            // Replace temp reply with real one
+            setAllComments(prev => {
+                const replaceReply = (comments) => {
+                    return comments.map(c => {
+                        if (c.replies && c.replies.length > 0) {
+                            return { ...c, replies: c.replies.map(r => r._id === tempId ? res.data.comment : r) }
+                        }
+                        return c
+                    })
+                }
+                const updated = replaceReply(prev)
+                // If it wasn't found in immediate children, try deeper
+                return updated
+            })
+            
             onXpToast(res.data.message || '💬 Reply posted · +1 XP', 'gain')
-            setReplyText(''); setShowReplyBox(false); setRepliesVisible(true)
-            onRefresh(true) // Silently sync with server
+            onRefresh(true) 
         } catch (err) { 
             console.error('Reply error:', err)
+            // Revert optimistic update
+            setAllComments(prev => {
+                const removeReply = (comments) => {
+                    return comments.map(c => {
+                        if (c.replies && c.replies.length > 0) {
+                            return { ...c, replies: c.replies.filter(r => r._id !== tempId) }
+                        }
+                        return c
+                    })
+                }
+                return removeReply(prev)
+            })
+            setReplyText(text)
+            setShowReplyBox(true)
             onXpToast('Failed to post reply', 'loss')
         }
         finally { setSubmittingReply(false) }
@@ -250,13 +309,20 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                 // Check if it's an image/gif
                 const isImage = /\.(jpg|jpeg|png|webp|gif)$|giphy\.com\/media/i.test(part)
                 if (isImage) {
+                    // Optimize Giphy URLs to use downsized versions for performance
+                    let optimizedPart = part
+                    if (part.includes('giphy.com')) {
+                        optimizedPart = part.replace(/\/giphy\.gif$/, '/giphy-downsized.gif')
+                            .replace(/\/200\.gif$/, '/200w.gif')
+                    }
+
                     return (
                         <div key={i} className="mt-2 mb-1 max-w-full">
                             <img 
-                                src={part} 
+                                src={optimizedPart} 
                                 alt="GIF" 
                                 loading="lazy"
-                                className="rounded-lg max-h-64 object-contain border border-[#2a2a35] hover:border-[#c8ff57]/50 transition-all" 
+                                className="rounded-lg max-h-64 object-contain border border-[#2a2a35] hover:border-[#c8ff57]/50 transition-all bg-[#0a0a0f]" 
                             />
                         </div>
                     )
@@ -431,7 +497,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                     <div className={`overflow-hidden transition-all duration-300 ${repliesVisible ? 'opacity-100 max-h-[9999px]' : 'opacity-0 max-h-0'}`}>
                         <div className="mt-2 flex flex-col gap-2">
                             {comment.replies.map(reply => (
-                                <CommentItem key={reply._id} comment={reply} currentUser={currentUser} igdbId={igdbId} onRefresh={onRefresh} onXpToast={onXpToast} depth={Math.min(depth + 1, 2)} gameTitle={gameTitle} />
+                                <CommentItem key={reply._id} comment={reply} currentUser={currentUser} igdbId={igdbId} onRefresh={onRefresh} onXpToast={onXpToast} setAllComments={setAllComments} depth={Math.min(depth + 1, 2)} gameTitle={gameTitle} />
                             ))}
                         </div>
                     </div>
@@ -467,6 +533,10 @@ function GameDetail() {
     const [xpToast, setXpToast] = useState(null)
     const [lightboxIndex, setLightboxIndex] = useState(null)
     const [shareCopied, setShareCopied] = useState(false)
+    const [commentPage, setCommentPage] = useState(1)
+    const [allComments, setAllComments] = useState([])
+    const [hasMoreComments, setHasMoreComments] = useState(false)
+    const [loadingMoreComments, setLoadingMoreComments] = useState(false)
     const location = useLocation()
 
     // ── Deep Linking for Tabs ──
@@ -493,17 +563,34 @@ function GameDetail() {
         }
     }, [contextData])
 
-    const { data: commentsData, refetch: refetchComments, setData: setCommentsData } = useCachedFetch(
-        `game_comments_${igdbId}`,
-        `/comments/${igdbId}`,
-        { ttl: 1 * 60 * 1000, deps: [igdbId] } 
+    const { data: commentsData, loading: loadingComments, refetch: refetchComments } = useCachedFetch(
+        `game_comments_${igdbId}_${commentPage}`,
+        `/comments/${igdbId}?page=${commentPage}&limit=10`,
+        { ttl: 1 * 60 * 1000, deps: [igdbId, commentPage] } 
     )
+
+    useEffect(() => {
+        if (commentsData?.comments) {
+            if (commentPage === 1) {
+                setAllComments(commentsData.comments)
+            } else {
+                setAllComments(prev => {
+                    // Avoid duplicates
+                    const existingIds = new Set(prev.map(c => c._id))
+                    const newComments = commentsData.comments.filter(c => !existingIds.has(c._id))
+                    return [...prev, ...newComments]
+                })
+            }
+            setHasMoreComments(commentsData.pagination?.hasMore || false)
+            setLoadingMoreComments(false)
+        }
+    }, [commentsData, commentPage])
 
     const game = contextData?.game
     const stats = contextData?.stats
     const loading = loadingContext && !game
     const error = contextError
-    const comments = commentsData?.comments || []
+    const comments = allComments
 
     const [similarStats, setSimilarStats] = useState({})
     useEffect(() => {
@@ -535,8 +622,6 @@ function GameDetail() {
 
     const fetchPlatformStats = refetchContext
     const fetchComments = refetchComments
-
-
 
     useEffect(() => {
         const handler = (e) => {
@@ -661,30 +746,23 @@ function GameDetail() {
     const handlePostComment = async () => {
         if (!commentText.trim() || submittingComment) return
         const text = commentText.trim()
-        const previousComments = commentsData?.comments || []
         
-        // Optimistic Comment
-        const tempId = `temp_${Date.now()}`
-        const optimisticComment = {
+        // Optimistic Update
+        const tempId = 'temp-' + Date.now()
+        const tempComment = {
             _id: tempId,
             text,
+            userId: user,
             createdAt: new Date().toISOString(),
-            userId: {
-                _id: user.id || user._id,
-                username: user.username,
-                avatar: user.avatar,
-                badge: user.badge || '🎮',
-                level: user.level || 1
-            },
             likes: [],
             dislikes: [],
-            replies: []
+            likeCount: 0,
+            dislikeCount: 0,
+            replies: [],
+            isOptimistic: true // To show a "posting" style if needed
         }
-
-        setCommentsData({
-            ...commentsData,
-            comments: [optimisticComment, ...previousComments]
-        })
+        
+        setAllComments(prev => [tempComment, ...prev])
         setCommentText('')
         setSubmittingComment(true)
 
@@ -693,17 +771,17 @@ function GameDetail() {
                 text,
                 gameTitle: game?.title,
             })
+            
+            // Replace temp comment with real one
+            setAllComments(prev => prev.map(c => c._id === tempId ? res.data.comment : c))
             showXpToast(res.data.message || '💬 Comment posted · +1 XP', 'gain')
             
-            // Re-sync with server to get real ID and correct data
-            await fetchComments(true)
+            // Still sync with server to ensure everything is correct
+            await refetchComments(true)
         } catch (err) { 
             console.error('Comment error:', err)
-            // Rollback
-            setCommentsData({
-                ...commentsData,
-                comments: previousComments
-            })
+            // Revert optimistic update
+            setAllComments(prev => prev.filter(c => c._id !== tempId))
             setCommentText(text)
             showXpToast('Failed to post comment', 'loss')
         }
@@ -1155,11 +1233,22 @@ function GameDetail() {
                                         {comments.map(comment => (
                                             <CommentItem key={comment._id} comment={comment}
                                                 currentUser={user} igdbId={igdbId}
-                                                onRefresh={fetchComments} onXpToast={showXpToast}
+                                                onRefresh={refetchComments} onXpToast={showXpToast}
+                                                setAllComments={setAllComments}
                                                 depth={0}
                                                 gameTitle={game?.title}
                                             />
                                         ))}
+
+                                        {hasMoreComments && (
+                                            <button 
+                                                onClick={() => { setLoadingMoreComments(true); setCommentPage(p => p + 1) }}
+                                                disabled={loadingMoreComments || loadingComments}
+                                                className="w-full py-4 mt-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-xs uppercase tracking-widest rounded-lg hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all bg-[#111118]/50 disabled:opacity-50"
+                                            >
+                                                {loadingMoreComments ? 'Loading more...' : 'Load More Comments ↓'}
+                                            </button>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-16 gap-3">
