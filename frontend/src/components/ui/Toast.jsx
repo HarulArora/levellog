@@ -2,7 +2,7 @@
 // Small popup notification that appears and disappears automatically
 // Used to show success/error messages to the user
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 // message → text to show
 // type → 'success' or 'error' (controls color)
@@ -12,6 +12,11 @@ function Toast({ message, type = 'success', onClose }) {
     // visible controls the slide-in animation
     const [visible, setVisible] = useState(false)
 
+    const onCloseRef = useRef(onClose)
+    useEffect(() => {
+        onCloseRef.current = onClose
+    }, [onClose])
+
     useEffect(() => {
         // Trigger slide-in animation after mount
         setTimeout(() => setVisible(true), 10)
@@ -20,11 +25,13 @@ function Toast({ message, type = 'success', onClose }) {
         const timer = setTimeout(() => {
             setVisible(false)
             // Wait for slide-out animation then call onClose
-            setTimeout(onClose, 300)
+            setTimeout(() => {
+                if (onCloseRef.current) onCloseRef.current()
+            }, 300)
         }, 2800)
 
         return () => clearTimeout(timer)
-    }, [onClose])
+    }, []) // Run once on mount
 
     return (
         <div
