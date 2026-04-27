@@ -56,9 +56,14 @@ export default function useCachedFetch(cacheKey, url, options = {}) {
     useEffect(() => {
         if (cachedData) {
             setData(cachedData)
+            setLoading(false)
+            setError(null)
+        } else {
+            setData(null)
+            setLoading(enabled)
             setError(null)
         }
-    }, [cacheKey, cachedData])
+    }, [cacheKey, cachedData, enabled])
 
     useEffect(() => {
         if (!enabled) {

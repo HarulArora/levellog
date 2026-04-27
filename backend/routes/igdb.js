@@ -4,6 +4,7 @@ import { searchGames, getAccessToken } from '../utils/igdb.js'
 import Game from '../models/Game.js'
 import GameLike from '../models/GameLike.js'
 import logger from '../utils/logger.js'
+import apiClient from '../utils/apiClient.js'
 import { shortPlatform, normalizeCover } from '../utils/helpers.js'
 import GlobalList from '../models/GlobalList.js'
 import { syncIGDBLists } from '../tasks/igdbSync.js'
@@ -94,25 +95,17 @@ router.get('/discover', async (req, res) => {
         }
 
         const [gamesRes, countRes] = await Promise.all([
-            fetch('https://api.igdb.com/v4/games', {
-                method: 'POST',
-                headers,
-                body: `
+            apiClient.post('https://api.igdb.com/v4/games', `
           fields name, cover.url, genres.name, platforms.name, rating, rating_count, first_release_date;
           ${where};
           sort rating_count desc;
           limit ${limitNum};
           offset ${offset};
-        `
-            }),
-            fetch('https://api.igdb.com/v4/games/count', {
-                method: 'POST',
-                headers,
-                body: `${where};`
-            })
+        `, { headers, retry: 2, retryDelay: 2000 }),
+            apiClient.post('https://api.igdb.com/v4/games/count', `${where};`, { headers, retry: 2, retryDelay: 2000 })
         ])
 
-        const [gamesData, countData] = await Promise.all([gamesRes.json(), countRes.json()])
+        const [gamesData, countData] = [gamesRes.data, countRes.data]
 
         // Uses imported shortPlatform
 
@@ -188,14 +181,7 @@ export const fetchGameDetailById = async (gameId) => {
 
     const performFetch = async () => {
         const token = await getAccessToken()
-            const response = await fetch('https://api.igdb.com/v4/games', {
-                method: 'POST',
-                headers: {
-                    'Client-ID': process.env.IGDB_CLIENT_ID,
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'text/plain'
-                },
-                body: `
+            const response = await apiClient.post('https://api.igdb.com/v4/games', `
             fields name, cover.url, summary, genres.name,
                    platforms.name, first_release_date,
                    rating, rating_count, aggregated_rating,
@@ -208,16 +194,20 @@ export const fetchGameDetailById = async (gameId) => {
                    keywords.name,
                    similar_games.name, similar_games.cover.url,
                    similar_games.rating,
-                   screenshots.url,
-                   videos.video_id,
-                   storyline,
-                   themes.name;
+                   similar_games.genres.name,
+                   videos.video_id, screenshots.url;
             where id = ${gameId};
-            limit 1;
-          `
+            `, {
+                headers: {
+                    'Client-ID': process.env.IGDB_CLIENT_ID,
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'text/plain'
+                },
+                retry: 3,
+                retryDelay: 1000
             })
 
-            const data = await response.json()
+            const data = response.data
             if (!data || data.length === 0) return null
 
             const g = data[0]

@@ -18,7 +18,11 @@ import listsRouter from './routes/lists.js'
 import commentsRouter from './routes/comments.js'
 import dealsRouter from './routes/deals.js'
 import leaderboardRouter from './routes/leaderboard.js'
+import animeRouter from './routes/anime.js'
+import moviesRouter from './routes/movies.js'
+
 import { initCronJobs } from './tasks/igdbSync.js'
+import { initXPCron } from './tasks/xpSync.js'
 
 dotenv.config()
 
@@ -78,8 +82,8 @@ app.use(helmet({
             "default-src": ["'self'"],
             "script-src": ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
             "connect-src": ["'self'", "https://questduck.com", "https://*.onrender.com", "https://*.googleapis.com"],
-            "img-src": ["'self'", "data:", "https://images.igdb.com", "https://www.cheapshark.com", "https://*.googleusercontent.com"],
-            "frame-src": ["'self'", "https://accounts.google.com"],
+            "img-src": ["'self'", "data:", "https://images.igdb.com", "https://www.cheapshark.com", "https://*.googleusercontent.com", "https://cdn.myanimelist.net", "https://image.tmdb.org", "https://*.tmdb.org"],
+            "frame-src": ["'self'", "https://accounts.google.com", "https://www.youtube.com", "https://youtube.com"],
             "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             "font-src": ["'self'", "https://fonts.gstatic.com"],
         },
@@ -110,6 +114,9 @@ app.use('/api/lists', listsRouter)
 app.use('/api/comments', commentsRouter)
 app.use('/api/deals', dealsRouter)
 app.use('/api/leaderboard', leaderboardRouter)
+app.use('/api/anime', animeRouter)
+app.use('/api/movies', moviesRouter)
+
 
 app.get('/', (req, res) => res.json({ 
     success: true, 
@@ -142,6 +149,7 @@ mongoose
         app.listen(PORT, () => {
             logger.info(`🚀 Server running on port ${PORT}`)
             initCronJobs() // 🕒 Start background tasks
+            initXPCron()   // 🛡️ Start weekly XP maintenance
         })
     })
     .catch((error) => {

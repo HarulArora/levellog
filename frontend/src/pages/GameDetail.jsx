@@ -1018,6 +1018,7 @@ function GameDetail() {
                                     </div>
                                 )}
 
+
                                 {summaryText && (
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">About</div>

@@ -11,6 +11,8 @@ import { GamesProvider } from './context/GamesContext.jsx'
 import { DealsProvider } from './context/DealsContext.jsx'
 import { FollowProvider } from './context/FollowContext.jsx'
 import { LeaderboardProvider } from './context/LeaderboardContext.jsx'
+import { SectionProvider } from './context/SectionContext.jsx'
+
 
 if (import.meta.env.VITE_SENTRY_DSN) {
     Sentry.init({
@@ -32,6 +34,7 @@ createRoot(document.getElementById('root')).render(
         <HelmetProvider>
             {GoogleClientId ? (
                 <GoogleOAuthProvider clientId={GoogleClientId}>
+                    <SectionProvider>
                     <AuthProvider>
                         <GamesProvider>
                             <DealsProvider>
@@ -43,8 +46,10 @@ createRoot(document.getElementById('root')).render(
                             </DealsProvider>
                         </GamesProvider>
                     </AuthProvider>
+                    </SectionProvider>
                 </GoogleOAuthProvider>
             ) : (
+                <SectionProvider>
                 <AuthProvider>
                     <GamesProvider>
                         <DealsProvider>
@@ -56,6 +61,7 @@ createRoot(document.getElementById('root')).render(
                         </DealsProvider>
                     </GamesProvider>
                 </AuthProvider>
+                </SectionProvider>
             )}
         </HelmetProvider>
     </StrictMode>

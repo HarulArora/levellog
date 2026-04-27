@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
-import Navbar from './components/Navbar'
+import NavbarSectionAdapter from './components/NavbarSectionAdapter'
+import SectionSwitcher from './components/SectionSwitcher'
 import Footer from './components/Footer'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
@@ -24,6 +25,37 @@ const Deals = lazy(() => import('./pages/Deals'))
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const UniversalSearch = lazy(() => import('./pages/UniversalSearch'))
+
+// Anime pages
+const AnimeHome = lazy(() => import('./pages/anime/AnimeHome'))
+const AnimeDiscover = lazy(() => import('./pages/anime/AnimeDiscover'))
+const AnimeLibrary = lazy(() => import('./pages/anime/AnimeLibrary'))
+const AnimeLists = lazy(() => import('./pages/anime/AnimeLists'))
+const AnimeDetail = lazy(() => import('./pages/anime/AnimeDetail'))
+
+// Movies pages
+const MoviesHome = lazy(() => import('./pages/movies/MoviesHome'))
+const MoviesDiscover = lazy(() => import('./pages/movies/MoviesDiscover'))
+const MoviesLibrary = lazy(() => import('./pages/movies/MoviesLibrary'))
+const MoviesLists = lazy(() => import('./pages/movies/MoviesLists'))
+const MovieDetail = lazy(() => import('./pages/movies/MovieDetail'))
+
+// Manga pages
+const MangaHome = lazy(() => import('./pages/manga/MangaHome'))
+const MangaDiscover = lazy(() => import('./pages/manga/MangaDiscover'))
+const MangaLibrary = lazy(() => import('./pages/manga/MangaLibrary'))
+const MangaLists = lazy(() => import('./pages/manga/MangaLists'))
+const MangaDetail = lazy(() => import('./pages/manga/MangaDetail'))
+
+// TV pages
+const TVHome = lazy(() => import('./pages/tv/TVHome'))
+const TVDiscover = lazy(() => import('./pages/tv/TVDiscover'))
+const TVLibrary = lazy(() => import('./pages/tv/TVLibrary'))
+const TVLists = lazy(() => import('./pages/tv/TVLists'))
+const TVDetail = lazy(() => import('./pages/tv/TVDetail'))
+
+
 
 const PageLoader = () => (
     <div className="fixed inset-0 bg-[#0a0a0f] z-[9999] flex flex-col items-center justify-center pointer-events-none">
@@ -139,7 +171,7 @@ function App() {
                         <Route path="/reset-password" element={<ResetPassword />} />
                         
                         {/* Main Layout Routes */}
-                        <Route element={<><Navbar /><main className="flex-1 flex flex-col w-full min-h-[90vh] bg-[#0a0a0f]"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></main><Footer /></>}>
+                        <Route element={<><NavbarSectionAdapter /><main className="flex-1 flex flex-col w-full min-h-[90vh] bg-[#0a0a0f]"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></main><Footer /></>}>
                             <Route path="/" element={<Home />} />
                             <Route path="/library" element={<Library />} />
                             <Route path="/lists" element={<Lists />} />
@@ -148,16 +180,48 @@ function App() {
                             <Route path="/user/:username" element={<Profile />} />
                             <Route path="/notifications" element={<Notifications />} />
                             <Route path="/search" element={<Search />} />
-                            <Route path="/game/:igdbId" element={<GameDetail />} />
+                            <Route path="/universal-search" element={<UniversalSearch />} />
+                             <Route path="/game/:igdbId" element={<GameDetail />} />
+                            <Route path="/anime/:id" element={<AnimeDetail />} />
+                            <Route path="/manga/:id" element={<MangaDetail />} />
+                            <Route path="/movies/:id" element={<MovieDetail />} />
+                            <Route path="/tv/:id" element={<TVDetail />} />
+
                             <Route path="/edit-profile" element={<EditProfile />} />
                             <Route path="/discover" element={<Discover />} />
                             <Route path="/deals" element={<Deals />} />
                             <Route path="/leaderboard" element={<Leaderboard />} />
                             <Route path="/privacy" element={<PrivacyPolicy />} />
                             <Route path="/terms" element={<TermsOfService />} />
+
+                            {/* Anime Routes */}
+                            <Route path="/anime" element={<AnimeHome />} />
+                            <Route path="/anime/discover" element={<AnimeDiscover />} />
+                            <Route path="/anime/library" element={<AnimeLibrary />} />
+                            <Route path="/anime/lists" element={<AnimeLists />} />
+
+                             {/* Movies Routes */}
+                            <Route path="/movies" element={<MoviesHome />} />
+                            <Route path="/movies/discover" element={<MoviesDiscover />} />
+                            <Route path="/movies/library" element={<MoviesLibrary />} />
+                            <Route path="/movies/lists" element={<MoviesLists />} />
+
+                            {/* Manga Routes */}
+                            <Route path="/manga" element={<MangaHome />} />
+                            <Route path="/manga/discover" element={<MangaDiscover />} />
+                            <Route path="/manga/library" element={<MangaLibrary />} />
+                            <Route path="/manga/lists" element={<MangaLists />} />
+
+                            {/* TV Routes */}
+                            <Route path="/tv" element={<TVHome />} />
+                            <Route path="/tv/discover" element={<TVDiscover />} />
+                            <Route path="/tv/library" element={<TVLibrary />} />
+                            <Route path="/tv/lists" element={<TVLists />} />
+
                         </Route>
-                        <Route path="*" element={<><Navbar /><NotFound /></>} />
+                        <Route path="*" element={<><NavbarSectionAdapter /><NotFound /></>} />
                     </Routes>
+                    <SectionSwitcher />
                 </Suspense>
             </div>
         </BrowserRouter>

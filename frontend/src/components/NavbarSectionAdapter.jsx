@@ -1,35 +1,46 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useSection } from '../context/SectionContext'
 import useNotifications from '../hooks/useNotifications'
 import { Bell, User, Search, LogOut, ChevronDown, UserSearch, Tags, ListChecks, Flame } from 'lucide-react'
 import { useDeals } from '../context/DealsContext'
 import Avatar from './ui/Avatar'
 
-
-function Navbar() {
+function NavbarSectionAdapter() {
     const location = useLocation()
     const navigate = useNavigate()
     const { user, logout, loading } = useAuth()
+    const { activeSection, animeSubSection, cinemaSubSection } = useSection()
     const { unreadCount, setUnreadCount } = useNotifications()
     const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const { newDealsCount, clearNewDealsCount } = useDeals()
     const dropdownRef = useRef(null)
 
+    // Dynamic links based on section and sub-section
+    const getSectionPath = (base) => {
+        if (activeSection === 'games') return base === 'home' ? '/' : `/${base}`
+        if (activeSection === 'anime') {
+            const sub = animeSubSection === 'manga' ? 'manga' : 'anime'
+            return base === 'home' ? `/${sub}` : `/${sub}/${base}`
+        }
+        if (activeSection === 'movies') {
+            const sub = cinemaSubSection === 'tv' ? 'tv' : 'movies'
+            return base === 'home' ? `/${sub}` : `/${sub}/${base}`
+        }
+        return base === 'home' ? '/' : `/${base}`
+    }
+
     const links = [
-        { name: 'HOME', path: '/' },
-        { name: 'DISCOVER', path: '/discover' },
-        { name: 'LIBRARY', path: '/library' },
+        { name: 'HOME', path: getSectionPath('home') },
+        { name: 'DISCOVER', path: getSectionPath('discover') },
+        { name: 'LIBRARY', path: getSectionPath('library') },
         { name: 'FRIENDS', path: '/search' },
         { name: 'LEADERBOARD', path: '/leaderboard' },
     ]
 
 
-    // Listen for new deals from Deals page
-    // Handle menu clicks outside
-
-    // Clear badge when visiting /deals
     useEffect(() => {
         if (location.pathname === '/deals') clearNewDealsCount()
     }, [location.pathname, clearNewDealsCount])
@@ -72,6 +83,7 @@ function Navbar() {
         setDropdownOpen(false)
     }
 
+    // Reuse the exact same JSX as Navbar.jsx but with the dynamic links
     return (
         <nav className="relative border-b border-[#2a2a35] bg-[#0a0a0f]/90 backdrop-blur-md sticky top-0 z-50">
             <div className="flex items-center justify-between px-5 md:px-10 py-4">
@@ -101,7 +113,6 @@ function Navbar() {
                                 >
                                     {link.name}
                                 </Link>
-                                {/* Deals new-deals badge */}
                                 {isDeals && newDealsCount > 0 && (
                                     <div className="absolute -top-2 -right-3 w-4 h-4 bg-[#c8ff57] rounded-full flex items-center justify-center font-mono text-[9px] text-black font-bold pointer-events-none">
                                         {newDealsCount > 9 ? '9+' : newDealsCount}
@@ -112,32 +123,15 @@ function Navbar() {
                     })}
                 </ul>
 
-                {/* Global Search Bar */}
-                <div className="hidden lg:flex flex-1 max-w-md mx-8 relative">
-                    <form 
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            const q = e.target.search.value;
-                            if (q.trim()) navigate(`/search?q=${encodeURIComponent(q)}`);
-                        }}
-                        className="w-full relative group"
-                    >
-                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors" />
-                        <input 
-                            name="search"
-                            type="text"
-                            placeholder="Quick Search..."
-                            className="w-full bg-[#111118] border border-[#2a2a35] rounded-full pl-12 pr-4 py-2 text-xs text-white focus:outline-none focus:border-[#c8ff57]/50 focus:bg-[#1a1a25] transition-all placeholder:text-[#505060]"
-                        />
-                    </form>
-                </div>
-
                 {/* Desktop right */}
                 <div className="hidden md:flex gap-3 items-center min-w-[120px] justify-end">
                     {!loading && (
                         user ? (
                             <>
-                                {/* Notifications */}
+                                <Link to="/universal-search" onClick={handleLinkClick} className="p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
+                                    <Search size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
+                                </Link>
+
                                 <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
                                     <Bell size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
                                     {unreadCount > 0 && (
@@ -147,7 +141,6 @@ function Navbar() {
                                     )}
                                 </Link>
 
-                                {/* Avatar dropdown */}
                                 <div className="relative" ref={dropdownRef}>
                                     <button onClick={() => setDropdownOpen(o => !o)} className="flex items-center gap-1.5 focus:outline-none p-1 pr-2 hover:bg-[#2a2a35]/30 rounded-full transition-all border border-transparent hover:border-[#2a2a35]">
                                         <Avatar />
@@ -156,8 +149,6 @@ function Navbar() {
 
                                     {dropdownOpen && (
                                         <div className="absolute right-0 top-[calc(100%+10px)] w-52 bg-[#111118] border border-[#2a2a35] rounded-lg shadow-2xl overflow-hidden z-50">
-
-                                            {/* User info */}
                                             <div className="px-4 py-4 border-b border-[#2a2a35] bg-[#1a1a25]/30">
                                                 <div className="flex items-center gap-3 mb-2">
                                                     <Avatar size="sm" />
@@ -172,7 +163,6 @@ function Navbar() {
                                                 </Link>
                                             </div>
 
-                                            {/* Dropdown Menu Links... (same as original) */}
                                             <div className="py-1">
                                                 <Link to={`/user/${user.username}`} onClick={handleLinkClick}
                                                     className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
@@ -180,7 +170,7 @@ function Navbar() {
                                                     <span>My Profile</span>
                                                 </Link>
 
-                                                <Link to="/lists" onClick={handleLinkClick}
+                                                <Link to={activeSection === 'games' ? '/lists' : `/${activeSection}/lists`} onClick={handleLinkClick}
                                                     className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
                                                     <ListChecks size={14} className="opacity-70" strokeWidth={2.5} />
                                                     <span>My Lists</span>
@@ -265,6 +255,13 @@ function Navbar() {
                     })}
 
                     {user && (
+                        <>
+                        <Link to="/universal-search" onClick={handleLinkClick}
+                            className="text-sm font-semibold tracking-widest uppercase text-[#94a3b8] flex items-center gap-3 py-1">
+                            <Search size={18} />
+                            <span>Search</span>
+                        </Link>
+
                         <Link to="/notifications" onClick={handleNotificationClick}
                             className="text-sm font-semibold tracking-widest uppercase text-[#94a3b8] flex items-center gap-3 py-1">
                             <Bell size={18} />
@@ -275,6 +272,7 @@ function Navbar() {
                                 </span>
                             )}
                         </Link>
+                        </>
                     )}
 
                     <div className="border-t border-[#2a2a35]" />
@@ -301,7 +299,7 @@ function Navbar() {
                                     <span>My Profile</span>
                                 </Link>
 
-                                <Link to="/lists" onClick={handleLinkClick}
+                                <Link to={activeSection === 'games' ? '/lists' : `/${activeSection}/lists`} onClick={handleLinkClick}
                                     className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
                                     <ListChecks size={16} />
                                     <span>My Lists</span>
@@ -345,4 +343,4 @@ function Navbar() {
     )
 }
 
-export default Navbar
+export default NavbarSectionAdapter;
