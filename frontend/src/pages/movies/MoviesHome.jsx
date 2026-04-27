@@ -2,23 +2,17 @@ import { useState, useRef, useMemo, useEffect, lazy, Suspense, memo, useCallback
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
-import { useSection } from '../../context/SectionContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Film, Flame, Plus, Tv, ChevronRight } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import AvatarFrame from '../../components/ui/AvatarFrame'
-import { getXPProgress } from '../../utils/levels'
 import { useLeaderboard } from '../../context/LeaderboardContext'
 import { Helmet } from 'react-helmet-async'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
+import StatsBar from '../../components/ui/StatsBar'
 
-const BAR_THEMES = {
-    1: 'bg-gradient-to-r from-[#ffd700]/15 to-[#111118] border-y-[#ffd700]/40 shadow-[0_0_40px_rgba(255,215,0,0.05)]',
-    2: 'bg-gradient-to-r from-[#B9F2FF]/15 to-[#111118] border-y-[#B9F2FF]/30',
-    3: 'bg-gradient-to-r from-[#cd7f32]/15 to-[#111118] border-y-[#cd7f32]/30',
-    4: 'bg-gradient-to-r from-[#94999c]/15 to-[#111118] border-y-[#94999c]/30',
-}
+
 
 const MovieLogModal = lazy(() => import('../../components/movies/MovieLogModal'))
 
@@ -47,44 +41,6 @@ const RatingDisplay = memo(({ myRating, platformAvg, hasUser }) => {
     )
 })
 
-const timeAgo = (date) => {
-    const seconds = Math.floor((new Date() - new Date(date)) / 1000)
-    if (seconds < 60) return 'just now'
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m ago`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours}h ago`
-    const days = Math.floor(hours / 24)
-    if (days < 7) return `${days}d ago`
-    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-const makeActivityConfig = (navigate, section) => ({
-    completed: {
-        icon: <Trophy size={16} />, bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
-        getText: (a) => (<>Finished watching{' '}<span onClick={() => a.movie.externalId && navigate(`/movies/${a.movie.externalId}?type=${a.movie.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.movie.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.movie.title}</span>{a.rating ? ` — rated it ${a.rating}/10` : ''}</>)
-    },
-    playing: {
-        icon: <Play size={16} fill="currentColor" />, bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
-        getText: (a) => (<>Started watching{' '}<span onClick={() => a.movie.externalId && navigate(`/movies/${a.movie.externalId}?type=${a.movie.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.movie.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.movie.title}</span></>)
-    },
-    rated: {
-        icon: <Star size={16} fill="currentColor" />, bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
-        getText: (a) => (<>Rated{' '}<span onClick={() => a.movie.externalId && navigate(`/movies/${a.movie.externalId}?type=${a.movie.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.movie.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.movie.title}</span>{` ${a.rating}/10`}</>)
-    },
-    planned: {
-        icon: <ListChecks size={16} />, bg: 'bg-[#2a2a35] text-[#e8e8f0]',
-        getText: (a) => (<>Added{' '}<span onClick={() => a.movie.externalId && navigate(`/movies/${a.movie.externalId}?type=${a.movie.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.movie.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.movie.title}</span>{' to watchlist'}</>)
-    },
-    dropped: {
-        icon: <X size={16} strokeWidth={3} />, bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
-        getText: (a) => (<>Dropped{' '}<span onClick={() => a.movie.externalId && navigate(`/movies/${a.movie.externalId}?type=${a.movie.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.movie.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.movie.title}</span>{a.movie.episodesWatched ? ` after ${a.movie.episodesWatched} ep` : ''}</>)
-    },
-    paused: {
-        icon: <Pause size={16} fill="currentColor" />, bg: 'bg-[#c45cff]/15 text-[#c45cff]',
-        getText: (a) => (<>Paused{' '}<span onClick={() => a.movie.externalId && navigate(`/movies/${a.movie.externalId}?type=${a.movie.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.movie.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.movie.title}</span></>)
-    },
-})
 
 const HeroBanner = memo(({ movies }) => {
     const isMobile = window.innerWidth < 768
@@ -292,18 +248,19 @@ function MoviesHome() {
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
     const [userMovies, setUserMovies] = useState([])
-    const [loadingLibrary, setLoadingLibrary] = useState(true)
 
-    const showToast = useCallback((message, type = 'success') => setToast({ message, type }), [])
+    const showToast = useCallback((message, type = 'success') => {
+        setToast({ message, type })
+        setTimeout(() => setToast(null), 3000)
+    }, [])
 
     useEffect(() => {
         const fetchLibrary = async () => {
-            if (!user) { setLoadingLibrary(false); return }
+            if (!user) return
             try {
                 const res = await api.get('/movies/library')
                 setUserMovies(res.data.library || [])
             } catch (err) { console.error(err) }
-            finally { setLoadingLibrary(false) }
         }
         fetchLibrary()
     }, [user, location.key])
@@ -334,6 +291,7 @@ function MoviesHome() {
         const filtered = userMovies.filter(m => (m.type || m.mediaType) === 'movie')
         return {
             total: filtered.length,
+            watching: filtered.filter(m => m.status === 'playing').length,
             completed: filtered.filter(m => m.status === 'completed').length,
             planned: filtered.filter(m => m.status === 'planned').length,
             avgRating: filtered.filter(m => m.rating > 0).length > 0
@@ -357,11 +315,6 @@ function MoviesHome() {
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
     }), [])
 
-    const getMyRating = (externalId) => {
-        if (!externalId || !user) return null
-        const match = userMovies.find(m => String(m.externalId) === String(externalId))
-        return match?.rating > 0 ? match.rating : null
-    }
 
     const allMovies = useMemo(() => homeData?.sections?.flatMap(s => s.items) || [], [homeData])
 
@@ -498,35 +451,17 @@ function MoviesHome() {
                 </div>
             </section>
 
-            {user && (
-                <section className={`border-y border-[#2a2a35] cursor-pointer hover:brightness-110 transition-all duration-500 ${BAR_THEMES[userRank] || 'bg-[#111118] hover:bg-[#18181f]'}`} onClick={() => navigate('/stats')}>
-                    <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-5">
-                        <div className="flex flex-col sm:flex-row items-center gap-6">
-                            <div className="flex items-center gap-3">
-                                <AvatarFrame userId={user?._id || user?.id} src={user?.avatar} size={42} className="home-stats-avatar" />
-                                <div className="flex flex-col gap-1 min-w-0">
-                                    <div className="text-white font-bold text-sm truncate">{user.username}</div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90]">@{user.username} · Cinephile</div>
-                                    <div className="flex items-center gap-2.5 mt-2">
-                                        <div className="flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2.5 py-1 border border-[#2a2a35]">
-                                            <span className="font-mono text-[10px] text-[#c8ff57] uppercase font-black tracking-widest leading-none">Lv.{user.level || 1}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="hidden sm:block w-px h-8 bg-[#2a2a35]" />
-                            <div className="flex gap-8">
-                                {[{ value: userStats.total, label: 'Total' }, { value: userStats.completed, label: 'Watched' }, { value: userStats.planned, label: 'Planned' }].map(stat => (
-                                    <div key={stat.label}>
-                                        <div className="font-black text-2xl text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stat.value}</div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider">{stat.label}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            )}
+            <StatsBar 
+                user={user} 
+                userRank={userRank} 
+                mediaType="movie"
+                stats={{
+                    total: userStats.total,
+                    active: userStats.watching,
+                    completed: userStats.completed,
+                    planned: userStats.planned
+                }}
+            />
             
             {error && (
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-12">
@@ -558,7 +493,7 @@ function MoviesHome() {
                                     <div className="w-10 h-10 bg-[#111118] border border-[#2a2a35] rounded-lg animate-pulse" />
                                     <div className="w-48 h-8 bg-[#111118] border border-[#2a2a35] rounded animate-pulse" />
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                                     {Array.from({ length: 6 }).map((_, j) => <GameCardSkeleton key={j} />)}
                                 </div>
                             </div>
@@ -578,17 +513,21 @@ function MoviesHome() {
                                         </h2>
                                     </div>
                                     <div 
-                                        onClick={() => navigate('/movies/discover')}
+                                        onClick={() => {
+                                            const type = section.title.toLowerCase().includes('trending') ? 'trending' : 
+                                                         section.title.toLowerCase().includes('top') ? 'top_rated' : 'coming_soon';
+                                            navigate(`/explore/movie/${type}`);
+                                        }}
                                         className="flex items-center gap-2 text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest group-hover:text-white transition-colors cursor-pointer"
                                     >
-                                        View More <ChevronRight size={14} />
+                                        Explore All <ChevronRight size={14} />
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                                    {section.items.map(item => (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                    {section.items.map((item, idx) => (
                                         <div 
-                                            key={item.externalId} 
+                                            key={`${section.title}-${item.externalId}-${idx}`} 
                                             onClick={() => navigate(`/movies/${item.externalId}`)}
                                             className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg"
                                         >
@@ -602,7 +541,6 @@ function MoviesHome() {
                                                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                                                     {stats[item.externalId]?.avgRating && (
                                                         <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                                                            <Star size={10} className="text-[#5c9fff] fill-current" />
                                                             <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats[item.externalId].avgRating}</span>
                                                         </div>
                                                     )}
@@ -620,7 +558,10 @@ function MoviesHome() {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono text-[10px] text-[#7a7a90]">{item.year}</span>
-                                                    <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-sm bg-[#2a2a35] text-[#94999c]">Movie</span>
+                                                    <span className="w-1 h-1 rounded-full bg-[#3a3a4a]" />
+                                                    <span className="font-mono text-[9px] text-[#c8ff57] uppercase tracking-widest">
+                                                        {item.genres?.[0] || 'Movie'}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>

@@ -16,6 +16,7 @@ const buildUser = (userData) => ({
     badge: userData.badge || '🎮',
     googleId: userData.googleId || null,
     hasPassword: userData.hasPassword || false,
+    settings: userData.settings || { libraryViewMode: 'grid' }
 })
 
 export function AuthProvider({ children }) {
@@ -200,6 +201,27 @@ export function AuthProvider({ children }) {
         }
     }
 
+    const updateSettings = async (newSettings) => {
+        try {
+            const res = await api.patch('/auth/settings', newSettings)
+            if (res.data.success) {
+                setUser(prev => ({ ...prev, settings: res.data.settings }))
+                return { success: true }
+            }
+        } catch (err) {
+            console.error('Failed to update settings', err)
+            return { success: false }
+        }
+    }
+
+    const updateUser = (data) => {
+        if (!data) return
+        setUser(prev => {
+            if (!prev) return null
+            return { ...prev, ...data }
+        })
+    }
+
     return (
         <AuthContext.Provider value={{
             user,
@@ -216,7 +238,9 @@ export function AuthProvider({ children }) {
             linkGoogle,
             unlinkGoogle,
             setPassword,
-            changePassword
+            changePassword,
+            updateSettings,
+            updateUser
         }}>
             {children}
         </AuthContext.Provider>

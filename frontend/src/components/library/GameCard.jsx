@@ -4,6 +4,7 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getIGDBImage, SIZES } from '../../utils/igdb'
+import { Star } from 'lucide-react'
 
 const GameCard = memo(({ game, onDelete, onEdit }) => {
 
@@ -52,25 +53,34 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
         >
 
             {/* ── Game Cover Image ── */}
-            <div
-                className="h-[110px] bg-cover bg-top bg-[#18181f] relative overflow-hidden shrink-0"
-                style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}
-            >
-                {!imageUrl && (
+            <div className="aspect-video relative overflow-hidden bg-[#18181f] shrink-0">
+                {imageUrl ? (
+                    <img 
+                        src={imageUrl} 
+                        alt={game.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                ) : (
                     <div className="w-full h-full flex items-center justify-center text-4xl">
                         🎮
                     </div>
                 )}
 
                 {/* Dark gradient at bottom */}
-                <div className="absolute bottom-0 left-0 right-0 h-10
-                                bg-gradient-to-t from-[#111118] to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#111118] via-transparent to-transparent opacity-60" />
 
                 {/* Status badge */}
                 <div className={`absolute top-2 left-2 font-mono text-[10px] uppercase
                                  tracking-wider px-2 py-[2px] rounded-sm ${sc.bg} ${sc.color}`}>
                     {sc.label}
                 </div>
+
+                {/* Community Average Rating Badge */}
+                {game.avgRating > 0 && (
+                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1.5 py-0.5 shadow-xl z-10">
+                        <span className="font-black text-[11px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
+                    </div>
+                )}
 
                 {/* "View Details" overlay — only if igdbId exists */}
                 {game.igdbId && (
@@ -83,13 +93,10 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                         </span>
                     </div>
                 )}
-
             </div>
 
             {/* ── Card Body ── */}
-            {/* flex flex-col + flex-1 so this section fills remaining card height */}
-            <div className="p-3 flex flex-col flex-1">
-
+            <div className="p-2.5 flex flex-col flex-1">
                 {/* Game title */}
                 <div className="font-semibold text-sm mb-2 truncate text-white
                                 group-hover:text-[#c8ff57] transition-colors">
@@ -110,30 +117,29 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                     ))}
                 </div>
 
-                {/* Bottom row — genre left, rating right */}
-                <div className="mt-auto flex justify-between items-end pb-2">
-                    <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider">
-                        {game.genre}
-                    </span>
+                {/* Bottom row — genre/year left, rating right */}
+                <div className="mt-auto flex justify-between items-end">
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[100px]">
+                            {game.genre}
+                        </span>
+                        {game.hours > 0 && (
+                            <span className="text-[#c8ff57] font-mono text-[9px] uppercase tracking-widest">
+                                ⏱ {game.hours}h tracked
+                            </span>
+                        )}
+                    </div>
 
                     {game.rating > 0 ? (
                         <span
-                            className="font-black text-lg text-[#c8ff57] leading-none tracking-wide"
+                            className="font-black text-2xl text-[#c8ff57] leading-none tracking-wide"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                         >
                             {game.rating}
-                            <small className="font-mono text-[10px] text-[#7a7a90] font-normal">
-                                /10
-                            </small>
                         </span>
                     ) : (
                         <span className="text-[#7a7a90] font-mono text-xs">—</span>
                     )}
-                </div>
-
-                {/* Hours tracked */}
-                <div className="pt-2 border-t border-[#2a2a35] text-[#94a3b8] font-mono text-[10px]">
-                    {game.hours > 0 ? `⏱ ${game.hours}h tracked` : String.fromCharCode(160)}
                 </div>
 
                 {/* ── Edit + Delete Buttons ── */}

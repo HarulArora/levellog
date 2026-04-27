@@ -20,9 +20,10 @@ import dealsRouter from './routes/deals.js'
 import leaderboardRouter from './routes/leaderboard.js'
 import animeRouter from './routes/anime.js'
 import moviesRouter from './routes/movies.js'
+import rankingsRouter from './routes/rankings.js'
 
-import { initCronJobs } from './tasks/igdbSync.js'
 import { initXPCron } from './tasks/xpSync.js'
+import { initRankingCrons } from './tasks/rankingsSync.js'
 
 dotenv.config()
 
@@ -116,6 +117,7 @@ app.use('/api/deals', dealsRouter)
 app.use('/api/leaderboard', leaderboardRouter)
 app.use('/api/anime', animeRouter)
 app.use('/api/movies', moviesRouter)
+app.use('/api/rankings', rankingsRouter)
 
 
 app.get('/', (req, res) => res.json({ 
@@ -148,8 +150,8 @@ mongoose
         const PORT = process.env.PORT || 5000
         app.listen(PORT, () => {
             logger.info(`🚀 Server running on port ${PORT}`)
-            initCronJobs() // 🕒 Start background tasks
             initXPCron()   // 🛡️ Start weekly XP maintenance
+            initRankingCrons() // 📊 Start rankings engine
         })
     })
     .catch((error) => {

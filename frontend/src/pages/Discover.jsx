@@ -4,7 +4,7 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
-import { Search } from 'lucide-react'
+import { Search, Star } from 'lucide-react'
 import { GameCardSkeleton } from '../components/ui/Skeleton'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
@@ -156,8 +156,36 @@ const GameCard = memo(({ game, entry, onClick }) => {
                 ) : (
                     <div className="game-card-placeholder">🎮</div>
                 )}
-                {/* gradient fade at bottom like the sample */}
+                {/* score color matching the HTML sample */}
                 <div className="game-card-gradient" />
+
+                {/* Community Average Rating Badge */}
+                {game.avgRating && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        background: 'rgba(0,0,0,0.82)',
+                        backdropFilter: 'blur(4px)',
+                        border: '1px solid rgba(92,159,255,0.3)',
+                        borderRadius: 4,
+                        padding: '3px 6px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        zIndex: 10,
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
+                    }}>
+                        <Star size={9} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                        <span style={{
+                            fontFamily: "'Bebas Neue', sans-serif",
+                            fontSize: 12,
+                            color: '#5c9fff',
+                            letterSpacing: '0.5px',
+                            lineHeight: 1
+                        }}>{game.avgRating}</span>
+                    </div>
+                )}
             </div>
 
             {/* Status pill — positioned relative to CARD (not banner) so overflow:hidden doesn't clip it */}
@@ -225,20 +253,6 @@ const GameCard = memo(({ game, entry, onClick }) => {
                             </div>
                         ) : (
                             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 16, color: '#3a3a4a', fontWeight: 600 }}>—</span>
-                        )}
-
-                        {/* Avg platform rating — blue */}
-                        {game.avgRating && (
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                                <span style={{
-                                    fontFamily: "'Bebas Neue', sans-serif",
-                                    fontSize: userRating ? 15 : 20,
-                                    color: '#5c9fff',
-                                    letterSpacing: 1,
-                                    lineHeight: 1,
-                                }}>{game.avgRating}</span>
-                                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: 'rgba(92,159,255,0.45)' }}>/10</span>
-                            </div>
                         )}
 
                     </div>

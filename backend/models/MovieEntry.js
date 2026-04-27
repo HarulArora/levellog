@@ -72,6 +72,10 @@ const movieEntrySchema = new mongoose.Schema(
         notes: {
             type: String,
             default: ''
+        },
+        genre: {
+            type: String,
+            default: ''
         }
     },
     {

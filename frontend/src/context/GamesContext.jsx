@@ -22,7 +22,7 @@ const CACHE_KEY = 'user_games'
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 export function GamesProvider({ children }) {
-    const { user } = useAuth()
+    const { user, updateUser } = useAuth()
 
     // Seed state from cache so the UI is instant on return visits
     const { data: cachedGames, isStale } = getCache(CACHE_KEY)
@@ -98,6 +98,10 @@ export function GamesProvider({ children }) {
                 invalidateCache(`game_stats_v2_${res.data.game.igdbId}`)
             }
 
+            if (res.data.xp) {
+                updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+            }
+
             return { success: true, game: res.data.game }
         } catch (err) {
             console.error('[GamesContext] updateGame error:', err)
@@ -155,6 +159,10 @@ export function GamesProvider({ children }) {
                 invalidateCache(`game_stats_v2_${res.data.game.igdbId}`)
             }
 
+            if (res.data.xp) {
+                updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+            }
+
             return { success: true, game: res.data.game }
         } catch (err) {
             console.error('[GamesContext] addGame error:', err)
@@ -174,12 +182,16 @@ export function GamesProvider({ children }) {
             // Asynchronous backend call
             api.delete(`/games/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
-            }).then(() => {
+            }).then((res) => {
                 setCache(CACHE_KEY, next, CACHE_TTL)
                 // Invalidate community stats caches
                 invalidateCache('home_data')
                 invalidatePrefix('discover_')
                 invalidatePrefix('game_stats_')
+                
+                if (res.data.xp) {
+                    updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                }
             }).catch(err => {
                 console.error('[GamesContext] lazy delete error:', err)
                 setGames(previousGames) // Rollback on failure

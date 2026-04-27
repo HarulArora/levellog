@@ -34,7 +34,7 @@ export const syncIGDBLists = async () => {
             },
             {
                 key: 'coming-soon',
-                body: `fields name, cover.url, genres.name, first_release_date, hypes; where first_release_date > ${now} & first_release_date < ${sixMonths} & cover != null & hypes > 5; sort hypes desc; limit 12;`
+                body: `fields name, first_release_date, cover.url, rating, rating_count, summary, genres.name; where first_release_date >= ${now} & cover != null; sort first_release_date asc; limit 15;`
             }
         ]
 

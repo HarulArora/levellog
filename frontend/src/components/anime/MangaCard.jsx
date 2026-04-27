@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSection } from '../../context/SectionContext'
+// import { useSection } from '../../context/SectionContext'
 
 const MangaCard = memo(({ anime: manga, onDelete, onEdit }) => {
     const navigate = useNavigate()
@@ -47,7 +47,7 @@ const MangaCard = memo(({ anime: manga, onDelete, onEdit }) => {
                         ${manga.externalId ? 'cursor-pointer' : 'cursor-default'}`}
             style={{ animation: 'fadeUp 0.3s ease backwards' }}
         >
-            <div className="aspect-[3/4] relative overflow-hidden bg-[#18181f] shrink-0">
+            <div className="aspect-video relative overflow-hidden bg-[#18181f] shrink-0">
                 {imageUrl ? (
                     <img 
                         src={imageUrl} 
@@ -79,7 +79,7 @@ const MangaCard = memo(({ anime: manga, onDelete, onEdit }) => {
                 )}
             </div>
 
-            <div className="p-3 flex flex-col flex-1">
+            <div className="p-2.5 flex flex-col flex-1">
                 <div className="font-semibold text-sm mb-2 truncate text-white
                                 group-hover:text-[#c8ff57] transition-colors">
                     {manga.title}
@@ -93,28 +93,28 @@ const MangaCard = memo(({ anime: manga, onDelete, onEdit }) => {
                     </span>
                 </div>
 
-                <div className="mt-auto flex justify-between items-end pb-2">
-                    <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider">
-                        {manga.genres?.[0] || manga.genre}
-                    </span>
+                <div className="mt-auto flex justify-between items-end">
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[100px]">
+                            {manga.genres?.[0] || manga.genre}
+                        </span>
+                        {manga.chaptersRead > 0 && (
+                            <span className="text-[#c8ff57] font-mono text-[9px] uppercase tracking-widest">
+                                📖 {manga.chaptersRead} ch tracked
+                            </span>
+                        )}
+                    </div>
 
                     {manga.rating > 0 ? (
                         <span
-                            className="font-black text-lg text-[#c8ff57] leading-none tracking-wide"
+                            className="font-black text-2xl text-[#c8ff57] leading-none tracking-wide"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                         >
                             {manga.rating}
-                            <small className="font-mono text-[10px] text-[#7a7a90] font-normal">
-                                /10
-                            </small>
                         </span>
                     ) : (
                         <span className="text-[#7a7a90] font-mono text-xs">—</span>
                     )}
-                </div>
-
-                <div className="pt-2 border-t border-[#2a2a35] text-[#94a3b8] font-mono text-[10px]">
-                    {manga.chaptersRead > 0 ? `📖 ${manga.chaptersRead} ch tracked` : String.fromCharCode(160)}
                 </div>
 
                 <div className="mt-2 flex gap-1">

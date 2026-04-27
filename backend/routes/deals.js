@@ -95,10 +95,9 @@ async function syncAllDeals() {
     }
 }
 
-// 🚦 Start first sync on boot
-syncAllDeals()
-// 🔄 Schedule periodic sync
-setInterval(syncAllDeals, SYNC_INTERVAL_MS)
+// 🚦 Disabled auto-sync to reduce log clutter and 429 errors
+// syncAllDeals()
+// setInterval(syncAllDeals, SYNC_INTERVAL_MS)
 
 router.get('/', async (req, res) => {
     const { storeFilter, freeOnly } = req.query

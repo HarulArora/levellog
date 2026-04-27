@@ -14,27 +14,59 @@ import AnimeWishlist from '../models/AnimeWishlist.js';
 /**
  * ── GAME STATS (LEGACY SYSTEM) ──
  */
-export const updateGlobalStats = async (igdbId, delta) => {
-    const { loggedCount = 0, wishlistCount = 0, likeCount = 0, ratingCount = 0, ratingValue = 0 } = delta;
-    const stats = await GlobalStats.findOneAndUpdate(
-        { igdbId },
-        {
-            $inc: {
-                loggedCount,
-                wishlistCount,
-                likeCount,
-                ratingCount,
-                totalRatingSum: ratingValue
+export const updateGlobalStats = async (igdbId, delta = {}, session = null) => {
+    try {
+        const { ratingCount = 0, totalRatingSum = 0, loggedCount = 0, likeCount = 0, wishlistCount = 0 } = delta;
+        
+        const stats = await GlobalStats.findOneAndUpdate(
+            { igdbId },
+            {
+                $inc: {
+                    ratingCount,
+                    totalRatingSum,
+                    loggedCount,
+                    likeCount,
+                    wishlistCount
+                },
+                $set: { updatedAt: new Date() }
+            },
+            { upsert: true, returnDocument: 'after', session }
+        );
+
+        // 🛡️ DATA INTEGRITY CHECKS
+        let needsSave = false;
+        
+        ['loggedCount', 'likeCount', 'wishlistCount', 'ratingCount'].forEach(field => {
+            if (stats[field] < 0) {
+                stats[field] = 0;
+                needsSave = true;
             }
-        },
-        { upsert: true, new: true }
-    );
-    if (stats.ratingCount > 0) {
-        stats.avgRating = parseFloat((stats.totalRatingSum / stats.ratingCount).toFixed(1));
-    } else {
-        stats.avgRating = 0;
+        });
+
+        if (stats.totalRatingSum < 0) {
+            stats.totalRatingSum = 0;
+            needsSave = true;
+        }
+
+        if (stats.ratingCount > 0) {
+            const newAvg = parseFloat((stats.totalRatingSum / stats.ratingCount).toFixed(1));
+            if (stats.avgRating !== newAvg) {
+                stats.avgRating = newAvg;
+                needsSave = true;
+            }
+        } else {
+            if (stats.avgRating !== 0) {
+                stats.avgRating = 0;
+                needsSave = true;
+            }
+        }
+
+        if (needsSave) {
+            await stats.save({ session });
+        }
+    } catch (error) {
+        console.error('Update Global Stats Error:', error);
     }
-    await stats.save();
 };
 
 export const syncGlobalStats = async (igdbId) => {
@@ -73,7 +105,7 @@ export const syncGlobalStats = async (igdbId) => {
  * Performs a full recalculation for a media item (Sync).
  * Use this for background maintenance or initialization.
  */
-export const syncMediaStats = async (externalId, type) => {
+export const syncMediaStats = async (externalId, type, session = null) => {
     try {
         const id = parseInt(externalId);
         const EntryModel = (type === 'movie' || type === 'tv') ? MovieEntry : AnimeEntry;
@@ -89,9 +121,9 @@ export const syncMediaStats = async (externalId, type) => {
                     ratingCount: { $sum: { $cond: [{ $gt: ['$rating', 0] }, 1, 0] } }, 
                     loggedCount: { $sum: 1 } 
                 }}
-            ]),
-            LikeModel.countDocuments({ externalId: id, type }),
-            WishlistModel.countDocuments({ externalId: id, type })
+            ], { session }),
+            LikeModel.countDocuments({ externalId: id, type }, { session }),
+            WishlistModel.countDocuments({ externalId: id, type }, { session })
         ]);
 
         const stats = statsAgg[0] || { totalRatingSum: 0, ratingCount: 0, loggedCount: 0 };
@@ -108,7 +140,7 @@ export const syncMediaStats = async (externalId, type) => {
                 wishlistCount,
                 updatedAt: new Date()
             },
-            { upsert: true }
+            { upsert: true, session }
         );
     } catch (error) {
         console.error('Sync Media Stats Error:', error);
@@ -118,14 +150,14 @@ export const syncMediaStats = async (externalId, type) => {
 /**
  * Incremental update for O(1) performance during CRUD operations.
  */
-export const updateMediaStats = async (externalId, type, delta = {}) => {
+export const updateMediaStats = async (externalId, type, delta = {}, session = null) => {
     try {
         const id = parseInt(externalId);
         const { loggedCount = 0, likeCount = 0, wishlistCount = 0, ratingCount = 0, ratingValue = 0 } = delta;
 
         // If no delta is provided, fallback to a full sync (legacy behavior)
         if (Object.keys(delta).length === 0) {
-            return syncMediaStats(externalId, type);
+            return syncMediaStats(externalId, type, session);
         }
 
         const stats = await MediaStats.findOneAndUpdate(
@@ -140,20 +172,51 @@ export const updateMediaStats = async (externalId, type, delta = {}) => {
                 },
                 $set: { updatedAt: new Date() }
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after', session }
         );
+
+        // 🛡️ DATA INTEGRITY CHECKS (Anti-Negative Logic)
+        let needsSave = false;
+        
+        // Counts should never be negative
+        ['loggedCount', 'likeCount', 'wishlistCount', 'ratingCount'].forEach(field => {
+            if (stats[field] < 0) {
+                stats[field] = 0;
+                needsSave = true;
+            }
+        });
+
+        // totalRatingSum should never be negative
+        if (stats.totalRatingSum < 0) {
+            stats.totalRatingSum = 0;
+            needsSave = true;
+        }
 
         // Recalculate average based on new totals
         if (stats.ratingCount > 0) {
-            stats.avgRating = parseFloat((stats.totalRatingSum / stats.ratingCount).toFixed(1));
+            const newAvg = parseFloat((stats.totalRatingSum / stats.ratingCount).toFixed(1));
+            if (stats.avgRating !== newAvg) {
+                stats.avgRating = newAvg;
+                needsSave = true;
+            }
         } else {
-            stats.avgRating = null;
+            if (stats.avgRating !== null) {
+                stats.avgRating = null;
+                needsSave = true;
+            }
+            if (stats.totalRatingSum !== 0) {
+                stats.totalRatingSum = 0;
+                needsSave = true;
+            }
         }
-        await stats.save();
+
+        if (needsSave) {
+            await stats.save({ session });
+        }
     } catch (error) {
         console.error('Update Media Stats Error:', error);
         // On failure, trigger a full sync to heal the data
-        syncMediaStats(externalId, type);
+        syncMediaStats(externalId, type, session);
     }
 };
 

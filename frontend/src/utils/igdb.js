@@ -15,13 +15,8 @@
  */
 
 export const getIGDBImage = (url, size = 't_cover_big') => {
-    if (!url) return null;
-    
-    // Ensure the URL is protocol-absolute
-    let fullUrl = url.startsWith('http') ? url : `https:${url}`;
-    
-    // Replace the size segment (e.g. t_thumb -> t_cover_big)
-    // IGDB URLs usually follow pattern: //images.igdb.com/igdb/image/upload/t_thumb/co1r8v.jpg
+    if (typeof url !== 'string') return null;
+    const fullUrl = url.startsWith('http') ? url : `https:${url}`;
     return fullUrl.replace(/t_[a-zA-Z0-9_]+/, size);
 };
 

@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSection } from '../../context/SectionContext'
+// import { useSection } from '../../context/SectionContext'
 
 const TVCard = memo(({ movie: tvShow, onDelete, onEdit }) => {
     const navigate = useNavigate()
@@ -44,7 +44,7 @@ const TVCard = memo(({ movie: tvShow, onDelete, onEdit }) => {
                         ${tvShow.externalId ? 'cursor-pointer' : 'cursor-default'}`}
             style={{ animation: 'fadeUp 0.3s ease backwards' }}
         >
-            <div className="aspect-[3/4] relative overflow-hidden bg-[#18181f] shrink-0">
+            <div className="aspect-video relative overflow-hidden bg-[#18181f] shrink-0">
                 {imageUrl ? (
                     <img 
                         src={imageUrl} 
@@ -97,13 +97,10 @@ const TVCard = memo(({ movie: tvShow, onDelete, onEdit }) => {
 
                     {tvShow.rating > 0 ? (
                         <span
-                            className="font-black text-lg text-[#c8ff57] leading-none tracking-wide"
+                            className="font-black text-2xl text-[#c8ff57] leading-none tracking-wide"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                         >
                             {tvShow.rating}
-                            <small className="font-mono text-[10px] text-[#7a7a90] font-normal">
-                                /10
-                            </small>
                         </span>
                     ) : (
                         <span className="text-[#7a7a90] font-mono text-xs">—</span>

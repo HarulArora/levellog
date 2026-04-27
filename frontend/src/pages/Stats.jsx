@@ -2,10 +2,11 @@ import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
-import { Target, Heart, Search, Gamepad2, TrendingUp, Trophy, Star, Sparkles, Flame, Diamond, Crown, Rocket, Zap, Clock, BarChart3, Check, X } from 'lucide-react'
+import { Target, Heart, Search, Gamepad2, TrendingUp, Trophy, Star, Sparkles, Flame, Diamond, Crown, Rocket, Zap, Clock, BarChart3, Check, X, Film, BookOpen, Tv as TvIcon, Play } from 'lucide-react'
 import { getLevelInfo, getXPProgress, LEVELS } from '../utils/levels'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import { useLeaderboard } from '../context/LeaderboardContext'
+import api from '../api/axios'
 
 const HEADER_THEMES = {
     1: { bg: 'from-[#ffd700]/15', border: 'border-b-[#ffd700]/30', accent: 'text-[#ffd700]', glow: 'shadow-[0_4px_30px_rgba(255,215,0,0.1)]' },
@@ -23,13 +24,70 @@ function Stats() {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'stats')
+    const [mediaType, setMediaType] = useState(searchParams.get('media') || 'game')
+    const [mediaData, setMediaData] = useState({
+        anime: [],
+        manga: [],
+        movie: [],
+        tv: []
+    })
+    const [mediaLoading, setMediaLoading] = useState(false)
 
     useEffect(() => {
         const tab = searchParams.get('tab')
         if (tab && (tab === 'stats' || tab === 'xp')) {
             setActiveTab(tab)
         }
+        const media = searchParams.get('media')
+        if (media && ['game', 'anime', 'manga', 'movie', 'tv'].includes(media)) {
+            setMediaType(media)
+        }
     }, [searchParams])
+
+    const fetchMediaData = async (type) => {
+        if (type === 'game' || mediaData[type].length > 0) return
+        try {
+            setMediaLoading(true)
+            const endpoint = (type === 'movie' || type === 'tv') ? '/movies/library' : '/anime/library'
+            const res = await api.get(endpoint)
+            const allItems = res.data.library || []
+            
+            if (type === 'movie' || type === 'tv') {
+                setMediaData(prev => ({
+                    ...prev,
+                    movie: allItems.filter(i => i.type === 'movie'),
+                    tv: allItems.filter(i => i.type === 'tv')
+                }))
+            } else {
+                setMediaData(prev => ({
+                    ...prev,
+                    anime: allItems.filter(i => i.type === 'anime'),
+                    manga: allItems.filter(i => i.type === 'manga')
+                }))
+            }
+        } catch (err) {
+            console.error(`Failed to fetch ${type} stats:`, err)
+        } finally {
+            setMediaLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        if (user && activeTab === 'stats' && mediaType !== 'game') {
+            fetchMediaData(mediaType)
+        }
+    }, [user, activeTab, mediaType])
+
+    const handleMediaTypeChange = (type) => {
+        setMediaType(type)
+        const params = { tab: activeTab, media: type }
+        setSearchParams(params)
+    }
+
+    const currentData = useMemo(() => {
+        if (mediaType === 'game') return games
+        return mediaData[mediaType] || []
+    }, [mediaType, games, mediaData])
 
     const handleTabChange = (tab) => {
         setActiveTab(tab)
@@ -48,24 +106,54 @@ function Stats() {
     const theme = HEADER_THEMES[userRank] || null
 
     // ── Computed stats ──
-    const { totalGames, totalHours, ratedGames, avgRating, completed, playing, planned, dropped, paused, completionRate } = useMemo(() => {
-        const totalGames = games.length
-        const totalHours = games.reduce((s, g) => s + (g.hours || 0), 0)
-        const ratedGames = games.filter(g => g.rating > 0)
-        const avgRating = ratedGames.length > 0
-            ? (ratedGames.reduce((s, g) => s + g.rating, 0) / ratedGames.length).toFixed(1)
+    const { totalItems, totalUnits, ratedItems, avgRating, completed, playing, planned, dropped, paused, completionRate, unitLabel } = useMemo(() => {
+        const totalItems = currentData.length
+        
+        let totalUnits = 0
+        let unitLabel = 'Hours'
+        
+        if (mediaType === 'game') {
+            totalUnits = currentData.reduce((s, g) => s + (g.hours || 0), 0)
+            unitLabel = 'Hours'
+        } else if (mediaType === 'anime') {
+            totalUnits = currentData.reduce((s, g) => s + (g.episodesWatched || 0), 0)
+            unitLabel = 'Episodes'
+        } else if (mediaType === 'manga') {
+            totalUnits = currentData.reduce((s, g) => s + (g.chaptersRead || 0), 0)
+            unitLabel = 'Chapters'
+        } else if (mediaType === 'movie') {
+            totalUnits = currentData.reduce((s, g) => s + (g.runtime || 0), 0)
+            unitLabel = 'Minutes'
+        } else if (mediaType === 'tv') {
+            totalUnits = currentData.reduce((s, g) => s + (g.episodesWatched || 0), 0)
+            unitLabel = 'Episodes'
+        }
+
+        const ratedItems = currentData.filter(g => g.rating > 0)
+        const avgRating = ratedItems.length > 0
+            ? (ratedItems.reduce((s, g) => s + g.rating, 0) / ratedItems.length).toFixed(1)
             : '—'
-        const completed = games.filter(g => g.status === 'completed').length
-        const playing = games.filter(g => g.status === 'playing').length
-        const planned = games.filter(g => g.status === 'planned').length
-        const dropped = games.filter(g => g.status === 'dropped').length
-        const paused = games.filter(g => g.status === 'paused').length
-        const completionRate = totalGames > 0
-            ? Math.round((completed / totalGames) * 100)
+            
+        const normalizeStatus = (status) => {
+            if (['playing', 'watching'].includes(status)) return 'playing'
+            if (['completed', 'watched'].includes(status)) return 'completed'
+            if (['planned', 'plan_to_watch'].includes(status)) return 'planned'
+            if (['paused', 'on_hold', 'on-hold'].includes(status)) return 'paused'
+            if (status === 'dropped') return 'dropped'
+            return 'planned'
+        }
+
+        const completed = currentData.filter(g => normalizeStatus(g.status) === 'completed').length
+        const playing = currentData.filter(g => normalizeStatus(g.status) === 'playing').length
+        const planned = currentData.filter(g => normalizeStatus(g.status) === 'planned').length
+        const dropped = currentData.filter(g => normalizeStatus(g.status) === 'dropped').length
+        const paused = currentData.filter(g => normalizeStatus(g.status) === 'paused').length
+        const completionRate = totalItems > 0
+            ? Math.round((completed / totalItems) * 100)
             : 0
 
-        return { totalGames, totalHours, ratedGames, avgRating, completed, playing, planned, dropped, paused, completionRate }
-    }, [games])
+        return { totalItems, totalUnits, ratedItems, avgRating, completed, playing, planned, dropped, paused, completionRate, unitLabel }
+    }, [currentData, mediaType])
 
     const memberYear = user?.createdAt
         ? new Date(user.createdAt).getFullYear()
@@ -74,8 +162,8 @@ function Stats() {
     // ── Genre breakdown ──
     const { genreList, maxGenreCount } = useMemo(() => {
         const genreMap = {}
-        games.forEach(game => {
-            const genre = game.genre || 'Unknown'
+        currentData.forEach(item => {
+            const genre = item.genre || 'Unknown'
             genreMap[genre] = (genreMap[genre] || 0) + 1
         })
         const genreList = Object.entries(genreMap)
@@ -83,12 +171,13 @@ function Stats() {
             .slice(0, 8)
         const maxGenreCount = genreList[0]?.[1] || 1
         return { genreList, maxGenreCount }
-    }, [games])
+    }, [currentData])
 
     // ── Platform breakdown ──
     const { platformList, maxPlatformCount } = useMemo(() => {
+        if (mediaType !== 'game') return { platformList: [], maxPlatformCount: 1 }
         const platformMap = {}
-        games.forEach(game => {
+        currentData.forEach(game => {
             game.platforms?.forEach(p => {
                 platformMap[p] = (platformMap[p] || 0) + 1
             })
@@ -97,12 +186,12 @@ function Stats() {
             .sort((a, b) => b[1] - a[1])
         const maxPlatformCount = platformList[0]?.[1] || 1
         return { platformList, maxPlatformCount }
-    }, [games])
+    }, [currentData, mediaType])
 
     // ── Rating distribution ──
     const { ratingBuckets, maxRatingCount } = useMemo(() => {
         const buckets = { '9-10': 0, '7-8': 0, '5-6': 0, '1-4': 0 }
-        ratedGames.forEach(g => {
+        ratedItems.forEach(g => {
             if (g.rating >= 9) buckets['9-10']++
             else if (g.rating >= 7) buckets['7-8']++
             else if (g.rating >= 5) buckets['5-6']++
@@ -110,34 +199,55 @@ function Stats() {
         })
         const maxRatingCount = Math.max(...Object.values(buckets), 1)
         return { ratingBuckets: buckets, maxRatingCount }
-    }, [ratedGames])
+    }, [ratedItems])
 
-    // ── Most played genre (by hours) ──
-    const { genreHoursList, maxGenreHours } = useMemo(() => {
-        const genreHoursMap = {}
-        games.forEach(game => {
-            const genre = game.genre || 'Unknown'
-            genreHoursMap[genre] = (genreHoursMap[genre] || 0) + (game.hours || 0)
+    // ── Most played genre (by units) ──
+    const { genreUnitsList, maxGenreUnits } = useMemo(() => {
+        const genreUnitsMap = {}
+        currentData.forEach(item => {
+            const genre = item.genre || 'Unknown'
+            let val = 0
+            if (mediaType === 'game') val = item.hours || 0
+            else if (mediaType === 'movie') val = item.runtime || 0
+            else if (mediaType === 'manga') val = item.chaptersRead || 0
+            else val = item.episodesWatched || 0
+            
+            genreUnitsMap[genre] = (genreUnitsMap[genre] || 0) + val
         })
-        const genreHoursList = Object.entries(genreHoursMap)
+        const genreUnitsList = Object.entries(genreUnitsMap)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 6)
-        const maxGenreHours = genreHoursList[0]?.[1] || 1
-        return { genreHoursList, maxGenreHours }
-    }, [games])
+        const maxGenreUnits = genreUnitsList[0]?.[1] || 1
+        return { genreUnitsList, maxGenreUnits }
+    }, [currentData, mediaType])
 
-    // ── Avg hours per game ──
-    const avgHours = useMemo(() => totalGames > 0
-        ? (totalHours / totalGames).toFixed(1)
-        : 0, [totalHours, totalGames])
+    // ── Avg units per item ──
+    const avgUnits = useMemo(() => totalItems > 0
+        ? (totalUnits / totalItems).toFixed(1)
+        : 0, [totalUnits, totalItems])
 
-    // ── Longest game ──
-    const longestGame = useMemo(() => games.reduce((max, g) =>
-        (g.hours || 0) > (max?.hours || 0) ? g : max, null), [games])
+    // ── Longest item ──
+    const longestItem = useMemo(() => {
+        return currentData.reduce((max, g) => {
+            let val = 0
+            if (mediaType === 'game') val = g.hours || 0
+            else if (mediaType === 'movie') val = g.runtime || 0
+            else if (mediaType === 'manga') val = g.chaptersRead || 0
+            else val = g.episodesWatched || 0
+            
+            let maxVal = 0
+            if (mediaType === 'game') maxVal = max?.hours || 0
+            else if (mediaType === 'movie') maxVal = max?.runtime || 0
+            else if (mediaType === 'manga') maxVal = max?.chaptersRead || 0
+            else maxVal = max?.episodesWatched || 0
 
-    // ── Highest rated game ──
-    const highestRated = useMemo(() => ratedGames.reduce((max, g) =>
-        g.rating > (max?.rating || 0) ? g : max, null), [ratedGames])
+            return val > maxVal ? g : max
+        }, null)
+    }, [currentData, mediaType])
+
+    // ── Highest rated item ──
+    const highestRated = useMemo(() => ratedItems.reduce((max, g) =>
+        g.rating > (max?.rating || 0) ? g : max, null), [ratedItems])
 
     if (authLoading || (gamesLoading && games.length === 0)) {
         return (
@@ -228,8 +338,8 @@ function Stats() {
                         {/* Right — header stats */}
                         <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-8 gap-y-4">
                             {[
-                                { value: totalGames, label: 'Games' },
-                                { value: `${totalHours}h`, label: 'Hours' },
+                                { value: totalItems, label: mediaType === 'game' ? 'Games' : mediaType === 'anime' ? 'Anime' : mediaType === 'manga' ? 'Manga' : mediaType === 'movie' ? 'Movies' : 'TV Shows' },
+                                { value: `${totalUnits}${unitLabel === 'Hours' ? 'h' : unitLabel === 'Minutes' ? 'm' : ''}`, label: unitLabel },
                                 { value: avgRating, label: 'Avg Score' },
                                 { value: `${completionRate}%`, label: 'Completion' },
                             ].map(stat => (
@@ -274,36 +384,64 @@ function Stats() {
                     </button>
                 </div>
 
+                {activeTab === 'stats' && (
+                    <div className="flex flex-wrap items-center gap-2 mb-8 p-1 bg-[#111118] border border-[#2a2a35] rounded-2xl w-fit">
+                        {[
+                            { id: 'game', label: 'Games', icon: <Gamepad2 size={14} /> },
+                            { id: 'anime', label: 'Anime', icon: <Play size={14} /> },
+                            { id: 'manga', label: 'Manga', icon: <BookOpen size={14} /> },
+                            { id: 'movie', label: 'Movies', icon: <Film size={14} /> },
+                            { id: 'tv', label: 'TV Shows', icon: <TvIcon size={14} /> },
+                        ].map(t => (
+                            <button
+                                key={t.id}
+                                onClick={() => handleMediaTypeChange(t.id)}
+                                className={`flex items-center gap-2 px-4 py-2 font-mono text-[10px] uppercase tracking-widest rounded-xl transition-all
+                                           ${mediaType === t.id ? 'bg-[#c8ff57] text-black font-bold' : 'text-[#7a7a90] hover:text-white hover:bg-[#1a1a25]'}`}
+                            >
+                                {t.icon}
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {activeTab === 'stats' ? (
                     <>
                         {/* ── Stat Cards Grid ── */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
-                            {[
-                                { value: totalGames, label: 'Total Games', sub: 'Across all platforms' },
-                                { value: `${totalHours}h`, label: 'Hours Played', sub: 'Total tracked time' },
-                                { value: avgRating, label: 'Average Rating', sub: 'Out of 10' },
-                                { value: completed, label: 'Completed', sub: `${completionRate}% completion rate` },
-                                { value: playing, label: 'Currently Playing', sub: 'Active now' },
-                                { value: planned, label: 'In Backlog', sub: 'Planned to play' },
-                                { value: dropped, label: 'Dropped', sub: 'Did not finish' },
-                                { value: paused, label: 'Paused', sub: 'On hold' },
-                                { value: avgHours, label: 'Avg Hours', sub: 'Per game' },
-                            ].map(card => (
-                                <div key={card.label}
-                                    className="bg-[#111118] border border-[#2a2a35] rounded-lg
-                                               p-5 hover:border-[#c8ff57]/30 transition-all">
-                                    <div className="font-black text-3xl text-[#c8ff57] leading-none mb-2"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                        {card.value}
+                            {mediaLoading ? (
+                                Array.from({ length: 10 }).map((_, i) => (
+                                    <div key={i} className="h-24 bg-[#111118] border border-[#2a2a35] rounded-lg animate-pulse" />
+                                ))
+                            ) : (
+                                [
+                                    { value: totalItems, label: `Total ${mediaType === 'game' ? 'Games' : mediaType === 'anime' ? 'Anime' : mediaType === 'manga' ? 'Manga' : mediaType === 'movie' ? 'Movies' : 'Shows'}`, sub: 'Across your pond' },
+                                    { value: `${totalUnits}${unitLabel === 'Hours' ? 'h' : unitLabel === 'Minutes' ? 'm' : ''}`, label: `${unitLabel} ${mediaType === 'game' ? 'Played' : mediaType === 'movie' ? 'Watched' : 'Tracked'}`, sub: 'Total engagement' },
+                                    { value: avgRating, label: 'Average Rating', sub: 'Out of 10' },
+                                    { value: completed, label: 'Completed', sub: `${completionRate}% completion rate` },
+                                    { value: playing, label: mediaType === 'game' ? 'Currently Playing' : 'Currently Watching', sub: 'Active now' },
+                                    { value: planned, label: 'Planned', sub: 'To experience later' },
+                                    { value: dropped, label: 'Dropped', sub: 'Did not finish' },
+                                    { value: paused, label: 'Paused', sub: 'On hold' },
+                                    { value: avgUnits, label: `Avg ${unitLabel}`, sub: `Per ${mediaType === 'game' ? 'game' : 'entry'}` },
+                                ].map(card => (
+                                    <div key={card.label}
+                                        className="bg-[#111118] border border-[#2a2a35] rounded-lg
+                                                   p-5 hover:border-[#c8ff57]/30 transition-all">
+                                        <div className="font-black text-3xl text-[#c8ff57] leading-none mb-2"
+                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                            {card.value}
+                                        </div>
+                                        <div className="font-mono text-[10px] text-white uppercase tracking-widest mb-1">
+                                            {card.label}
+                                        </div>
+                                        <div className="font-mono text-[10px] text-[#7a7a90]">
+                                            {card.sub}
+                                        </div>
                                     </div>
-                                    <div className="font-mono text-[10px] text-white uppercase tracking-widest mb-1">
-                                        {card.label}
-                                    </div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90]">
-                                        {card.sub}
-                                    </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -318,7 +456,7 @@ function Stats() {
                                     </div>
                                     <div className="flex flex-col gap-3">
                                         {[
-                                            { label: 'Playing', value: playing, color: '#c8ff57' },
+                                            { label: mediaType === 'game' ? 'Playing' : 'Watching', value: playing, color: '#c8ff57' },
                                             { label: 'Completed', value: completed, color: '#5c9fff' },
                                             { label: 'Planned', value: planned, color: '#ff9f5c' },
                                             { label: 'Paused', value: paused, color: '#c45cff' },
@@ -329,13 +467,13 @@ function Stats() {
                                                     <span className="font-mono text-xs text-[#7a7a90] uppercase tracking-wider">{s.label}</span>
                                                     <span className="font-mono text-xs text-[#7a7a90]">
                                                         {s.value}
-                                                        {totalGames > 0 && <span className="text-[#4a4a5a] ml-1">· {Math.round((s.value / totalGames) * 100)}%</span>}
+                                                        {totalItems > 0 && <span className="text-[#4a4a5a] ml-1">· {Math.round((s.value / totalItems) * 100)}%</span>}
                                                     </span>
                                                 </div>
                                                 <div className="h-1.5 bg-[#2a2a35] rounded-full overflow-hidden">
                                                     <div className="h-full rounded-full transition-all duration-700"
                                                         style={{
-                                                            width: totalGames > 0 ? `${(s.value / totalGames) * 100}%` : '0%',
+                                                            width: totalItems > 0 ? `${(s.value / totalItems) * 100}%` : '0%',
                                                             background: s.color
                                                         }} />
                                                 </div>
@@ -344,11 +482,11 @@ function Stats() {
                                     </div>
                                 </div>
 
-                                {/* Playtime by Genre */}
+                                {/* Genre Distribution */}
                                 {genreList.length > 0 && (
                                     <div>
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-5">
-                                            Playtime by Genre
+                                            Genre Distribution
                                         </div>
                                         <div className="flex flex-col gap-3">
                                             {genreList.map(([genre, count]) => {
@@ -372,15 +510,15 @@ function Stats() {
                                     </div>
                                 )}
 
-                                {/* Hours by Genre */}
-                                {genreHoursList.length > 0 && genreHoursList.some(([, h]) => h > 0) && (
+                                {/* Units by Genre */}
+                                {genreUnitsList.length > 0 && genreUnitsList.some(([, h]) => h > 0) && (
                                     <div>
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-5">
-                                            Hours by Genre
+                                            {unitLabel} by Genre
                                         </div>
                                         <div className="flex flex-col gap-3">
-                                            {genreHoursList.map(([genre, hours]) => {
-                                                const pct = Math.round((hours / maxGenreHours) * 100)
+                                            {genreUnitsList.map(([genre, units]) => {
+                                                const pct = Math.round((units / maxGenreUnits) * 100)
                                                 return (
                                                     <div key={genre} className="flex items-center gap-4">
                                                         <div className="font-mono text-[11px] text-[#7a7a90] w-28 flex-shrink-0 text-right truncate">
@@ -390,8 +528,8 @@ function Stats() {
                                                             <div className="h-full rounded-full transition-all duration-700"
                                                                 style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #c45cff, #5c9fff)' }} />
                                                         </div>
-                                                        <div className="font-mono text-[11px] text-[#7a7a90] w-8 flex-shrink-0">
-                                                            {hours}h
+                                                        <div className="font-mono text-[11px] text-[#7a7a90] w-12 flex-shrink-0">
+                                                            {units}{unitLabel === 'Hours' ? 'h' : unitLabel === 'Minutes' ? 'm' : ''}
                                                         </div>
                                                     </div>
                                                 )
@@ -400,8 +538,8 @@ function Stats() {
                                     </div>
                                 )}
 
-                                {/* Platform Breakdown */}
-                                {platformList.length > 0 && (
+                                {/* Platform Breakdown (Games Only) */}
+                                {mediaType === 'game' && platformList.length > 0 && (
                                     <div>
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-5">
                                             Platform Breakdown
@@ -429,7 +567,7 @@ function Stats() {
                                 )}
 
                                 {/* Rating Distribution */}
-                                {ratedGames.length > 0 && (
+                                {ratedItems.length > 0 && (
                                     <div>
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-5">
                                             Rating Distribution
@@ -443,7 +581,7 @@ function Stats() {
                                                             {range} / 10
                                                         </div>
                                                         <div className="flex-1 h-2 bg-[#2a2a35] rounded-full overflow-hidden">
-                                                            <div className="h-full rounded-full transition-all duration-700"
+                                                            <div className="h-full rounded-full transition-all duration-1000"
                                                                 style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #ff5c5c, #ff9f5c)' }} />
                                                         </div>
                                                         <div className="font-mono text-[11px] text-[#7a7a90] w-4 flex-shrink-0">
@@ -455,31 +593,33 @@ function Stats() {
                                         </div>
                                     </div>
                                 )}
-
                             </div>
 
                             {/* ── Right column ── */}
                             <div className="flex flex-col gap-10">
 
-                                {/* Top Rated Games */}
-                                {ratedGames.length > 0 && (
+                                {/* Top Rated Items */}
+                                {ratedItems.length > 0 && (
                                     <div>
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-5">
                                             Your Top Rated
                                         </div>
                                         <div className="flex flex-col gap-2">
-                                            {[...ratedGames]
+                                            {[...ratedItems]
                                                 .sort((a, b) => b.rating - a.rating)
                                                 .slice(0, 5)
-                                                .map((game, index) => {
-                                                    const imageUrl = game.cover
-                                                        ? game.cover
-                                                        : game.steamId
-                                                            ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
-                                                            : null
+                                                .map((item, index) => {
+                                                    const imageUrl = item.cover || item.coverImage
+                                                    let detailPath = '#'
+                                                    if (mediaType === 'game' && item.igdbId) detailPath = `/game/${item.igdbId}`
+                                                    else if (mediaType === 'anime' && item.externalId) detailPath = `/anime/${item.externalId}`
+                                                    else if (mediaType === 'manga' && item.externalId) detailPath = `/manga/${item.externalId}`
+                                                    else if (mediaType === 'movie' && item.externalId) detailPath = `/movies/${item.externalId}`
+                                                    else if (mediaType === 'tv' && item.externalId) detailPath = `/tv/${item.externalId}`
+
                                                     return (
-                                                        <Link key={game._id}
-                                                            to={game.igdbId ? `/game/${game.igdbId}` : '#'}
+                                                        <Link key={item._id}
+                                                            to={detailPath}
                                                             className="flex items-center gap-4 bg-[#111118] border
                                                                        border-[#2a2a35] rounded-lg p-3
                                                                        hover:border-[#c8ff57]/30 transition-all">
@@ -490,17 +630,18 @@ function Stats() {
                                                             <div className="w-10 h-14 rounded bg-[#18181f] bg-cover bg-center flex-shrink-0"
                                                                 style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}>
                                                                 {!imageUrl && (
-                                                                    <div className="w-full h-full flex items-center justify-center text-lg">🎮</div>
+                                                                    <div className="w-full h-full flex items-center justify-center text-lg">
+                                                                        {mediaType === 'game' ? '🎮' : mediaType === 'manga' ? '📖' : '🎬'}
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="text-white font-semibold text-sm truncate">{game.title}</div>
-                                                                <div className="font-mono text-[10px] text-[#7a7a90] mt-1">{game.genre}</div>
+                                                                <div className="text-white font-semibold text-sm truncate">{item.title}</div>
+                                                                <div className="font-mono text-[10px] text-[#7a7a90] mt-1">{item.genre}</div>
                                                             </div>
                                                             <div className="font-black text-2xl text-[#c8ff57] flex-shrink-0"
                                                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                                                {game.rating}
-                                                                <small className="font-mono text-[10px] text-[#7a7a90] font-normal">/10</small>
+                                                                {item.rating}
                                                             </div>
                                                         </Link>
                                                     )
@@ -509,26 +650,52 @@ function Stats() {
                                     </div>
                                 )}
 
-                                {/* Most Played Games */}
-                                {games.some(g => g.hours > 0) && (
+                                {/* Most Engaged Items */}
+                                {currentData.some(g => {
+                                    if (mediaType === 'game') return (g.hours || 0) > 0
+                                    if (mediaType === 'movie') return (g.runtime || 0) > 0
+                                    if (mediaType === 'manga') return (g.chaptersRead || 0) > 0
+                                    return (g.episodesWatched || 0) > 0
+                                }) && (
                                     <div>
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-5">
-                                            Most Played
+                                            Most {mediaType === 'game' ? 'Played' : mediaType === 'movie' ? 'Watched' : 'Engaged'}
                                         </div>
                                         <div className="flex flex-col gap-2">
-                                            {[...games]
-                                                .filter(g => g.hours > 0)
-                                                .sort((a, b) => b.hours - a.hours)
+                                            {[...currentData]
+                                                .filter(g => {
+                                                    if (mediaType === 'game') return (g.hours || 0) > 0
+                                                    if (mediaType === 'movie') return (g.runtime || 0) > 0
+                                                    if (mediaType === 'manga') return (g.chaptersRead || 0) > 0
+                                                    return (g.episodesWatched || 0) > 0
+                                                })
+                                                .sort((a, b) => {
+                                                    let valA = 0, valB = 0
+                                                    if (mediaType === 'game') { valA = a.hours || 0; valB = b.hours || 0 }
+                                                    else if (mediaType === 'movie') { valA = a.runtime || 0; valB = b.runtime || 0 }
+                                                    else if (mediaType === 'manga') { valA = a.chaptersRead || 0; valB = b.chaptersRead || 0 }
+                                                    else { valA = a.episodesWatched || 0; valB = b.episodesWatched || 0 }
+                                                    return valB - valA
+                                                })
                                                 .slice(0, 5)
-                                                .map((game, index) => {
-                                                    const imageUrl = game.cover
-                                                        ? game.cover
-                                                        : game.steamId
-                                                            ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg`
-                                                            : null
+                                                .map((item, index) => {
+                                                    const imageUrl = item.cover || item.coverImage
+                                                    let val = 0
+                                                    if (mediaType === 'game') val = item.hours || 0
+                                                    else if (mediaType === 'movie') val = item.runtime || 0
+                                                    else if (mediaType === 'manga') val = item.chaptersRead || 0
+                                                    else val = item.episodesWatched || 0
+
+                                                    let detailPath = '#'
+                                                    if (mediaType === 'game' && item.igdbId) detailPath = `/game/${item.igdbId}`
+                                                    else if (mediaType === 'anime' && item.externalId) detailPath = `/anime/${item.externalId}`
+                                                    else if (mediaType === 'manga' && item.externalId) detailPath = `/manga/${item.externalId}`
+                                                    else if (mediaType === 'movie' && item.externalId) detailPath = `/movies/${item.externalId}`
+                                                    else if (mediaType === 'tv' && item.externalId) detailPath = `/tv/${item.externalId}`
+
                                                     return (
-                                                        <Link key={game._id}
-                                                            to={game.igdbId ? `/game/${game.igdbId}` : '#'}
+                                                        <Link key={item._id}
+                                                            to={detailPath}
                                                             className="flex items-center gap-4 bg-[#111118] border
                                                                        border-[#2a2a35] rounded-lg p-3
                                                                        hover:border-[#c8ff57]/30 transition-all">
@@ -539,17 +706,19 @@ function Stats() {
                                                             <div className="w-10 h-14 rounded bg-[#18181f] bg-cover bg-center flex-shrink-0"
                                                                 style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}>
                                                                 {!imageUrl && (
-                                                                    <div className="w-full h-full flex items-center justify-center text-lg">🎮</div>
+                                                                    <div className="w-full h-full flex items-center justify-center text-lg">
+                                                                        {mediaType === 'game' ? '🎮' : mediaType === 'manga' ? '📖' : '🎬'}
+                                                                    </div>
                                                                 )}
                                                             </div>
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="text-white font-semibold text-sm truncate">{game.title}</div>
-                                                                <div className="font-mono text-[10px] text-[#7a7a90] mt-1">{game.genre}</div>
+                                                                <div className="text-white font-semibold text-sm truncate">{item.title}</div>
+                                                                <div className="font-mono text-[10px] text-[#7a7a90] mt-1">{item.genre}</div>
                                                             </div>
                                                             <div className="font-black text-2xl text-[#5c9fff] flex-shrink-0"
                                                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                                                {game.hours}
-                                                                <small className="font-mono text-[10px] text-[#7a7a90] font-normal">h</small>
+                                                                {val}
+                                                                <small className="font-mono text-[10px] text-[#7a7a90] font-normal">{unitLabel === 'Hours' ? 'h' : unitLabel === 'Minutes' ? 'm' : ''}</small>
                                                             </div>
                                                         </Link>
                                                     )
@@ -566,12 +735,12 @@ function Stats() {
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden">
                                         {[
                                             { label: 'Favourite Genre', value: genreList[0]?.[0] || '—' },
-                                            { label: 'Favourite Platform', value: platformList[0]?.[0] || '—' },
-                                            { label: 'Longest Game', value: longestGame ? `${longestGame.title} (${longestGame.hours}h)` : '—' },
+                                            { label: mediaType === 'game' ? 'Favourite Platform' : 'Total Items', value: mediaType === 'game' ? (platformList[0]?.[0] || '—') : totalItems },
+                                            { label: 'Longest Item', value: longestItem ? `${longestItem.title}` : '—' },
                                             { label: 'Highest Rated', value: highestRated ? `${highestRated.title} (${highestRated.rating}/10)` : '—' },
                                             { label: 'Completion Rate', value: `${completionRate}%` },
-                                            { label: 'Avg Hours Per Game', value: `${avgHours}h` },
-                                            { label: 'Games Rated', value: `${ratedGames.length} of ${totalGames}` },
+                                            { label: `Avg ${unitLabel} Per Entry`, value: `${avgUnits}${unitLabel === 'Hours' ? 'h' : unitLabel === 'Minutes' ? 'm' : ''}` },
+                                            { label: 'Entries Rated', value: `${ratedItems.length} of ${totalItems}` },
                                             { label: 'Total Genres Explored', value: genreList.length },
                                         ].map((item, i, arr) => (
                                             <div key={item.label}
@@ -588,22 +757,21 @@ function Stats() {
                                         ))}
                                     </div>
                                 </div>
-
                             </div>
                         </div>
 
                         {/* Empty state */}
-                        {games.length === 0 && (
+                        {!mediaLoading && currentData.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-20 gap-4">
                                 <div className="text-5xl">📊</div>
                                 <div className="text-white font-black text-2xl tracking-widest uppercase"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                    No data yet
+                                    No {mediaType} data yet
                                 </div>
                                 <div className="text-[#7a7a90] font-mono text-sm">
-                                    Start logging games to see your stats
+                                    Start logging {mediaType === 'game' ? 'games' : mediaType} to see your stats
                                 </div>
-                                <button onClick={() => navigate('/library')}
+                                <button onClick={() => navigate(mediaType === 'game' ? '/library' : `/${mediaType}/library`)}
                                     className="px-6 py-3 bg-[#c8ff57] text-black font-bold
                                                text-sm rounded hover:bg-[#d4ff6e] transition-all">
                                     + Add to Pond

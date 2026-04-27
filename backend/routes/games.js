@@ -8,6 +8,8 @@ import { updateGlobalStats, syncGlobalStats } from '../utils/stats.js'
 import { updateUserStats } from '../utils/userStats.js'
 import GlobalStats from '../models/GlobalStats.js'
 import { fetchGameDetailById } from './igdb.js'
+import { logEngagement } from '../utils/engagement.js'
+import mongoose from 'mongoose'
 
 const router = express.Router()
 
@@ -18,7 +20,26 @@ router.get('/', protect, async (req, res) => {
             .select('title cover status genre rating hours platforms igdbId steamId createdAt updatedAt')
             .sort({ createdAt: -1 })
             .lean()
-        res.json({ success: true, games })
+
+        // ── FETCH COMMUNITY STATS FOR LIBRARY ──
+        const allIds = games.map(g => g.igdbId).filter(Boolean)
+        let stats = {}
+        if (allIds.length > 0) {
+            const reviewData = await GlobalStats.find({ igdbId: { $in: allIds } })
+            reviewData.forEach(s => {
+                stats[s.igdbId] = {
+                    avgRating: s.avgRating || null,
+                    ratingCount: s.ratingCount || 0
+                }
+            })
+        }
+
+        const gamesWithStats = games.map(g => ({
+            ...g,
+            avgRating: stats[g.igdbId]?.avgRating || null
+        }))
+
+        res.json({ success: true, games: gamesWithStats })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch games', error: error.message })
     }
@@ -31,7 +52,26 @@ router.get('/user/:userId', async (req, res) => {
             .select('title cover status genre rating hours platforms igdbId createdAt updatedAt')
             .sort({ createdAt: -1 })
             .lean()
-        res.json({ success: true, games })
+
+        // ── FETCH COMMUNITY STATS FOR USER LIBRARY ──
+        const allIds = games.map(g => g.igdbId).filter(Boolean)
+        let stats = {}
+        if (allIds.length > 0) {
+            const reviewData = await GlobalStats.find({ igdbId: { $in: allIds } })
+            reviewData.forEach(s => {
+                stats[s.igdbId] = {
+                    avgRating: s.avgRating || null,
+                    ratingCount: s.ratingCount || 0
+                }
+            })
+        }
+
+        const gamesWithStats = games.map(g => ({
+            ...g,
+            avgRating: stats[g.igdbId]?.avgRating || null
+        }))
+
+        res.json({ success: true, games: gamesWithStats })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch games', error: error.message })
     }
@@ -150,6 +190,9 @@ router.get('/context/:igdbId', protectOptional, async (req, res) => {
                 wishlisted: !!wish
             }
         })
+
+        // Log view engagement for trending
+        logEngagement(igdbId, 'game', 'view', userId);
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
@@ -191,178 +234,223 @@ router.post('/stats/batch', async (req, res) => {
 router.post('/', protect, async (req, res) => {
     try {
         const { title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId } = req.body
-
         if (!title) return res.status(400).json({ success: false, message: 'Title is required' })
-
-        const newGame = new Game({
-            userId: req.user._id,
-            title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId
-        })
-        const savedGame = await newGame.save()
-
-        // ── Global Stats Denormalization ──
-        const statsUpdate = { loggedCount: 1 }
-        if (rating > 0) {
-            statsUpdate.ratingCount = 1
-            statsUpdate.ratingValue = Number(rating)
+        const session = await mongoose.startSession()
+        session.startTransaction()
+        try {
+            const newGame = new Game({
+                userId: req.user._id,
+                title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId
+            })
+            const savedGame = await newGame.save({ session })
+            const statsUpdate = { loggedCount: 1 }
+            if (rating > 0) {
+                statsUpdate.ratingCount = 1
+                statsUpdate.ratingValue = Number(rating)
+            }
+            await updateGlobalStats(igdbId, statsUpdate)
+            const userStatsUpdate = {
+                'gameStats.total': 1,
+                [`gameStats.${status}`]: 1,
+                'gameStats.totalHours': Number(hours) || 0
+            }
+            if (rating > 0) {
+                userStatsUpdate['gameStats.ratingCount'] = 1
+                userStatsUpdate['gameStats.totalRatingSum'] = Number(rating)
+            }
+            await updateUserStats(req.user._id, userStatsUpdate)
+            let updatedUser = await awardXP(req.user._id, 1, session)
+            let xpGained = 1
+            if (rating > 0) {
+                updatedUser = await awardXP(req.user._id, 1, session)
+                xpGained += 1
+                await logEngagement(igdbId, 'game', 'rating', req.user._id)
+            }
+            await session.commitTransaction()
+            session.endSession()
+            res.status(201).json({
+                success: true,
+                message: 'Game added successfully',
+                game: savedGame,
+                xpGained,
+                xp: updatedUser.xp,
+                level: updatedUser.level,
+                badge: updatedUser.badge
+            })
+        } catch (innerErr) {
+            await session.abortTransaction()
+            session.endSession()
+            throw innerErr
         }
-        await updateGlobalStats(igdbId, statsUpdate)
-
-        // ── User Stats Denormalization ──
-        const userStatsUpdate = { 
-            'gameStats.total': 1,
-            [`gameStats.${status}`]: 1,
-            'gameStats.totalHours': Number(hours) || 0
-        }
-        if (rating > 0) {
-            userStatsUpdate['gameStats.ratingCount'] = 1
-            userStatsUpdate['gameStats.totalRatingSum'] = Number(rating)
-        }
-        await updateUserStats(req.user._id, userStatsUpdate)
-
-        // +1 XP for logging
-        let updatedUser = await awardXP(req.user._id, 1)
-        let xpGained = 1
-
-        // +1 XP if rated on first log
-        if (rating > 0) {
-            updatedUser = await awardXP(req.user._id, 1)
-            xpGained += 1
-        }
-
-        res.status(201).json({
-            success: true,
-            message: 'Game added successfully',
-            game: savedGame,
-            xpGained,
-            xp: updatedUser.xp,
-            level: updatedUser.level,
-            badge: updatedUser.badge
-        })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to add game', error: error.message })
     }
 })
 
-// ── PUT /api/games/:id ── award/deduct XP for rating changes only
+router.post('/like', protect, async (req, res) => {
+    try {
+        const { externalId, title, cover, type, genre } = req.body
+        const existing = await GameLike.findOne({ userId: req.user._id, externalId: parseInt(externalId), type })
+        if (existing) {
+            const session = await mongoose.startSession()
+            session.startTransaction()
+            try {
+                await existing.deleteOne({ session })
+                await updateGlobalStats(externalId, { likeCount: -1 })
+                await deductXP(req.user._id, 1, session)
+                await logEngagement(externalId, type, 'like', req.user._id)
+                await session.commitTransaction()
+                session.endSession()
+                return res.json({ success: true, liked: false, message: 'Like removed · -1 XP' })
+            } catch (innerErr) {
+                await session.abortTransaction()
+                session.endSession()
+                throw innerErr
+            }
+        }
+        const session = await mongoose.startSession()
+        session.startTransaction()
+        try {
+            await GameLike.create([{ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre }], { session })
+            await updateGlobalStats(externalId, { likeCount: 1 })
+            await logEngagement(externalId, type, 'like', req.user._id)
+            const updatedUser = await awardXP(req.user._id, 1, session)
+            await session.commitTransaction()
+            session.endSession()
+            res.json({
+                success: true,
+                liked: true,
+                message: 'Liked · +1 XP',
+                xp: updatedUser?.xp,
+                level: updatedUser?.level,
+                badge: updatedUser?.badge
+            })
+            gameCache.delete(`game-home-${type}`)
+            gameCache.delete(`game-detail-${type}-${externalId}`)
+        } catch (innerErr) {
+            await session.abortTransaction()
+            session.endSession()
+            throw innerErr
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Like failed' })
+    }
+})
+
 router.put('/:id', protect, async (req, res) => {
     try {
         const existingGame = await Game.findOne({ _id: req.params.id, userId: req.user._id })
         if (!existingGame) return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
-
         const oldRating = existingGame.rating || 0
         const hadRatingBefore = oldRating > 0
         const hasRatingNow = req.body.rating > 0
-
-        const game = await Game.findOneAndUpdate(
-            { _id: req.params.id, userId: req.user._id },
-            req.body,
-            { returnDocument: 'after' }
-        )
-
-        // ── Global Stats Update ──
-        if (game.igdbId) {
-            const ratingDelta = (Number(req.body.rating) || 0) - oldRating
-            const countDelta = (!hadRatingBefore && hasRatingNow) ? 1 : (hadRatingBefore && !hasRatingNow) ? -1 : 0
-            
-            if (ratingDelta !== 0 || countDelta !== 0) {
-                await updateGlobalStats(game.igdbId, {
-                    ratingCount: countDelta,
-                    ratingValue: ratingDelta
-                })
+        const session = await mongoose.startSession()
+        session.startTransaction()
+        try {
+            const game = await Game.findOneAndUpdate(
+                { _id: req.params.id, userId: req.user._id },
+                req.body,
+                { returnDocument: 'after', session }
+            )
+            if (game.igdbId) {
+                const ratingDelta = (Number(req.body.rating) || 0) - oldRating
+                const countDelta = (!hadRatingBefore && hasRatingNow) ? 1 : (hadRatingBefore && !hasRatingNow) ? -1 : 0
+                if (ratingDelta !== 0 || countDelta !== 0) {
+                    await updateGlobalStats(game.igdbId, {
+                        ratingCount: countDelta,
+                        ratingValue: ratingDelta
+                    })
+                }
             }
+            const userStatsUpdate = {}
+            const oldStatus = existingGame.status
+            const newStatus = req.body.status
+            if (newStatus && oldStatus !== newStatus) {
+                userStatsUpdate[`gameStats.${oldStatus}`] = -1
+                userStatsUpdate[`gameStats.${newStatus}`] = 1
+            }
+            const oldHours = existingGame.hours || 0
+            const newHours = Number(req.body.hours)
+            if (!isNaN(newHours) && oldHours !== newHours) {
+                userStatsUpdate['gameStats.totalHours'] = newHours - oldHours
+            }
+            const ratingDelta = (Number(req.body.rating) || 0) - (existingGame.rating || 0)
+            const countDelta = (!hadRatingBefore && hasRatingNow) ? 1 : (hadRatingBefore && !hasRatingNow) ? -1 : 0
+            if (ratingDelta !== 0 || countDelta !== 0) {
+                userStatsUpdate['gameStats.ratingCount'] = countDelta
+                userStatsUpdate['gameStats.totalRatingSum'] = ratingDelta
+            }
+            if (Object.keys(userStatsUpdate).length > 0) {
+                await updateUserStats(req.user._id, userStatsUpdate)
+            }
+            let updatedUser = null
+            if (!hadRatingBefore && hasRatingNow) {
+                updatedUser = await awardXP(req.user._id, 1, session)
+            }
+            if (hadRatingBefore && !hasRatingNow) {
+                updatedUser = await deductXP(req.user._id, 1, session)
+            }
+            await session.commitTransaction()
+            session.endSession()
+            res.json({
+                success: true,
+                message: 'Game updated',
+                game,
+                ...(updatedUser && { xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge })
+            })
+        } catch (innerErr) {
+            await session.abortTransaction()
+            session.endSession()
+            throw innerErr
         }
-
-        // ── User Stats Update ──
-        const userStatsUpdate = {}
-        const oldStatus = existingGame.status
-        const newStatus = req.body.status
-        if (newStatus && oldStatus !== newStatus) {
-            userStatsUpdate[`gameStats.${oldStatus}`] = -1
-            userStatsUpdate[`gameStats.${newStatus}`] = 1
-        }
-        const oldHours = existingGame.hours || 0
-        const newHours = Number(req.body.hours)
-        if (!isNaN(newHours) && oldHours !== newHours) {
-            userStatsUpdate['gameStats.totalHours'] = newHours - oldHours
-        }
-        const ratingDelta = (Number(req.body.rating) || 0) - (existingGame.rating || 0)
-        const countDelta = (!hadRatingBefore && hasRatingNow) ? 1 : (hadRatingBefore && !hasRatingNow) ? -1 : 0
-        
-        if (ratingDelta !== 0 || countDelta !== 0) {
-            userStatsUpdate['gameStats.ratingCount'] = countDelta
-            userStatsUpdate['gameStats.totalRatingSum'] = ratingDelta
-        }
-
-        if (Object.keys(userStatsUpdate).length > 0) {
-            await updateUserStats(req.user._id, userStatsUpdate)
-        }
-
-        let updatedUser = null
-
-        // First time rating → +1 XP
-        if (!hadRatingBefore && hasRatingNow) {
-            updatedUser = await awardXP(req.user._id, 1)
-        }
-        // Rating removed → -1 XP
-        if (hadRatingBefore && !hasRatingNow) {
-            updatedUser = await deductXP(req.user._id, 1)
-        }
-
-        res.json({
-            success: true,
-            message: 'Game updated',
-            game,
-            ...(updatedUser && { xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge })
-        })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to update game', error: error.message })
     }
 })
 
-// ── DELETE /api/games/:id ── deduct XP earned for this game
 router.delete('/:id', protect, async (req, res) => {
     try {
         const game = await Game.findOne({ _id: req.params.id, userId: req.user._id })
         if (!game) return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
-
-        // Calculate XP to deduct: 1 for logging + 1 if had rating
         let xpToDeduct = 1
         if (game.rating > 0) xpToDeduct += 1
-
-        await game.deleteOne()
-        
-        // ── Global Stats Update ──
-        if (game.igdbId) {
-            await updateGlobalStats(game.igdbId, {
-                loggedCount: -1,
-                ratingCount: game.rating > 0 ? -1 : 0,
-                ratingValue: game.rating > 0 ? -game.rating : 0
+        const session = await mongoose.startSession()
+        session.startTransaction()
+        try {
+            await game.deleteOne({ session })
+            if (game.igdbId) {
+                await updateGlobalStats(game.igdbId, {
+                    loggedCount: -1,
+                    ratingCount: game.rating > 0 ? -1 : 0,
+                    ratingValue: game.rating > 0 ? -game.rating : 0
+                })
+            }
+            const userStatsDelete = {
+                'gameStats.total': -1,
+                [`gameStats.${game.status}`]: -1,
+                'gameStats.totalHours': -(game.hours || 0)
+            }
+            if (game.rating > 0) {
+                userStatsDelete['gameStats.ratingCount'] = -1
+                userStatsDelete['gameStats.totalRatingSum'] = -game.rating
+            }
+            await updateUserStats(req.user._id, userStatsDelete)
+            const updatedUser = await deductXP(req.user._id, xpToDeduct, session)
+            await session.commitTransaction()
+            session.endSession()
+            res.json({
+                success: true,
+                message: 'Game deleted',
+                xpDeducted: xpToDeduct,
+                xp: updatedUser.xp,
+                level: updatedUser.level,
+                badge: updatedUser.badge
             })
+        } catch (innerErr) {
+            await session.abortTransaction()
+            session.endSession()
+            throw innerErr
         }
-
-        // ── User Stats Update ──
-        const userStatsDelete = {
-            'gameStats.total': -1,
-            [`gameStats.${game.status}`]: -1,
-            'gameStats.totalHours': -(game.hours || 0)
-        }
-        if (game.rating > 0) {
-            userStatsDelete['gameStats.ratingCount'] = -1
-            userStatsDelete['gameStats.totalRatingSum'] = -game.rating
-        }
-        await updateUserStats(req.user._id, userStatsDelete)
-
-        const updatedUser = await deductXP(req.user._id, xpToDeduct)
-
-        res.json({
-            success: true,
-            message: 'Game deleted',
-            xpDeducted: xpToDeduct,
-            xp: updatedUser.xp,
-            level: updatedUser.level,
-            badge: updatedUser.badge
-        })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to delete game', error: error.message })
     }

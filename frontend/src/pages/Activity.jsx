@@ -20,102 +20,148 @@ const timeAgo = (date) => {
     })
 }
 
-const makeActivityConfig = (navigate) => ({
-    completed: {
-        icon: <Trophy size={16} />,
-        bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
-        getText: (a) => (
-            <>
-                Completed{' '}
-                <span
-                    onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)}
-                    className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}
-                >
-                    {a.game.title}
-                </span>
-                {a.rating ? ` — rated it ${a.rating}/10` : ''}
-            </>
-        )
-    },
-    playing: {
-        icon: <Play size={16} fill="currentColor" />,
-        bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
-        getText: (a) => (
-            <>
-                Started playing{' '}
-                <span
-                    onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)}
-                    className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}
-                >
-                    {a.game.title}
-                </span>
-            </>
-        )
-    },
-    rated: {
-        icon: <Star size={16} fill="currentColor" />,
-        bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
-        getText: (a) => (
-            <>
-                Rated{' '}
-                <span
-                    onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)}
-                    className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}
-                >
-                    {a.game.title}
-                </span>
-                {` ${a.rating}/10`}
-            </>
-        )
-    },
-    planned: {
-        icon: <ListChecks size={16} />,
-        bg: 'bg-[#2a2a35] text-[#e8e8f0]',
-        getText: (a) => (
-            <>
-                Added{' '}
-                <span
-                    onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)}
-                    className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}
-                >
-                    {a.game.title}
-                </span>
-                {' to planned list'}
-            </>
-        )
-    },
-    dropped: {
-        icon: <X size={16} strokeWidth={3} />,
-        bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
-        getText: (a) => (
-            <>
-                Dropped{' '}
-                <span
-                    onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)}
-                    className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}
-                >
-                    {a.game.title}
-                </span>
-                {a.hours ? ` after ${a.hours}h` : ''}
-            </>
-        )
-    },
-    paused: {
-        icon: <Pause size={16} fill="currentColor" />,
-        bg: 'bg-[#c45cff]/15 text-[#c45cff]',
-        getText: (a) => (
-            <>
-                Paused{' '}
-                <span
-                    onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)}
-                    className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}
-                >
-                    {a.game.title}
-                </span>
-            </>
-        )
-    }
-})
+const makeActivityConfig = (navigate) => {
+    const getPath = (item) => {
+        const media = item.game || item.movie || item.anime || item.manga;
+        if (!media) return '#';
+        const id = media.igdbId || media.externalId;
+        const type = media.mediaType || 'game';
+        
+        if (type === 'game') return `/game/${id}`;
+        if (type === 'anime') return `/anime/${id}`;
+        if (type === 'manga') return `/manga/${id}`;
+        if (type === 'tv') return `/tv/${id}`;
+        if (type === 'movie') return `/movies/${id}`;
+        return '#';
+    };
+
+    const getMedia = (a) => a.game || a.movie || a.anime || a.manga;
+
+    return {
+        completed: {
+            icon: <Trophy size={16} />,
+            bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
+            getText: (a) => {
+                const m = getMedia(a);
+                const path = getPath(a);
+                const action = m.mediaType === 'manga' ? 'Finished' : 'Completed';
+                return (
+                    <>
+                        {action}{' '}
+                        <span
+                            onClick={() => path !== '#' && navigate(path)}
+                            className={`text-[#c8ff57] font-bold ${path !== '#' ? 'cursor-pointer hover:underline' : ''}`}
+                        >
+                            {m.title}
+                        </span>
+                        {a.rating ? ` — rated it ${a.rating}/10` : ''}
+                    </>
+                );
+            }
+        },
+        playing: {
+            icon: <Play size={16} fill="currentColor" />,
+            bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
+            getText: (a) => {
+                const m = getMedia(a);
+                const path = getPath(a);
+                let action = 'Started playing';
+                if (m.mediaType === 'movie' || m.mediaType === 'tv' || m.mediaType === 'anime') action = 'Started watching';
+                if (m.mediaType === 'manga') action = 'Started reading';
+                return (
+                    <>
+                        {action}{' '}
+                        <span
+                            onClick={() => path !== '#' && navigate(path)}
+                            className={`text-[#c8ff57] font-bold ${path !== '#' ? 'cursor-pointer hover:underline' : ''}`}
+                        >
+                            {m.title}
+                        </span>
+                    </>
+                );
+            }
+        },
+        rated: {
+            icon: <Star size={16} fill="currentColor" />,
+            bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
+            getText: (a) => {
+                const m = getMedia(a);
+                const path = getPath(a);
+                return (
+                    <>
+                        Rated{' '}
+                        <span
+                            onClick={() => path !== '#' && navigate(path)}
+                            className={`text-[#c8ff57] font-bold ${path !== '#' ? 'cursor-pointer hover:underline' : ''}`}
+                        >
+                            {m.title}
+                        </span>
+                        {` ${a.rating}/10`}
+                    </>
+                );
+            }
+        },
+        planned: {
+            icon: <ListChecks size={16} />,
+            bg: 'bg-[#2a2a35] text-[#e8e8f0]',
+            getText: (a) => {
+                const m = getMedia(a);
+                const path = getPath(a);
+                return (
+                    <>
+                        Added{' '}
+                        <span
+                            onClick={() => path !== '#' && navigate(path)}
+                            className={`text-[#c8ff57] font-bold ${path !== '#' ? 'cursor-pointer hover:underline' : ''}`}
+                        >
+                            {m.title}
+                        </span>
+                        {' to planned list'}
+                    </>
+                );
+            }
+        },
+        dropped: {
+            icon: <X size={16} strokeWidth={3} />,
+            bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
+            getText: (a) => {
+                const m = getMedia(a);
+                const path = getPath(a);
+                return (
+                    <>
+                        Dropped{' '}
+                        <span
+                            onClick={() => path !== '#' && navigate(path)}
+                            className={`text-[#c8ff57] font-bold ${path !== '#' ? 'cursor-pointer hover:underline' : ''}`}
+                        >
+                            {m.title}
+                        </span>
+                        {a.hours ? ` after ${a.hours}h` : ''}
+                    </>
+                );
+            }
+        },
+        paused: {
+            icon: <Pause size={16} fill="currentColor" />,
+            bg: 'bg-[#c45cff]/15 text-[#c45cff]',
+            getText: (a) => {
+                const m = getMedia(a);
+                const path = getPath(a);
+                return (
+                    <>
+                        Paused{' '}
+                        <span
+                            onClick={() => path !== '#' && navigate(path)}
+                            className={`text-[#c8ff57] font-bold ${path !== '#' ? 'cursor-pointer hover:underline' : ''}`}
+                        >
+                            {m.title}
+                        </span>
+                    </>
+                );
+            }
+        }
+    };
+};
 
 function Activity() {
     const { user } = useAuth()
@@ -130,7 +176,7 @@ function Activity() {
     // Cached — instant on return within 2 min
     const { data: activityData, loading: loadingActivity } = useCachedFetch(
         userId ? `activity_${userId}` : null,
-        userId ? `/games/activity/${userId}` : null,
+        userId ? `/auth/activity/${userId}` : null,
         { enabled: !!userId, ttl: 2 * 60 * 1000 }
     )
     const { data: feedData, loading: loadingFeed } = useCachedFetch(
@@ -280,43 +326,63 @@ function Activity() {
                 <>
                     {feed.length > 0 ? (
                         <div className="flex flex-col gap-3">
-                            {feed.map(game => {
-                                const sc = statusConfig[game.status] || statusConfig.planned
-                                const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.THUMB)
+                            {feed.map(item => {
+                                const sc = statusConfig[item.status] || statusConfig.planned
+                                const isGame = item.mediaType === 'game'
+                                const imageUrl = isGame 
+                                    ? getIGDBImage(item.cover || (item.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${item.steamId}/header.jpg` : null), SIZES.THUMB)
+                                    : item.cover
 
-                                const myRating = getMyRating(game.title)
+                                const myRating = getMyRating(item.title)
+                                const id = item.igdbId || item.externalId
+                                const pathMap = {
+                                    game: `/game/${id}`,
+                                    anime: `/anime/${id}`,
+                                    manga: `/manga/${id}`,
+                                    movie: `/movies/${id}`,
+                                    tv: `/tv/${id}`
+                                }
+                                const detailPath = pathMap[item.mediaType] || '#'
 
                                 return (
                                     <div
-                                        key={game._id}
+                                        key={item._id}
                                         className="bg-[#111118] border border-[#2a2a35] rounded-lg
                                overflow-hidden hover:border-[#c8ff57]/30 transition-all w-full"
                                     >
                                         <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4 p-3 md:p-4">
                                             <div className="flex items-center gap-3 flex-1 min-w-0">
 
-                                            {/* Cover — clickable if igdbId */}
+                                            {/* Cover — clickable if ID exists */}
                                             <div
-                                                onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
+                                                onClick={() => detailPath !== '#' && navigate(detailPath)}
                                                 className={`w-10 h-7.5 md:w-16 md:h-12 bg-cover bg-center bg-[#18181f]
-                                   rounded-sm flex-shrink-0
-                                   ${game.igdbId ? 'cursor-pointer' : ''}`}
+                                   rounded-sm flex-shrink-0 relative
+                                   ${detailPath !== '#' ? 'cursor-pointer' : ''}`}
                                                 style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}
                                             >
                                                 {!imageUrl && (
                                                     <div className="w-full h-full flex items-center
-                                          justify-center text-xl">🎮</div>
+                                          justify-center text-xl">{isGame ? '🎮' : '🎬'}</div>
+                                                )}
+                                                
+                                                {/* Community Average Rating Badge */}
+                                                {item.avgRating > 0 && (
+                                                    <div className="absolute top-0.5 right-0.5 flex items-center gap-0.5 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-0.5 py-0.2 shadow-lg z-10">
+                                                        <Star size={7} className="text-[#5c9fff] fill-current" />
+                                                        <span className="font-black text-[9px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
+                                                    </div>
                                                 )}
                                             </div>
 
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
                                                 <div
-                                                    onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
+                                                    onClick={() => detailPath !== '#' && navigate(detailPath)}
                                                     className={`text-white font-semibold text-[13px] md:text-sm truncate mb-1
-                                      ${game.igdbId ? 'cursor-pointer hover:text-[#c8ff57] transition-colors' : ''}`}
+                                      ${detailPath !== '#' ? 'cursor-pointer hover:text-[#c8ff57] transition-colors' : ''}`}
                                                 >
-                                                    {game.title}
+                                                    {item.title}
                                                 </div>
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className={`font-mono text-[9px] uppercase
@@ -324,14 +390,14 @@ function Activity() {
                                            rounded-sm ${sc.bg} ${sc.color}`}>
                                                         {sc.label}
                                                     </span>
-                                                    {game.userId?.username && (
+                                                    {item.userId?.username && (
                                                         <span className="font-mono text-[9px] md:text-[10px] text-[#7a7a90]">
                                                             by{' '}
                                                             <Link
-                                                                to={`/user/${game.userId.username}`}
+                                                                to={`/user/${item.userId.username}`}
                                                                 className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors truncate max-w-[40px] md:max-w-none inline-block align-bottom"
                                                             >
-                                                                {game.userId.username}
+                                                                {item.userId.username}
                                                             </Link>
                                                         </span>
                                                     )}
@@ -340,23 +406,23 @@ function Activity() {
                                         </div>
 
                                             {/* Ratings column — stacks on mobile, row on desktop */}
-                                                                                        {!(game.rating > 0 && myRating) && (
+                                                                                        {!(item.rating > 0 && myRating) && (
                                                 <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 md:gap-1 flex-shrink-0 pt-2 sm:pt-0 border-t border-[#2a2a35]/40 sm:border-t-0">
 
                                                 {/* Friend's rating — BLUE */}
-                                                {game.rating > 0 && (
+                                                {item.rating > 0 && (
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90]
                                              uppercase tracking-wider max-w-[60px] md:max-w-none truncate text-right">
-                                                            {game.userId?.username
-                                                                ? `${game.userId.username}'s`
+                                                            {item.userId?.username
+                                                                ? `${item.userId.username}'s`
                                                                 : "friend's"}
                                                         </span>
                                                         <div
                                                             className="font-black text-sm md:text-xl text-[#5c9fff] leading-none"
                                                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                                         >
-                                                            {game.rating}
+                                                            {item.rating}
                                                             <small className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] font-normal">
                                                                 /10
                                                             </small>
@@ -394,7 +460,7 @@ function Activity() {
                                             {/* Date */}
                                             <div className="font-mono text-[10px] text-[#7a7a90]
                                      flex-shrink-0 hidden sm:block ml-2">
-                                                {new Date(game.createdAt).toLocaleDateString('en-US', {
+                                                {new Date(item.createdAt).toLocaleDateString('en-US', {
                                                     month: 'short', day: 'numeric'
                                                 })}
                                             </div>
@@ -402,22 +468,22 @@ function Activity() {
                                         </div>
 
                                         {/* Comparison bars — only if both rated */}
-                                        {game.rating > 0 && myRating && (
+                                        {item.rating > 0 && myRating && (
                                             <div className="px-3 md:px-4 pb-3 flex flex-col gap-1">
 
                                                 {/* Friend bar — BLUE */}
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] w-10 md:w-14 text-right truncate">
-                                                        {game.userId?.username?.slice(0, 8) || 'friend'}
+                                                        {item.userId?.username?.slice(0, 8) || 'friend'}
                                                     </span>
                                                     <div className="flex-1 relative h-1 md:h-1.5 bg-[#2a2a35] rounded-full">
                                                         <div
                                                             className="absolute left-0 top-0 h-full rounded-full bg-[#5c9fff]"
-                                                            style={{ width: `${(game.rating / 10) * 100}%` }}
+                                                            style={{ width: `${(item.rating / 10) * 100}%` }}
                                                         />
                                                     </div>
                                                     <span className="font-mono text-[8px] md:text-[9px] text-[#5c9fff] w-4 text-right">
-                                                        {game.rating}
+                                                        {item.rating}
                                                     </span>
                                                 </div>
 

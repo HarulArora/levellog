@@ -53,7 +53,6 @@ const AnimeCard = memo(({ item, section }) => {
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                     {item.avgRating && (
                         <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <Star size={10} className="text-[#5c9fff] fill-current" />
                             <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
                         </div>
                     )}
@@ -192,7 +191,7 @@ function AnimeDiscover() {
                         </div>
 
                         <form onSubmit={handleSearch} className="w-full md:w-96 relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90]" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white" size={18} />
                             <input 
                                 type="text"
                                 placeholder="Search anime..."
@@ -268,7 +267,7 @@ function AnimeDiscover() {
                 </div>
 
                 {/* ── Grid ── */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                     {loading || isSearching ? (
                         Array.from({ length: 24 }).map((_, i) => <GameCardSkeleton key={i} />)
                     ) : (searchPerformed ? searchResults : items).map(item => (

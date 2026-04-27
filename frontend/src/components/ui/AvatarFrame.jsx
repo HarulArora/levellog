@@ -4,7 +4,7 @@ import './AvatarFrame.css'
 const RANK_CONFIG = {
     1: { label: '👑', color: '#ffd700', name: 'Gold Crown' },
     2: { label: '🪽', color: '#B9F2FF', name: 'Silver Wings' },
-    3: { label: '⭐', color: '#cd7f32', name: 'Bronze Star' },
+    3: { label: '🎖️', color: '#cd7f32', name: 'Bronze Medal' },
     4: { label: '⚔️', color: '#94999c', name: 'Iron Guard' },
 }
 

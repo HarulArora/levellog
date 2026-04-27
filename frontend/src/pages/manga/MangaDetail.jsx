@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
-import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, Heart, Share, Star, Play } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, Heart, Share, Play, Layers, ListChecks, ShoppingBag, BookOpen, ExternalLink, ChevronRight } from 'lucide-react'
 import AddAnimeModal from '../../components/library/AddAnimeModal'
 import Skeleton from '../../components/ui/Skeleton'
 import { useLeaderboard } from '../../context/LeaderboardContext'
@@ -88,6 +88,9 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
     
     const userRankInfo = topUsers.find(u => u._id === comment.userId?._id || u._id === comment.userId?.id)
     const rank = userRankInfo?.rank
+
+    const currentUserRankInfo = topUsers.find(u => u._id === currentUser?.id || u._id === currentUser?._id)
+    const currentUserRank = currentUserRankInfo?.rank
 
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [showGifPicker, setShowGifPicker] = useState(false)
@@ -235,7 +238,11 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
                     )}
                     <div className="flex items-center gap-2 mt-3">
                         <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm relative">
-                            {showBurst && <div className="rank-like-burst">🍥</div>}
+                            {showBurst && (
+                                <div className="rank-like-burst">
+                                    {currentUserRank === 1 ? '👑' : currentUserRank === 2 ? '🪽' : currentUserRank === 3 ? '🎖️' : currentUserRank === 4 ? '⚔️' : '🍿'}
+                                </div>
+                            )}
                             <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg ${liked ? 'bg-[#c8ff57]/20 text-[#c8ff57]' : 'text-[#7a7a90] hover:text-white'}`}><ThumbsUp size={12} /> {likes > 0 && <span>{likes}</span>}</button>
                             <div className="w-[1px] bg-[#2a2a35] my-1 mx-0.5" />
                             <button onClick={handleDislike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg ${disliked ? 'bg-[#ff5c5c]/20 text-[#ff5c5c]' : 'text-[#7a7a90] hover:text-white'}`}><ThumbsDown size={12} /> {dislikes > 0 && <span>{dislikes}</span>}</button>
@@ -313,12 +320,16 @@ function MangaDetail() {
     const { id } = useParams()
     const location = useLocation()
     const navigate = useNavigate()
-    const { user } = useAuth()
+    const { user, updateUser } = useAuth()
     const type = 'manga'
 
     const [activeTab, setActiveTab] = useState('overview')
     const [expanded, setExpanded] = useState(false)
     const [showAddModal, setShowAddModal] = useState(false)
+    const [showListModal, setShowListModal] = useState(false)
+    const [customLists, setCustomLists] = useState([])
+    const [loadingLists, setLoadingLists] = useState(false)
+    const [listToast, setListToast] = useState(null)
     const [userLibrary, setUserLibrary] = useState([])
     const [liked, setLiked] = useState(false)
     const [wishlisted, setWishlisted] = useState(false)
@@ -393,9 +404,18 @@ function MangaDetail() {
             userStatus: { ...(oldData.userStatus || {}), liked: !wasLiked }
         })
         try {
-            const res = await api.post('/anime/like', { externalId: id, title: anime.title, cover: anime.cover || anime.coverImage, type, genre: anime.genres?.[0] })
+            const res = await api.post('/lists/like', { 
+                externalId: id, 
+                gameTitle: anime.title, 
+                gameCover: anime.cover || anime.coverImage, 
+                mediaType: type, 
+                genre: anime.genres?.[0] 
+            })
             setLiked(res.data.liked)
-            if (res.data.liked) showXpToast('❤️ Liked! +1 XP', 'gain')
+            if (res.data.liked) {
+                showXpToast('❤️ Liked! +1 XP', 'gain')
+                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+            }
             else showXpToast('💔 Unliked', 'loss')
             refetchContext(true)
         } catch (err) {
@@ -417,7 +437,13 @@ function MangaDetail() {
             userStatus: { ...(oldData.userStatus || {}), wishlisted: !wasWishlisted }
         })
         try {
-            const res = await api.post('/anime/wishlist', { externalId: id, title: anime.title, cover: anime.cover || anime.coverImage, type, genre: anime.genres?.[0] })
+            const res = await api.post('/lists/wishlist', { 
+                externalId: id, 
+                gameTitle: anime.title, 
+                gameCover: anime.cover || anime.coverImage, 
+                mediaType: type, 
+                genre: anime.genres?.[0] 
+            })
             setWishlisted(res.data.wishlisted)
             if (res.data.wishlisted) showXpToast('🎯 Wishlisted!', 'gain')
             refetchContext(true)
@@ -425,6 +451,33 @@ function MangaDetail() {
             setWishlisted(wasWishlisted)
             if (oldData) setContextData(oldData)
         } finally { setWishing(false) }
+    }
+
+    const handleOpenListModal = async () => {
+        if (!user) { navigate('/login'); return }
+        setShowListModal(true)
+        if (user.level < 2) return
+        setLoadingLists(true)
+        try {
+            const res = await api.get(`/lists/me?mediaType=${type}`)
+            setCustomLists(res.data.customLists || [])
+        } catch (err) { console.error('Error fetching lists:', err) }
+        finally { setLoadingLists(false) }
+    }
+
+    const handleAddToList = async (listId, listName) => {
+        try {
+            await api.put(`/lists/custom/${listId}/game`, {
+                externalId: id, gameTitle: anime.title,
+                gameCover: anime.cover || anime.coverImage, genre: anime.genres?.[0], action: 'add'
+            })
+            setListToast({ msg: `Added to "${listName}"`, type: 'success' })
+            setTimeout(() => setListToast(null), 3000)
+            setShowListModal(false)
+        } catch (err) { 
+            setListToast({ msg: 'Failed to add to list', type: 'error' }) 
+            setTimeout(() => setListToast(null), 3000)
+        }
     }
 
     const handlePostComment = async () => {
@@ -514,7 +567,6 @@ function MangaDetail() {
                             <div className="flex flex-wrap gap-8 mb-8">
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <Star size={20} className="text-[#5c9fff] fill-current" />
                                         <div className="font-black text-4xl text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.avgRating || '—'}{stats?.avgRating && <small className="text-[10px] font-normal opacity-60">/10</small>}</div>
                                     </div>
                                     <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Avg Rating ({stats?.ratingCount || 0})</div>
@@ -552,6 +604,9 @@ function MangaDetail() {
                                 <button onClick={handleShare} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border transition-all ${shareCopied ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#c8ff57] hover:text-[#c8ff57]'}`}>
                                     {shareCopied ? <Check size={16} /> : <Share size={16} />} {shareCopied ? 'Copied!' : 'Share'}
                                 </button>
+                                <button onClick={handleOpenListModal} className="btn-apple px-4 py-2.5 flex items-center gap-1.5 border border-white/10 text-[#c8c8d8] hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all backdrop-blur-md">
+                                    <Layers size={16} /> List
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -562,11 +617,11 @@ function MangaDetail() {
             <div className="border-b border-[#2a2a35] bg-[#0a0a0f] sticky top-[65px] z-40">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <div className="flex gap-6">
-                        {['overview', 'comments', 'cast'].map(tab => (
+                        {['overview', 'buy', 'comments', 'cast'].map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} 
                                 className={`font-mono text-xs uppercase tracking-widest py-4 border-b-2 transition-all 
                                            ${activeTab === tab ? 'border-[#c8ff57] text-[#c8ff57]' : 'border-transparent text-[#7a7a90] hover:text-white'}`}>
-                                {tab} {tab === 'comments' && allComments.length > 0 && <span className="opacity-60 ml-1.5 font-mono text-[10px]">({allComments.length})</span>}
+                                {tab === 'buy' ? 'Read / Buy' : tab.charAt(0).toUpperCase() + tab.slice(1)} {tab === 'comments' && allComments.length > 0 && <span className="opacity-60 ml-1.5 font-mono text-[10px]">({allComments.length})</span>}
                             </button>
                         ))}
                     </div>
@@ -577,6 +632,44 @@ function MangaDetail() {
             <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8">
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8">
                     <div className="flex flex-col gap-6">
+                        {activeTab === 'buy' && (
+                            <div className="flex flex-col gap-6">
+                                <div className="bg-[#111118] border border-[#2a2a35] rounded-xl p-8 text-center shadow-xl">
+                                    <div className="text-[#c8ff57] mb-4"><BookOpen size={40} className="mx-auto opacity-20" /></div>
+                                    <div className="text-[#7a7a90] font-mono text-xs uppercase tracking-widest mb-6">Official Reading & Buying Sources</div>
+                                    
+                                    {anime.externalLinks?.length > 0 ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {anime.externalLinks.map((link, i) => (
+                                                <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" 
+                                                   className="flex items-center justify-between p-5 rounded-2xl bg-[#18181f]/40 border border-white/5 hover:border-[#c8ff57]/40 hover:bg-[#18181f]/60 transition-all group shadow-xl text-left">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center text-[#c8ff57] shadow-inner group-hover:scale-105 transition-transform duration-500">
+                                                            <ShoppingBag size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-white font-black text-sm uppercase tracking-wider group-hover:text-[#c8ff57] transition-colors">{link.name}</div>
+                                                            <div className="text-[#7a7a90] text-[10px] font-mono uppercase tracking-[0.2em] mt-0.5">Official Source</div>
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRight size={16} className="text-[#5c5c6c] group-hover:text-white transition-colors" />
+                                                </a>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="py-10">
+                                            <p className="text-[#5c5c6c] font-mono text-sm uppercase tracking-widest">No official links found in the multiverse</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-8 p-5 rounded-2xl bg-black/20 border border-white/5">
+                                    <p className="text-[10px] text-[#5c5c6c] font-mono leading-relaxed uppercase tracking-widest text-center">
+                                        Note: We only provide official links to support the creators. Always read responsibly.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                         {activeTab === 'overview' && (
                             <>
                                 {anime.trailer && (
@@ -866,12 +959,85 @@ function MangaDetail() {
                 </div>
             </div>
 
+            {showListModal && (
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={e => e.target === e.currentTarget && setShowListModal(false)}>
+                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between p-5 border-b border-[#2a2a35]">
+                            <div>
+                                <div className="font-black text-lg text-white tracking-widest uppercase"
+                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Add to List</div>
+                                <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5 truncate max-w-[220px]">{anime.title}</div>
+                            </div>
+                            <button onClick={() => setShowListModal(false)} className="text-[#7a7a90] hover:text-white text-xl">✕</button>
+                        </div>
+                        <div className="p-5">
+                            {user?.level < 2 ? (
+                                <div className="flex flex-col items-center gap-4 py-8 text-center">
+                                    <div className="w-14 h-14 bg-[#1a1a25] border border-[#3a3a4a] rounded-full flex items-center justify-center mb-2">
+                                        <span className="text-2xl">🔒</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="font-black text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Feature Locked</div>
+                                        <div className="font-mono text-[10px] text-[#7a7a90] max-w-[200px] leading-relaxed">Reach Level 2 to create and use custom collections.</div>
+                                    </div>
+                                    <button onClick={() => setShowListModal(false)}
+                                        className="mt-2 px-6 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:text-white hover:border-white transition-all">
+                                        GOT IT
+                                    </button>
+                                </div>
+                            ) : loadingLists ? (
+                                <div className="text-center py-8 font-mono text-xs text-[#7a7a90]">Loading lists...</div>
+                            ) : customLists.length === 0 ? (
+                                <div className="flex flex-col items-center gap-3 py-8 text-center">
+                                    <div className="text-3xl">📋</div>
+                                    <div className="font-mono text-xs text-[#7a7a90]">No {type} collections yet.</div>
+                                    <button onClick={() => { setShowListModal(false); navigate('/lists') }}
+                                        className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-xs rounded hover:bg-[#d4ff6e] transition-all">
+                                        Create a Collection →
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                                    {customLists.map(list => (
+                                        <button key={list._id} onClick={() => handleAddToList(list._id, list.name)}
+                                            className="flex items-center gap-3 p-3 rounded-lg border border-[#2a2a35]
+                                                       hover:border-[#c8ff57] hover:bg-[#c8ff57]/05 transition-all text-left group">
+                                            <div className="w-8 h-8 rounded bg-[#c8ff57]/15 flex items-center justify-center text-sm flex-shrink-0">📋</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-white font-semibold text-sm truncate group-hover:text-[#c8ff57] transition-colors">{list.name}</div>
+                                                <div className="font-mono text-[9px] text-[#7a7a90] mt-0.5">
+                                                    {list.games?.length || 0} items · {list.isPublic ? 'Public' : 'Private'}
+                                                </div>
+                                            </div>
+                                            <span className="font-mono text-[10px] text-[#c8ff57] opacity-0 group-hover:opacity-100 transition-opacity">+ Add</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* List Toast */}
+            {listToast && (
+                <div className={`fixed bottom-8 md:bottom-12 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
+                                ${listToast.type === 'error' ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]'
+                        : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
+                    {listToast.msg}
+                </div>
+            )}
+
             {showAddModal && (
                 <AddAnimeModal
                     onClose={() => setShowAddModal(false)}
                     onAdd={async (formData) => {
                         try {
-                            await api.post('/anime/log', formData)
+                            const res = await api.post('/anime/log', formData)
+                            if (res.data.xp) {
+                                updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                            }
                             setShowAddModal(false)
                             refetchContext(true)
                             const libRes = await api.get('/anime/library')

@@ -4,21 +4,16 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
-import { Trophy, Play, Star, ListChecks, X, Pause, Search, Gamepad2, Flame, Plus } from 'lucide-react'
+import { Trophy, Play, Star, ListChecks, X, Pause, Search, Gamepad2, Flame, Plus, ChevronRight, Calendar } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../components/ui/Skeleton'
 import Toast from '../components/ui/Toast'
 import AvatarFrame from '../components/ui/AvatarFrame'
-import { getXPProgress } from '../utils/levels'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 import { useLeaderboard } from '../context/LeaderboardContext'
 import { Helmet } from 'react-helmet-async'
+import StatsBar from '../components/ui/StatsBar'
 
-const BAR_THEMES = {
-    1: 'bg-gradient-to-r from-[#ffd700]/15 to-[#111118] border-y-[#ffd700]/40 shadow-[0_0_40px_rgba(255,215,0,0.05)]',
-    2: 'bg-gradient-to-r from-[#B9F2FF]/15 to-[#111118] border-y-[#B9F2FF]/30',
-    3: 'bg-gradient-to-r from-[#cd7f32]/15 to-[#111118] border-y-[#cd7f32]/30',
-    4: 'bg-gradient-to-r from-[#94999c]/15 to-[#111118] border-y-[#94999c]/30',
-}
+
 
 const AddGameModal = lazy(() => import('../components/library/AddGameModal'))
 
@@ -26,20 +21,19 @@ const RatingDisplay = memo(({ myRating, platformAvg, hasUser }) => {
     return (
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
             {myRating ? (
-                <div className="flex items-center gap-1">
-                    <span className="font-mono text-[9px] text-[#94a3b8] uppercase tracking-wider">me</span>
-                    <div className="font-black text-lg text-[#c8ff57] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        {myRating}<small className="font-mono text-[9px] text-[#94a3b8] font-normal">/10</small>
+                <div className="flex items-center gap-1.5 bg-[#c8ff57]/10 border border-[#c8ff57]/20 rounded px-1.5 py-0.5 shadow-sm">
+                    <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-bold">me</span>
+                    <div className="font-black text-sm text-[#c8ff57] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        {myRating}
                     </div>
                 </div>
             ) : hasUser ? (
-                <div className="font-mono text-[9px] text-[#3a3a4a] uppercase tracking-wider">not rated</div>
+                <div className="font-mono text-[8px] text-[#3a3a4a] uppercase tracking-wider">no rate</div>
             ) : null}
             {platformAvg ? (
-                <div className="flex items-center gap-1">
-                    <span className="font-mono text-[9px] text-[#94a3b8] uppercase tracking-wider">avg</span>
-                    <div className="font-black text-lg text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        {platformAvg}<small className="font-mono text-[9px] text-[#94a3b8] font-normal">/10</small>
+                <div className="flex items-center gap-1.5 bg-[#5c9fff]/10 border border-[#5c9fff]/20 rounded px-1.5 py-0.5 shadow-sm mt-1">
+                    <div className="font-black text-sm text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        {platformAvg}
                     </div>
                 </div>
             ) : null}
@@ -171,19 +165,8 @@ const HeroBanner = memo(({ games }) => {
     )
 })
 
-// ── Normalize IGDB search result (handles both field naming conventions) ──
-const normalizeGame = (g) => ({
-    id: g.id,
-    title: g.title || g.name || 'Unknown',
-    cover: g.cover
-        ? (g.cover.startsWith('http') ? g.cover : `https:${g.cover}`)
-        : null,
-    genre: g.genre || g.genres?.[0]?.name || null,
-    releaseYear: g.releaseYear || (g.first_release_date
-        ? new Date(g.first_release_date * 1000).getFullYear()
-        : null),
-    rating: g.rating ?? g.igdbRating ?? null,
-})
+// normalizeGame removed because it was unused.
+
 
 // ── IGDB Search Bar ──
 function GameSearchBar({ id = 'game-search' }) {
@@ -326,6 +309,72 @@ function GameSearchBar({ id = 'game-search' }) {
     )
 }
 
+const TrendingGameCard = memo(({ game, stats, myRating, showFullDate }) => {
+    const navigate = useNavigate()
+    const avgRating = stats?.avgRating || 0
+
+    return (
+        <div 
+            onClick={() => navigate(`/game/${game.id}`)}
+            className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+        >
+            <div className="aspect-[3/4] relative overflow-hidden">
+                {game.cover ? (
+                    <img 
+                        src={getIGDBImage(game.cover, SIZES.COVER_BIG)} 
+                        alt={game.title} 
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                    />
+                ) : (
+                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">
+                        🎮
+                    </div>
+                )}
+                
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
+                
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                    {avgRating > 0 && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{avgRating}</span>
+                        </div>
+                    )}
+                    {myRating && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                            <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-bold">ME</span>
+                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{myRating}</span>
+                        </div>
+                    )}
+                </div>
+                
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                    <div className="bg-[#c8ff57] text-black px-4 py-2 rounded font-black uppercase text-xs tracking-widest shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        View Details
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-4">
+                <h3 className="font-bold text-sm text-white truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
+                    {game.title}
+                </h3>
+                <div className="flex items-center gap-2">
+                    {game.releaseDate && (
+                        <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider">
+                            {showFullDate ? game.releaseDate : game.releaseDate.split(',').pop().trim()}
+                        </span>
+                    )}
+                    {game.releaseDate && game.genre && <span className="w-1 h-1 rounded-full bg-[#3a3a4a]" />}
+                    <span className="font-mono text-[9px] text-[#c8ff57] uppercase tracking-widest truncate">
+                        {game.genre || 'Game'}
+                    </span>
+                </div>
+            </div>
+        </div>
+    )
+})
+
 function Home() {
     const { user } = useAuth()
     const navigate = useNavigate()
@@ -335,7 +384,10 @@ function Home() {
     const [toast, setToast] = useState(null)
     const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
 
-    const showToast = useCallback((message, type = 'success') => setToast({ message, type }), [])
+    const showToast = useCallback((message, type = 'success') => {
+        setToast({ message, type })
+        setTimeout(() => setToast(null), 3000)
+    }, [])
 
     const handleAddGame = useCallback(async (gameData) => {
         // Optimistic UI closed immediately
@@ -361,9 +413,9 @@ function Home() {
         { enabled: !!userId, ttl: 2 * 60 * 1000 }
     )
 
-    const trending  = homeData?.trending   ?? []
-    const topRated  = homeData?.topRated   ?? []
-    const comingSoon = homeData?.comingSoon ?? []
+    const trending   = useMemo(() => homeData?.trending   ?? [], [homeData?.trending])
+    const topRated   = useMemo(() => homeData?.topRated   ?? [], [homeData?.topRated])
+    const comingSoon = useMemo(() => homeData?.comingSoon ?? [], [homeData?.comingSoon])
     const gameStats  = homeData?.gameStats  ?? {}
     const activity   = activityData?.activity ?? []
 
@@ -652,218 +704,149 @@ function Home() {
             {/* ══════════════════════════
                 USER STATS BAR
             ══════════════════════════ */}
-            {user && (
-                <section 
-                    className={`border-y border-[#2a2a35] cursor-pointer hover:brightness-110 transition-all duration-500
-                                ${BAR_THEMES[userRank] || 'bg-[#111118] hover:bg-[#18181f]'}`} 
-                    onClick={() => navigate('/stats')}
-                >
-                    <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-5">
-                        <div className="flex flex-col sm:flex-row items-center gap-6">
-                            <div className="flex items-center gap-3">
-                                <AvatarFrame 
-                                    userId={user?._id || user?.id} 
-                                    src={user?.avatar} 
-                                    size={42} 
-                                    className="home-stats-avatar" 
-                                />
-                                <div className="flex flex-col gap-1 min-w-0">
-                                    <div className="text-white font-bold text-sm truncate">{user.username}</div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90]">@{user.username} · All platforms</div>
-                                    <div className="flex items-center gap-2.5 mt-2" onClick={(e) => { e.stopPropagation(); navigate('/stats?tab=xp') }}>
-                                        <div className="flex items-center gap-1.5 bg-[#0a0a0f]/60 rounded-full px-2.5 py-1 border border-[#2a2a35] w-fit shadow-inner shadow-black/60 shadow-[0_1px_4px_rgba(0,0,0,0.5)] hover:border-[#c8ff57]/50 transition-colors">
-                                            <span className="flex items-center justify-center text-xs leading-none relative -top-[1.8px] flex-shrink-0">{user.badge || '🎮'}</span>
-                                            <span className="font-mono text-[10px] text-[#c8ff57] uppercase font-black tracking-widest flex-shrink-0 leading-none">Lv.{user.level || 1}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 group/xp cursor-pointer">
-                                            <div className="w-16 h-1 bg-[#2a2a35] rounded-full flex-shrink-0 overflow-hidden">
-                                                <div className="h-full rounded-full bg-gradient-to-r from-[#c8ff57] to-[#5c9fff] transition-all group-hover/xp:shadow-[0_0_8px_rgba(200,255,87,0.5)]"
-                                                    style={{ width: `${getXPProgress(user.xp || 0)}%` }} />
-                                            </div>
-                                            <span className="font-mono text-[10px] text-[#7a7a90] group-hover/xp:text-[#c8ff57] flex-shrink-0 tabular-nums font-bold tracking-tight whitespace-nowrap leading-none transition-colors">{user.xp || 0} XP</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="hidden sm:block w-px h-8 bg-[#2a2a35]" />
-                            <div className="flex gap-8">
-                                {[
-                                    { value: userStats.total, label: 'Total' },
-                                    { value: userStats.playing, label: 'Playing' },
-                                    { value: userStats.completed, label: 'Completed' },
-                                    { value: userStats.planned, label: 'Planned' },
-                                ].map(stat => (
-                                    <div key={stat.label} className="text-center sm:text-left">
-                                        <div className="font-black text-2xl text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stat.value}</div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider">{stat.label}</div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="sm:ml-auto">
-                                <Link to="/stats">
-                                    <button className="font-mono text-xs text-[#94a3b8] hover:text-[#c8ff57] transition-colors">View Full Stats →</button>
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            )}
+            <StatsBar 
+                user={user} 
+                userRank={userRank} 
+                mediaType="game"
+                stats={{
+                    total: userStats.total,
+                    active: userStats.playing,
+                    completed: userStats.completed,
+                    planned: userStats.planned
+                }}
+            />
 
             {/* ══════════════════════════
-                TRENDING NOW
+                GRID SECTIONS (TRENDING & TOP RATED)
             ══════════════════════════ */}
-            <section className="max-w-[1200px] mx-auto px-5 md:px-10 py-12">
-                <div className="flex items-center gap-3 mb-6">
-                    <span className="text-2xl"><Flame className="text-[#ff5c5c] fill-current" size={24} /></span>
-                    <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Trending Now</h2>
-                    <span className="font-mono text-xs text-[#94a3b8] hidden sm:block">Most ponded this week</span>
-                </div>
-                {loading && trending.length === 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex flex-col gap-2">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                                <div key={i} className="flex items-center gap-4 p-3 rounded-lg border border-[#2a2a35] bg-[#111118]">
-                                    <Skeleton variant="block" width="24px" height="24px" />
-                                    <Skeleton variant="block" width="40px" height="56px" />
-                                    <div className="flex-1">
-                                        <Skeleton variant="line" width="60%" height="14px" />
-                                        <Skeleton variant="line" width="30%" height="9px" style={{ marginTop: 4 }} />
-                                    </div>
-                                    <Skeleton variant="block" width="40px" height="30px" />
+            <div className="max-w-[1200px] mx-auto px-5 md:px-10 mt-12 mb-20">
+                <div className="flex flex-col gap-20">
+                    {/* Trending Section */}
+                    <div>
+                        <div className="flex items-center justify-between mb-8 group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#111118] border border-[#2a2a35] rounded-lg text-[#ff5c5c] group-hover:bg-[#ff5c5c] group-hover:text-white transition-all duration-300 shadow-lg">
+                                    <Flame size={20} />
                                 </div>
-                            ))}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                             {Array.from({ length: 5 }).map((_, i) => (
-                                <div key={i} className="flex items-center gap-4 p-3 rounded-lg border border-[#2a2a35] bg-[#111118]">
-                                    <Skeleton variant="block" width="24px" height="24px" />
-                                    <Skeleton variant="block" width="40px" height="56px" />
-                                    <div className="flex-1">
-                                        <Skeleton variant="line" width="60%" height="14px" />
-                                        <Skeleton variant="line" width="30%" height="9px" style={{ marginTop: 4 }} />
-                                    </div>
-                                    <Skeleton variant="block" width="40px" height="30px" />
+                                <div>
+                                    <h2 className="font-black text-2xl uppercase text-white tracking-widest" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                        Trending Games
+                                    </h2>
+                                    <p className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em]">Most ponded this week</p>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex flex-col gap-2">
-                            {trending.map((game, index) => (
-                                <div key={game.id} onClick={() => navigate(`/game/${game.id}`)}
-                                    className="flex items-center gap-4 p-3 rounded-lg border border-[#2a2a35] bg-[#111118] hover:border-[#c8ff57]/30 transition-all cursor-pointer">
-                                    <div className="font-black text-2xl text-[#4a4a5e] w-6 text-center flex-shrink-0" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{index + 1}</div>
-                                    {game.cover ? (
-                                        <img 
-                                            src={getIGDBImage(game.cover, SIZES.COVER_SMALL)} 
-                                            alt={game.title} 
-                                            width={40}
-                                            height={56}
-                                            loading="lazy"
-                                            className="w-10 h-14 object-cover rounded flex-shrink-0" 
-                                        />
-                                    ) : (
-                                        <div className="w-10 h-14 bg-[#2a2a35] rounded flex-shrink-0 flex items-center justify-center text-sm">🎮</div>
-                                    )}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-white font-semibold text-sm truncate">{game.title}</div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#2a2a35] text-[#d1d5db]">{game.genre}</span>
-                                                {index < 2 && <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#ff5c5c]/15 text-[#ff7a7a]">HOT</span>}
-                                            </div>
-                                        </div>
-                                    <RatingDisplay 
-                                        myRating={getMyRating(game.id)} 
-                                        platformAvg={gameStats[game.id]?.avgRating}
-                                        hasUser={!!user} 
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                        <div>
-                            <div className="font-mono text-xs text-[#94a3b8] uppercase tracking-widest mb-4">Top Rated This Month</div>
-                            <div className="flex flex-col gap-2">
-                                {topRated.map((game, index) => (
-                                    <div key={game.id} onClick={() => navigate(`/game/${game.id}`)}
-                                        className="flex items-center gap-4 p-3 rounded-lg border border-[#2a2a35] bg-[#111118] hover:border-[#c8ff57]/30 transition-all cursor-pointer">
-                                        <div className="font-black text-2xl text-[#4a4a5e] w-6 text-center flex-shrink-0" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{index + 1}</div>
-                                        {game.cover ? (
-                                            <img 
-                                                src={getIGDBImage(game.cover, SIZES.COVER_SMALL)} 
-                                                alt={game.title} 
-                                                width={40}
-                                                height={56}
-                                                loading="lazy"
-                                                className="w-10 h-14 object-cover rounded flex-shrink-0" 
-                                            />
-                                        ) : (
-                                            <div className="w-10 h-14 bg-[#2a2a35] rounded flex-shrink-0 flex items-center justify-center text-sm">🎮</div>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-white font-semibold text-sm truncate">{game.title}</div>
-                                            <div className="mt-1">
-                                                <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#2a2a35] text-[#d1d5db]">{game.genre}</span>
-                                            </div>
-                                        </div>
-                                        <RatingDisplay 
-                                        myRating={getMyRating(game.id)} 
-                                        platformAvg={gameStats[game.id]?.avgRating}
-                                        hasUser={!!user} 
-                                    />
-                                    </div>
-                                ))}
+                            </div>
+                            <div 
+                                onClick={() => navigate('/explore/game/trending')}
+                                className="flex items-center gap-2 text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest group-hover:text-white transition-colors cursor-pointer"
+                            >
+                                Explore All <ChevronRight size={14} />
                             </div>
                         </div>
+
+                        {loading && trending.length === 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                {Array.from({ length: 5 }).map((_, i) => <GameCardSkeleton key={i} />)}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                {trending.map((game) => (
+                                    <TrendingGameCard 
+                                        key={game.id} 
+                                        game={game} 
+                                        stats={gameStats[game.id]}
+                                        myRating={getMyRating(game.id)}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
-                )}
-            </section>
+
+                    {/* Top Rated Section */}
+                    <div>
+                        <div className="flex items-center justify-between mb-8 group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#111118] border border-[#2a2a35] rounded-lg text-[#ffd700] group-hover:bg-[#ffd700] group-hover:text-black transition-all duration-300 shadow-lg">
+                                    <Trophy size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="font-black text-2xl uppercase text-white tracking-widest" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                        Top Rated Games
+                                    </h2>
+                                    <p className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em]">Highest rated this month</p>
+                                </div>
+                            </div>
+                            <div 
+                                onClick={() => navigate('/explore/game/top_rated')}
+                                className="flex items-center gap-2 text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest group-hover:text-white transition-colors cursor-pointer"
+                            >
+                                Explore All <ChevronRight size={14} />
+                            </div>
+                        </div>
+
+                        {loading && topRated.length === 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                {Array.from({ length: 5 }).map((_, i) => <GameCardSkeleton key={i} />)}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                                {topRated.map((game) => (
+                                    <TrendingGameCard 
+                                        key={game.id} 
+                                        game={game} 
+                                        stats={gameStats[game.id]}
+                                        myRating={getMyRating(game.id)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
 
             {/* ══════════════════════════
                 COMING SOON
             ══════════════════════════ */}
-            <section className="max-w-[1200px] mx-auto px-5 md:px-10 py-12 border-t border-[#2a2a35]">
-                <div className="flex items-center gap-3 mb-6">
-                    <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Coming Soon</h2>
-                    <span className="font-mono text-xs text-[#94a3b8] hidden sm:block">Upcoming &amp; announced</span>
+            <div className="max-w-[1200px] mx-auto px-5 md:px-10 mb-20">
+                <div className="flex items-center justify-between mb-8 group">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-[#111118] border border-[#2a2a35] rounded-lg text-[#5c9fff] group-hover:bg-[#5c9fff] group-hover:text-white transition-all duration-300 shadow-lg">
+                            <Calendar size={20} />
+                        </div>
+                        <div>
+                            <h2 className="font-black text-2xl uppercase text-white tracking-widest" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                Coming Soon
+                            </h2>
+                            <p className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em]">Upcoming & announced</p>
+                        </div>
+                    </div>
+                    <div 
+                        onClick={() => navigate('/explore/game/coming_soon')}
+                        className="flex items-center gap-2 text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest group-hover:text-white transition-colors cursor-pointer"
+                    >
+                        Explore All <ChevronRight size={14} />
+                    </div>
                 </div>
+
                 {loading && comingSoon.length === 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                        {Array.from({ length: 6 }).map((_, i) => <GameCardSkeleton key={i} />)}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                        {Array.from({ length: 5 }).map((_, i) => <GameCardSkeleton key={i} />)}
                     </div>
                 ) : comingSoon.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                        {comingSoon.map(game => (
-                            <div key={game.id} onClick={() => navigate(`/game/${game.id}`)}
-                                className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden hover:border-[#c8ff57]/50 transition-all cursor-pointer">
-                                <div className="relative">
-                                    {game.cover ? (
-                                        <img 
-                                            src={getIGDBImage(game.cover, SIZES.COVER_BIG)} 
-                                            alt={game.title} 
-                                            width={264}
-                                            height={352}
-                                            loading="lazy"
-                                            className="w-full h-[160px] object-cover" 
-                                        />
-                                    ) : (
-                                        <div className="w-full h-[160px] bg-[#18181f] flex items-center justify-center text-3xl">🎮</div>
-                                    )}
-                                    <div className="absolute top-2 left-2">
-                                        <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#5c9fff]/90 text-white">Upcoming</span>
-                                    </div>
-                                </div>
-                                <div className="p-3">
-                                    <div className="text-white font-semibold text-xs truncate mb-1">{game.title}</div>
-                                    <div className="font-mono text-[9px] text-[#7a7a90]">{game.releaseDate}</div>
-                                </div>
-                            </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                        {comingSoon.map((game) => (
+                            <TrendingGameCard 
+                                key={game.id} 
+                                game={game} 
+                                stats={gameStats[game.id]}
+                                myRating={getMyRating(game.id)}
+                                showFullDate={true}
+                            />
                         ))}
                     </div>
                 ) : (
                     <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">No upcoming games found</div>
                 )}
-            </section>
+            </div>
 
             {/* ══════════════════════════
                 RECENT ACTIVITY

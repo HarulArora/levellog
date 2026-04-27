@@ -77,10 +77,10 @@ function UniversalSearch() {
     const mediaSearchKey = activeTab !== 'users' && isSearchable ? `${activeTab}_search_${trimmed.toLowerCase()}` : null
     const endpointMap = {
         games: `/igdb/search?q=${encodeURIComponent(trimmed)}`,
-        anime: `/anime/search?q=${encodeURIComponent(trimmed)}&type=anime`,
-        manga: `/anime/search?q=${encodeURIComponent(trimmed)}&type=manga`,
-        movie: `/movies/search?q=${encodeURIComponent(trimmed)}&type=movie`,
-        tv: `/movies/search?q=${encodeURIComponent(trimmed)}&type=tv`,
+        anime: `/anime/search?q=${encodeURIComponent(trimmed)}&type=anime&limit=24`,
+        manga: `/anime/search?q=${encodeURIComponent(trimmed)}&type=manga&limit=24`,
+        movie: `/movies/search?q=${encodeURIComponent(trimmed)}&type=movie&limit=24`,
+        tv: `/movies/search?q=${encodeURIComponent(trimmed)}&type=tv&limit=24`,
     }
 
     const { data: mediaData, loading: loadingMedia } = useCachedFetch(
@@ -93,8 +93,16 @@ function UniversalSearch() {
     const results = activeTab === 'users' 
         ? (userData?.users || []).filter(u => u.username !== currentUser?.username)
         : activeTab === 'games' 
-            ? (mediaData?.games || [])
-            : (mediaData?.results || []).map(r => ({ ...r, avgRating: mediaData.stats?.[r.externalId]?.avgRating }))
+            ? (mediaData?.games || []).map(g => ({ 
+                ...g, 
+                avgRating: mediaData.stats?.[String(g.id)]?.avgRating,
+                userRating: mediaData.userRatings?.[String(g.id)]
+            }))
+            : (mediaData?.results || []).map(r => ({ 
+                ...r, 
+                avgRating: mediaData.stats?.[String(r.externalId)]?.avgRating,
+                userRating: mediaData.userRatings?.[String(r.externalId)]
+            }))
 
     return (
         <div className="w-full max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10 min-h-[70vh]">
@@ -112,7 +120,7 @@ function UniversalSearch() {
                 </div>
 
                 <div className="relative w-full md:w-96">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white pointer-events-none">
                         <SearchIcon size={18} strokeWidth={2.5} />
                     </span>
                     <input
@@ -159,7 +167,7 @@ function UniversalSearch() {
                     </div>
                 </div>
             ) : loading ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                     {Array.from({ length: 12 }).map((_, i) => <GameCardSkeleton key={i} />)}
                 </div>
             ) : results.length === 0 ? (
@@ -171,7 +179,7 @@ function UniversalSearch() {
                     </div>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                     {results.map(item => (
                         activeTab === 'users' 
                             ? <UserResultCard key={item._id} u={item} getFollowStatus={getFollowStatus} handleFollowToggle={handleFollowToggle} loadingMap={loadingMap} topUsers={topUsers} currentUser={currentUser} />
@@ -222,13 +230,25 @@ function UserResultCard({ u, getFollowStatus, handleFollowToggle, loadingMap, to
                 <button
                     onClick={() => handleFollowToggle(u)}
                     disabled={isBtnLoading}
-                    className={`w-full py-3 text-xs font-bold rounded-lg transition-all
+                    className={`w-full py-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2
                                ${state === 'following'
                             ? 'border border-[#2a2a35] bg-transparent text-[#7a7a90] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'
+                            : state === 'requested'
+                            ? 'border border-[#c8ff57]/20 bg-[#c8ff57]/5 text-[#c8ff57]'
                             : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e] shadow-lg'}
                                disabled:opacity-50`}
                 >
-                    {isBtnLoading ? '...' : state === 'following' ? 'Unfollow' : 'Follow'}
+                    {isBtnLoading ? (
+                        '...'
+                    ) : state === 'following' ? (
+                        'Unfollow'
+                    ) : state === 'requested' ? (
+                        'Cancel Request'
+                    ) : u.isPrivate ? (
+                        'Request'
+                    ) : (
+                        'Follow'
+                    )}
                 </button>
             ) : (
                 <Link to="/login" className="w-full">
@@ -269,14 +289,19 @@ function MediaResultCard({ item, type }) {
                 {cover ? (
                     <img src={cover} alt={title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                 ) : (
-                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">🎬</div>
+                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">{type === 'tv' ? '📺' : '🎬'}</div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
                 
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                    {item.userRating && (
+                        <div className="bg-[#c8ff57]/90 backdrop-blur-md border border-[#c8ff57]/50 rounded px-2 py-1 flex items-center gap-1 shadow-xl">
+                            <span className="font-mono text-[8px] text-black/50 uppercase tracking-tighter">YOU</span>
+                            <span className="font-black text-xs text-black" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.userRating}</span>
+                        </div>
+                    )}
                     {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <Star size={10} className="text-[#5c9fff] fill-current" />
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
                             <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
                         </div>
                     )}
@@ -288,7 +313,7 @@ function MediaResultCard({ item, type }) {
                 <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider">{year || 'TBA'}</span>
                     <span className="w-1 h-1 rounded-full bg-[#3a3a4a]" />
-                    <span className="font-mono text-[9px] text-[#c8ff57] uppercase tracking-widest truncate">{genre || 'Media'}</span>
+                    <span className="font-mono text-[9px] text-[#c8ff57] uppercase tracking-widest truncate">{genre || (type === 'movie' ? 'Movie' : type === 'tv' ? 'TV Show' : type === 'anime' ? 'Anime' : type === 'manga' ? 'Manga' : 'Media')}</span>
                 </div>
             </div>
         </div>

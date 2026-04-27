@@ -1,5 +1,5 @@
 import apiClient from './apiClient.js'
-import { shortPlatform, normalizeCover } from './helpers.js'
+export { shortPlatform, normalizeCover } from './helpers.js'
 
 let cachedToken = null
 let tokenExpiry = null

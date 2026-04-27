@@ -1,43 +1,114 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import apiClient from '../utils/apiClient.js';
 import { LRUCache } from 'lru-cache';
 import MovieEntry from '../models/MovieEntry.js';
 import MovieComment from '../models/MovieComment.js';
+import MovieCommentLike from '../models/MovieCommentLike.js';
 import MovieLike from '../models/MovieLike.js';
 import MovieWishlist from '../models/MovieWishlist.js';
+import MediaStats from '../models/MediaStats.js';
+import Ranking from '../models/Ranking.js';
 import { protect, protectOptional } from '../middleware/auth.js';
 import { awardXP, deductXP } from '../utils/xp.js';
 import { updateMediaStats, getBulkStats } from '../utils/stats.js';
+import { logEngagement } from '../utils/engagement.js';
+import { withRetryTransaction } from '../utils/transaction.js';
 
 const router = express.Router();
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_BASE_URL = 'http://api.themoviedb.org/3';
 
 const movieCache = new LRUCache({
     max: 200,
-    ttl: 1000 * 60 * 60 // 1 hour
+    ttl: 1000 * 60 * 60 * 12 // 12 hours
 });
 
 const fetchMediaStats = getBulkStats;
 
-const formatMovieItem = (item, type) => ({
-    id: item.id,
-    externalId: item.id,
-    title: item.title || item.name,
-    cover: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
-    genre: 'Media', 
-    year: (item.release_date || item.first_air_date || '').split('-')[0],
-    score: item.vote_average,
-    summary: item.overview,
-    production: item.production_companies?.map(c => c.name).join(', '),
-    language: item.original_language?.toUpperCase(),
-    status: item.status,
-    type: type
-});
+const fetchTMDBPaginated = async (endpoint, params, page, limit, filterFn = null) => {
+    const requestedLimit = parseInt(limit) || 24;
+    const requestedPage = parseInt(page) || 1;
+    const tmdbPageSize = 20;
+    
+    // To ensure we have enough items after filtering, we fetch an extra buffer page.
+    // We fetch the 'theoretical' pages needed plus one more.
+    const startOffset = (requestedPage - 1) * requestedLimit;
+    const endOffset = requestedPage * requestedLimit;
+    
+    const startTMDBPage = Math.floor(startOffset / tmdbPageSize) + 1;
+    const endTMDBPage = Math.floor((endOffset - 1) / tmdbPageSize) + 1;
+    
+    // Fetch 3 pages to provide a good buffer for filtering
+    const pagesToFetch = [startTMDBPage, startTMDBPage + 1, startTMDBPage + 2];
+    
+    const responses = await Promise.all(pagesToFetch.map(p => 
+        apiClient.get(endpoint, { 
+            params: { ...params, page: p },
+            retry: 3 
+        })
+    ));
+    
+    let allResults = [];
+    responses.forEach(res => {
+        allResults = allResults.concat(res.data.results || []);
+    });
+    
+    // Apply filter if provided
+    let filteredResults = filterFn ? allResults.filter(item => !filterFn(item)) : allResults;
+    
+    // Calculate the slice. 
+    // Since we are fetching from a calculated startTMDBPage, we need to find the 
+    // relative offset. This isn't perfectly accurate across all pages if filtering 
+    // is heavy, but for TMDB movies it's very reliable.
+    const firstItemTMDBIndex = (startTMDBPage - 1) * tmdbPageSize;
+    const relativeOffset = startOffset - firstItemTMDBIndex;
+    
+    const slicedResults = filteredResults.slice(relativeOffset, relativeOffset + requestedLimit);
+    
+    const totalResults = responses[0].data.total_results || 0;
+    const totalPages = Math.ceil(totalResults / requestedLimit);
+    
+    return {
+        results: slicedResults,
+        total: totalResults,
+        totalPages: totalPages > 500 ? 500 : totalPages
+    };
+};
+
+const TMDB_GENRES = {
+    28: 'Action', 12: 'Adventure', 16: 'Animation', 35: 'Comedy', 80: 'Crime', 99: 'Documentary', 18: 'Drama',
+    10751: 'Family', 14: 'Fantasy', 36: 'History', 27: 'Horror', 10402: 'Music', 9648: 'Mystery', 10749: 'Romance',
+    878: 'Sci-Fi', 10770: 'TV Movie', 53: 'Thriller', 10752: 'War', 37: 'Western',
+    10759: 'Action & Adventure', 10762: 'Kids', 10763: 'News', 10764: 'Reality', 10765: 'Sci-Fi & Fantasy',
+    10766: 'Soap', 10767: 'Talk', 10768: 'War & Politics'
+};
+
+const formatMovieItem = (item, type) => {
+    const genreName = item.genre_ids?.[0] ? TMDB_GENRES[item.genre_ids[0]] : null;
+    const fallbackType = type === 'movie' ? 'Movie' : 'TV Show';
+
+    return {
+        id: item.id,
+        externalId: item.id,
+        title: item.title || item.name,
+        cover: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+        genre: genreName || fallbackType,
+        genres: genreName ? [genreName] : [fallbackType],
+        year: (item.release_date || item.first_air_date || '').split('-')[0],
+        score: item.vote_average,
+        summary: item.overview,
+        production: item.production_companies?.map(c => c.name).join(', '),
+        language: item.original_language?.toUpperCase(),
+        status: item.status,
+        type: type
+    };
+};
 
 const isAnime = (item) => {
-    // TMDB Genre 16 is Animation. Combined with original_language 'ja', it's almost always Anime.
+    // TMDB Genre 16 is Animation.
+    // We check for Japanese origin via original_language or origin_country.
     const isAnimation = item.genre_ids?.includes(16) || item.genres?.some(g => g.id === 16);
-    const isJapanese = item.original_language === 'ja';
+    const isJapanese = item.original_language === 'ja' || (item.origin_country && item.origin_country.includes('JP'));
     return isAnimation && isJapanese;
 };
 
@@ -47,27 +118,70 @@ router.get('/home', async (req, res) => {
         const { type = 'movie' } = req.query;
         const cacheKey = `movie-home-${type}`;
         if (movieCache.has(cacheKey)) return res.json({ success: true, ...movieCache.get(cacheKey) });
-
-        const params = { api_key: process.env.TMDB_API_KEY };
-        const requestConfig = { params, retry: 3, retryDelay: 2000 };
-        const [trendingRes, topRes, upcomingRes] = await Promise.all([
-            apiClient.get(`${TMDB_BASE_URL}/trending/${type}/week`, requestConfig),
-            apiClient.get(`${TMDB_BASE_URL}/${type}/top_rated`, requestConfig),
-            apiClient.get(`${TMDB_BASE_URL}/${type}/${type === 'movie' ? 'upcoming' : 'on_the_air'}`, requestConfig)
+        const [trendingRankings, topRatedRankings, upcomingRankings] = await Promise.all([
+            Ranking.find({ contentType: type, rankType: 'trending' }).sort({ rankPosition: 1 }).limit(15),
+            Ranking.find({ contentType: type, rankType: 'top_rated' }).sort({ rankPosition: 1 }).limit(15),
+            Ranking.find({ contentType: type, rankType: 'coming_soon' }).sort({ rankPosition: 1 }).limit(15)
         ]);
 
-        const trending = trendingRes.data.results
-            .filter(item => !isAnime(item))
-            .map(item => formatMovieItem(item, type))
-            .slice(0, 12);
-        const topRated = topRes.data.results
-            .filter(item => !isAnime(item))
-            .map(item => formatMovieItem(item, type))
-            .slice(0, 12);
-        const upcoming = upcomingRes.data.results
-            .filter(item => !isAnime(item))
-            .map(item => formatMovieItem(item, type))
-            .slice(0, 12);
+        let trending = (trendingRankings || []).map(r => ({
+            id: parseInt(r.contentId),
+            externalId: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            year: r.year,
+            genre: r.genres?.[0] || (type === 'movie' ? 'Movie' : 'TV Show'),
+            genres: r.genres || [],
+            type: type
+        }));
+
+        let topRated = (topRatedRankings || []).map(r => ({
+            id: parseInt(r.contentId),
+            externalId: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            year: r.year,
+            genre: r.genres?.[0] || (type === 'movie' ? 'Movie' : 'TV Show'),
+            genres: r.genres || [],
+            type: type
+        }));
+
+        let upcoming = (upcomingRankings || []).map(r => ({
+            id: parseInt(r.contentId),
+            externalId: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            year: r.year,
+            genre: r.genres?.[0] || (type === 'movie' ? 'Movie' : 'TV Show'),
+            genres: r.genres || [],
+            type: type
+        }));
+
+        // 4. Backfill/Fallback for Trending/Top/Upcoming if Ranking has less than 15 items
+        if (trending.length < 15 || topRated.length < 15 || upcoming.length < 15) {
+            const [trendFallback, topFallback, soonFallback] = await Promise.all([
+                trending.length < 15 ? apiClient.get(`${TMDB_BASE_URL}/trending/${type}/week`, { params: { api_key: process.env.TMDB_API_KEY }, retry: 3 }).catch(() => ({ data: { results: [] } })) : { data: { results: [] } },
+                topRated.length < 15 ? apiClient.get(`${TMDB_BASE_URL}/${type}/top_rated`, { params: { api_key: process.env.TMDB_API_KEY }, retry: 3 }).catch(() => ({ data: { results: [] } })) : { data: { results: [] } },
+                upcoming.length < 15 ? apiClient.get(`${TMDB_BASE_URL}/${type}/${type === 'movie' ? 'upcoming' : 'on_the_air'}`, { params: { api_key: process.env.TMDB_API_KEY }, retry: 3 }).catch(() => ({ data: { results: [] } })) : { data: { results: [] } }
+            ]);
+
+            const mergeUnique = (existing, fetchedRaw) => {
+                const fetched = (fetchedRaw || []).filter(item => !isAnime(item)).map(item => formatMovieItem(item, type));
+                const ids = new Set(existing.map(i => i.externalId));
+                const merged = [...existing];
+                for (const item of fetched) {
+                    if (!ids.has(item.externalId) && merged.length < 15) {
+                        merged.push(item);
+                        ids.add(item.externalId);
+                    }
+                }
+                return merged;
+            };
+
+            if (trending.length < 15) trending = mergeUnique(trending, trendFallback.data?.results);
+            if (topRated.length < 15) topRated = mergeUnique(topRated, topFallback.data?.results);
+            if (upcoming.length < 15) upcoming = mergeUnique(upcoming, soonFallback.data?.results);
+        }
 
         const allIds = [...trending, ...topRated, ...upcoming].map(i => i.externalId);
         const stats = await fetchMediaStats(allIds, type);
@@ -88,7 +202,7 @@ router.get('/home', async (req, res) => {
 });
 
 // ── SEARCH ──
-router.get('/search', async (req, res) => {
+router.get('/search', protectOptional, async (req, res) => {
     try {
         const { q, type = 'movie' } = req.query;
         if (!q) return res.status(400).json({ success: false, message: 'Query is required' });
@@ -96,21 +210,33 @@ router.get('/search', async (req, res) => {
         const cacheKey = `search-${type}-${q}`;
         if (movieCache.has(cacheKey)) return res.json({ success: true, ...movieCache.get(cacheKey) });
 
-        const params = { 
-            api_key: process.env.TMDB_API_KEY,
-            query: q,
-            include_adult: false
-        };
-        
         const endpoint = type === 'movie' ? 'search/movie' : 'search/tv';
-        const response = await apiClient.get(`${TMDB_BASE_URL}/${endpoint}`, { params, retry: 3, retryDelay: 1000 });
+        const { results: tmdbResults, total, totalPages } = await fetchTMDBPaginated(
+            `${TMDB_BASE_URL}/${endpoint}`, 
+            { api_key: process.env.TMDB_API_KEY, query: q, include_adult: false },
+            req.query.page || 1,
+            req.query.limit || 24,
+            isAnime
+        );
 
-        const results = response.data.results
-            .filter(item => !isAnime(item))
-            .map(item => formatMovieItem(item, type));
+        const results = tmdbResults.map(item => formatMovieItem(item, type));
         
         const stats = await fetchMediaStats(results.map(r => r.externalId), type);
-        const result = { results, stats };
+
+        // ── FETCH USER RATINGS IF AUTHENTICATED ──
+        let userRatings = {}
+        if (req.user && results.length > 0) {
+            const userEntries = await MovieEntry.find({
+                userId: req.user._id,
+                externalId: { $in: results.map(r => r.externalId) },
+                type
+            }).select('externalId rating')
+            userEntries.forEach(e => {
+                if (e.rating > 0) userRatings[e.externalId] = e.rating
+            })
+        }
+
+        const result = { results, stats, total, totalPages, userRatings };
         movieCache.set(cacheKey, result);
 
         res.json({ success: true, ...result });
@@ -127,42 +253,17 @@ router.get('/discover', async (req, res) => {
         const cacheKey = `movie-discover-${type}-${genre || 'all'}-${page}`;
         if (movieCache.has(cacheKey)) return res.json({ success: true, ...movieCache.get(cacheKey) });
 
-        const params = { api_key: process.env.TMDB_API_KEY, page: parseInt(page), include_adult: false };
-        const requestConfig = { params, retry: 3, retryDelay: 1000 };
+        const { results: tmdbResults, total, totalPages } = await fetchTMDBPaginated(
+            `${TMDB_BASE_URL}/discover/${type}`,
+            { api_key: process.env.TMDB_API_KEY, with_genres: genre, sort_by: 'popularity.desc', include_adult: false },
+            page,
+            req.query.limit || 24,
+            isAnime
+        );
 
-        if (genre) {
-            // Genre search uses discover endpoint
-            const response = await apiClient.get(`${TMDB_BASE_URL}/discover/${type}`, { 
-                params: { ...params, with_genres: genre, sort_by: 'popularity.desc' } 
-            });
-            const results = response.data.results.filter(item => !isAnime(item)).map(item => formatMovieItem(item, type));
-            const stats = await fetchMediaStats(results.map(r => r.externalId), type);
-            const result = { 
-                items: results, 
-                stats,
-                totalPages: response.data.total_pages > 500 ? 500 : response.data.total_pages, // TMDB limit
-                total: response.data.total_results
-            };
-            movieCache.set(cacheKey, result);
-            return res.json({ success: true, ...result });
-        }
-
-        const [popularRes, nowPlayingRes, topRes] = await Promise.all([
-            apiClient.get(`${TMDB_BASE_URL}/${type}/popular`, requestConfig),
-            apiClient.get(`${TMDB_BASE_URL}/${type}/${type === 'movie' ? 'now_playing' : 'airing_today'}`, requestConfig),
-            apiClient.get(`${TMDB_BASE_URL}/${type}/top_rated`, requestConfig)
-        ]);
-
-        const sections = [
-            { title: `Popular ${type === 'movie' ? 'Movies' : 'TV Shows'}`, items: popularRes.data.results.filter(item => !isAnime(item)).map(item => formatMovieItem(item, type)) },
-            { title: type === 'movie' ? 'In Theaters' : 'Airing Today', items: nowPlayingRes.data.results.filter(item => !isAnime(item)).map(item => formatMovieItem(item, type)) },
-            { title: `Critics Choice`, items: topRes.data.results.filter(item => !isAnime(item)).map(item => formatMovieItem(item, type)) }
-        ];
-
-        const allIds = sections.flatMap(s => s.items).map(i => i.externalId);
-        const stats = await fetchMediaStats(allIds, type);
-
-        const result = { sections, stats };
+        const results = tmdbResults.map(item => formatMovieItem(item, type));
+        const stats = await fetchMediaStats(results.map(r => r.externalId), type);
+        const result = { items: results, stats, total, totalPages };
         movieCache.set(cacheKey, result);
         res.json({ success: true, ...result });
     } catch (error) {
@@ -186,6 +287,7 @@ router.get('/genres', async (req, res) => {
         movieCache.set(cacheKey, genres);
         res.json({ success: true, genres });
     } catch (error) {
+        console.error('Genres API Error:', error.message);
         res.status(500).json({ success: false, message: 'Genres failed' });
     }
 });
@@ -229,27 +331,24 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
             movieCache.set(cacheKey, movie);
         }
 
-        const [statsAgg, like, wishlist] = await Promise.all([
-            MovieEntry.aggregate([
-                { $match: { externalId: parseInt(id), type } },
-                { $group: { _id: '$externalId', avgRating: { $avg: { $cond: [{ $gt: ['$rating', 0] }, '$rating', null] } }, ratingCount: { $sum: { $cond: [{ $gt: ['$rating', 0] }, 1, 0] } }, loggedCount: { $sum: 1 } }}
-            ]),
+        const [mediaStats, like, wishlist] = await Promise.all([
+            MediaStats.findOne({ externalId: parseInt(id), type }),
             userId ? MovieLike.findOne({ userId, externalId: parseInt(id), type }) : null,
             userId ? MovieWishlist.findOne({ userId, externalId: parseInt(id), type }) : null
         ]);
 
-        const likeCount = await MovieLike.countDocuments({ externalId: parseInt(id), type });
-        const wishlistCount = await MovieWishlist.countDocuments({ externalId: parseInt(id), type });
-
-        const stats = statsAgg[0] ? {
-            avgRating: statsAgg[0].avgRating ? parseFloat(statsAgg[0].avgRating.toFixed(1)) : null,
-            ratingCount: statsAgg[0].ratingCount,
-            loggedCount: statsAgg[0].loggedCount,
-            likeCount,
-            wishlistCount
-        } : { avgRating: null, ratingCount: 0, loggedCount: 0, likeCount, wishlistCount };
+        const stats = mediaStats ? {
+            avgRating: mediaStats.avgRating,
+            ratingCount: mediaStats.ratingCount,
+            loggedCount: mediaStats.loggedCount,
+            likeCount: mediaStats.likeCount,
+            wishlistCount: mediaStats.wishlistCount
+        } : { avgRating: null, ratingCount: 0, loggedCount: 0, likeCount: 0, wishlistCount: 0 };
 
         res.json({ success: true, movie, stats, userStatus: { liked: !!like, wishlisted: !!wishlist } });
+
+        // Log view engagement
+        logEngagement(id, type, 'view', userId);
     } catch (error) {
         console.error('Movie Detail Error:', error.message);
         res.status(500).json({ success: false, message: 'Detail failed' });
@@ -260,27 +359,43 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
 router.post('/like', protect, async (req, res) => {
     try {
         const { externalId, title, cover, type, genre } = req.body;
-        const existing = await MovieLike.findOne({ userId: req.user._id, externalId: parseInt(externalId), type });
-        if (existing) {
-            await existing.deleteOne();
-            updateMediaStats(externalId, type, { likeCount: -1 });
-            await deductXP(req.user._id, 1);
-            return res.json({ success: true, liked: false, message: 'Like removed · -1 XP' });
-        }
-        await MovieLike.create({ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre });
-        updateMediaStats(externalId, type, { likeCount: 1 });
-        const updatedUser = await awardXP(req.user._id, 1);
-        res.json({ 
-            success: true, 
-            liked: true, 
-            message: 'Liked · +1 XP',
-            xp: updatedUser?.xp,
-            level: updatedUser?.level,
-            badge: updatedUser?.badge
+        
+        const result = await withRetryTransaction(async (session) => {
+            const existing = await MovieLike.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
+            
+            if (existing) {
+                await existing.deleteOne({ session });
+                await updateMediaStats(externalId, type, { likeCount: -1 }, session);
+                const updatedUser = await deductXP(req.user._id, 1, session);
+                
+                return { 
+                    liked: false, 
+                    message: 'Like removed · -1 XP',
+                    xp: updatedUser?.xp,
+                    level: updatedUser?.level,
+                    badge: updatedUser?.badge
+                };
+            }
+            
+            await MovieLike.create([{ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre }], { session });
+            await updateMediaStats(externalId, type, { likeCount: 1 }, session);
+            await logEngagement(externalId, type, 'like', req.user._id, session);
+            
+            const updatedUser = await awardXP(req.user._id, 1, session);
+            return { 
+                liked: true, 
+                message: 'Liked · +1 XP',
+                xp: updatedUser?.xp,
+                level: updatedUser?.level,
+                badge: updatedUser?.badge
+            };
         });
-        movieCache.delete(`movie-home-${type}`);
-        movieCache.delete(`movie-detail-${type}-${externalId}`);
+
+        res.json({ success: true, ...result });
+        
+        movieCache.clear();
     } catch (error) {
+        console.error('Movie Like Error:', error);
         res.status(500).json({ success: false, message: 'Like failed' });
     }
 });
@@ -288,18 +403,27 @@ router.post('/like', protect, async (req, res) => {
 router.post('/wishlist', protect, async (req, res) => {
     try {
         const { externalId, title, cover, type, genre } = req.body;
-        const existing = await MovieWishlist.findOne({ userId: req.user._id, externalId: parseInt(externalId), type });
-        if (existing) {
-            await existing.deleteOne();
-            updateMediaStats(externalId, type, { wishlistCount: -1 });
-            return res.json({ success: true, wishlisted: false });
-        }
-        await MovieWishlist.create({ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre });
-        updateMediaStats(externalId, type, { wishlistCount: 1 });
-        res.json({ success: true, wishlisted: true });
-        movieCache.delete(`movie-home-${type}`);
-        movieCache.delete(`movie-detail-${type}-${externalId}`);
+        
+        const result = await withRetryTransaction(async (session) => {
+            const existing = await MovieWishlist.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
+            
+            if (existing) {
+                await existing.deleteOne({ session });
+                await updateMediaStats(externalId, type, { wishlistCount: -1 }, session);
+                return { wishlisted: false };
+            }
+            
+            await MovieWishlist.create([{ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre }], { session });
+            await updateMediaStats(externalId, type, { wishlistCount: 1 }, session);
+            await logEngagement(externalId, type, 'wishlist', req.user._id, session);
+            
+            return { wishlisted: true };
+        });
+
+        res.json({ success: true, ...result });
+        movieCache.clear();
     } catch (error) {
+        console.error('Movie Wishlist Error:', error);
         res.status(500).json({ success: false, message: 'Wishlist failed' });
     }
 });
@@ -342,17 +466,39 @@ router.get('/activity/:userId', protect, async (req, res) => {
 });
 
 // ── COMMENTS ──
-router.get('/comments/:id', async (req, res) => {
+router.get('/comments/:id', protectOptional, async (req, res) => {
     try {
         const { id } = req.params;
         const { type = 'movie' } = req.query;
+        const userId = req.user?._id;
+
         const comments = await MovieComment.find({ externalId: parseInt(id), type, parentId: null })
             .populate('userId', 'username avatar badge level')
             .sort({ createdAt: -1 });
         
         const commentsWithReplies = await Promise.all(comments.map(async (c) => {
             const replies = await MovieComment.find({ parentId: c._id }).populate('userId', 'username avatar badge level').sort({ createdAt: 1 });
-            return { ...c.toObject(), replies };
+            
+            // If user is logged in, check if they liked/disliked this comment and its replies
+            let userLike = null;
+            if (userId) {
+                userLike = await MovieCommentLike.findOne({ commentId: c._id, userId });
+            }
+
+            const repliesWithStatus = await Promise.all(replies.map(async (r) => {
+                let rUserLike = null;
+                if (userId) {
+                    rUserLike = await MovieCommentLike.findOne({ commentId: r._id, userId });
+                }
+                return { ...r.toObject(), liked: rUserLike?.type === 'like', disliked: rUserLike?.type === 'dislike' };
+            }));
+
+            return { 
+                ...c.toObject(), 
+                replies: repliesWithStatus,
+                liked: userLike?.type === 'like',
+                disliked: userLike?.type === 'dislike'
+            };
         }));
 
         res.json({ success: true, comments: commentsWithReplies });
@@ -364,16 +510,36 @@ router.get('/comments/:id', async (req, res) => {
 router.post('/comments/:id', protect, async (req, res) => {
     try {
         const { id } = req.params;
-        const { text, parentId, type = 'movie' } = req.body;
-        const comment = await MovieComment.create({
-            userId: req.user._id,
-            externalId: parseInt(id),
-            type,
-            text,
-            parentId: parentId || null
+        const { text, type, parentId } = req.body;
+        
+        const result = await withRetryTransaction(async (session) => {
+            const comment = await MovieComment.create([{
+                externalId: parseInt(id),
+                userId: req.user._id,
+                text,
+                type: type || 'movie',
+                parentId: parentId || null
+            }], { session });
+
+            const populated = await MovieComment.findById(comment[0]._id)
+                .populate('userId', 'username avatar badge level')
+                .session(session);
+
+            const updatedUser = await awardXP(req.user._id, 1, session);
+            await logEngagement(id, type || 'movie', 'comment', req.user._id, { session });
+
+            return { comment: populated, updatedUser };
         });
-        res.json({ success: true, comment });
+
+        res.json({ 
+            success: true, 
+            comment: result.comment,
+            xp: result.updatedUser?.xp,
+            level: result.updatedUser?.level,
+            badge: result.updatedUser?.badge
+        });
     } catch (error) {
+        console.error('Movie Comment Post Error:', error);
         res.status(500).json({ success: false, message: 'Comment post failed' });
     }
 });
@@ -385,7 +551,7 @@ router.put('/comments/:commentId', protect, async (req, res) => {
         const comment = await MovieComment.findOneAndUpdate(
             { _id: commentId, userId: req.user._id },
             { text, edited: true },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!comment) return res.status(404).json({ success: false, message: 'Comment not found or unauthorized' });
         res.json({ success: true, comment });
@@ -394,22 +560,120 @@ router.put('/comments/:commentId', protect, async (req, res) => {
     }
 });
 
+router.post('/comments/:commentId/like', protect, async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const { type: likeType } = req.body; // 'like' or 'dislike'
+        const userId = req.user._id;
+
+        const result = await withRetryTransaction(async (session) => {
+            const comment = await MovieComment.findById(commentId).session(session);
+            if (!comment) throw new Error('Comment not found');
+
+            const existing = await MovieCommentLike.findOne({ commentId, userId }).session(session);
+
+            let likeDiff = 0;
+            let dislikeDiff = 0;
+
+            if (existing) {
+                if (existing.type === likeType) {
+                    await existing.deleteOne({ session });
+                    if (likeType === 'like') {
+                        likeDiff = -1;
+                    } else {
+                        dislikeDiff = -1;
+                    }
+                } else {
+                    existing.type = likeType;
+                    await existing.save({ session });
+                    if (likeType === 'like') {
+                        likeDiff = 1;
+                        dislikeDiff = -1;
+                    } else {
+                        likeDiff = -1;
+                        dislikeDiff = 1;
+                    }
+                }
+            } else {
+                await MovieCommentLike.create([{ commentId, userId, type: likeType }], { session });
+                if (likeType === 'like') {
+                    likeDiff = 1;
+                } else {
+                    dislikeDiff = 1;
+                }
+            }
+
+            comment.likeCount = Math.max(0, (comment.likeCount || 0) + likeDiff);
+            comment.dislikeCount = Math.max(0, (comment.dislikeCount || 0) + dislikeDiff);
+            await comment.save({ session });
+
+            return { 
+                liked: existing?.type === likeType ? false : (likeType === 'like'),
+                disliked: existing?.type === likeType ? false : (likeType === 'dislike'),
+                likeCount: comment.likeCount,
+                dislikeCount: comment.dislikeCount
+            };
+        });
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Movie Comment Like Error:', error);
+        res.status(500).json({ success: false, message: 'Action failed' });
+    }
+});
+
 router.delete('/comments/:commentId', protect, async (req, res) => {
     try {
         const { commentId } = req.params;
-        const comment = await MovieComment.findOneAndDelete({ _id: commentId, userId: req.user._id });
-        if (!comment) return res.status(404).json({ success: false, message: 'Comment not found or unauthorized' });
         
-        // Also delete replies
-        await MovieComment.deleteMany({ parentId: commentId });
-        
-        res.json({ success: true, message: 'Comment deleted' });
+        const result = await withRetryTransaction(async (session) => {
+            const comment = await MovieComment.findOne({ _id: commentId, userId: req.user._id }).session(session);
+            if (!comment) throw new Error('Comment not found');
+
+            const replies = await MovieComment.find({ parentId: comment._id }).session(session);
+            for (const reply of replies) {
+                await deductXP(reply.userId, 1, session);
+            }
+            await MovieComment.deleteMany({ parentId: comment._id }, { session });
+            await MovieCommentLike.deleteMany({ commentId: comment._id }, { session });
+            await comment.deleteOne({ session });
+            const updatedUser = await deductXP(req.user._id, 1, session);
+            
+            return { updatedUser };
+        });
+
+        res.json({ 
+            success: true, 
+            message: 'Comment deleted',
+            xp: result.updatedUser?.xp,
+            level: result.updatedUser?.level,
+            badge: result.updatedUser?.badge
+        });
     } catch (error) {
+        console.error('Movie Comment Delete Error:', error);
         res.status(500).json({ success: false, message: 'Delete failed' });
     }
 });
 
 // ── LIBRARY ──
+router.get('/user/:userId', async (req, res) => {
+    try {
+        const library = await MovieEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 });
+        
+        // Populate legacy fields for frontend compatibility
+        const sanitizedLibrary = library.map(entry => {
+            const obj = entry.toObject();
+            if (!obj.cover && obj.coverImage) obj.cover = obj.coverImage;
+            if (!obj.type && obj.mediaType) obj.type = obj.mediaType;
+            return obj;
+        });
+
+        res.json({ success: true, games: sanitizedLibrary }); // Named "games" for profile component compatibility
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Library fetch failed' });
+    }
+});
+
 router.get('/library', protect, async (req, res) => {
     try {
         const library = await MovieEntry.find({ userId: req.user._id }).sort({ updatedAt: -1 });
@@ -432,89 +696,88 @@ router.post('/log', protect, async (req, res) => {
     try {
         const { externalId, type, status, rating, seasonsWatched, episodesWatched, totalEpisodes, totalSeasons, notes, title, cover, genre } = req.body;
         
-        const oldEntry = await MovieEntry.findOne({ userId: req.user._id, externalId: parseInt(externalId), type });
-        const isNew = !oldEntry;
+        const result = await withRetryTransaction(async (session) => {
+            const oldEntry = await MovieEntry.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
+            const isNew = !oldEntry;
 
-        const updateData = { status, rating, seasonsWatched, episodesWatched, totalEpisodes, totalSeasons, notes, title, cover, genre, type };
-        const entry = await MovieEntry.findOneAndUpdate(
-            { userId: req.user._id, externalId: parseInt(externalId), type },
-            updateData,
-            { upsert: true, returnDocument: 'after' }
-        );
-        
-        const delta = {
-            loggedCount: isNew ? 1 : 0,
-            ratingCount: (isNew && rating > 0) ? 1 : (!isNew && (oldEntry.rating || 0) === 0 && rating > 0) ? 1 : (!isNew && (oldEntry.rating || 0) > 0 && rating === 0) ? -1 : 0,
-            ratingValue: rating - (oldEntry?.rating || 0)
-        };
-        updateMediaStats(externalId, type, delta);
-        
-        // XP System integration
-        let xpGained = 0;
-        let updatedUser = null;
-        if (isNew) {
-            updatedUser = await awardXP(req.user._id, 1);
-            xpGained += 1;
-        }
-        if (delta.ratingCount === 1) {
-            updatedUser = await awardXP(req.user._id, 1);
-            xpGained += 1;
-        }
-        if (delta.ratingCount === -1) {
-            updatedUser = await deductXP(req.user._id, 1);
-            xpGained -= 1;
-        }
+            const updateData = { status, rating, seasonsWatched, episodesWatched, totalEpisodes, totalSeasons, notes, title, cover, genre, type };
+            const entry = await MovieEntry.findOneAndUpdate(
+                { userId: req.user._id, externalId: parseInt(externalId), type },
+                updateData,
+                { upsert: true, returnDocument: 'after', session }
+            );
+            
+            const delta = {
+                loggedCount: isNew ? 1 : 0,
+                ratingCount: (isNew && rating > 0) ? 1 : (!isNew && (oldEntry.rating || 0) === 0 && rating > 0) ? 1 : (!isNew && (oldEntry.rating || 0) > 0 && rating === 0) ? -1 : 0,
+                ratingValue: rating - (oldEntry?.rating || 0)
+            };
+            await updateMediaStats(externalId, type, delta, session);
+            
+            let updatedUser = req.user;
+            if (isNew) {
+                updatedUser = await awardXP(req.user._id, 1, session);
+            }
+            if (delta.ratingCount === 1) {
+                updatedUser = await awardXP(req.user._id, 1, session);
+                await logEngagement(externalId, type, 'rating', req.user._id, session);
+            }
+            if (delta.ratingCount === -1) {
+                updatedUser = await deductXP(req.user._id, 1, session);
+            }
+
+            return { entry, updatedUser };
+        });
 
         res.json({ 
             success: true, 
-            entry,
-            xpGained,
-            xp: updatedUser?.xp,
-            level: updatedUser?.level,
-            badge: updatedUser?.badge
+            entry: result.entry,
+            xp: result.updatedUser?.xp,
+            level: result.updatedUser?.level,
+            badge: result.updatedUser?.badge
         });
 
         movieCache.clear();
     } catch (error) {
+        console.error('Movie Log Error:', error);
         res.status(500).json({ success: false, message: 'Log failed' });
     }
 });
 
 router.delete('/log/:id', protect, async (req, res) => {
     try {
-        const entry = await MovieEntry.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
-        if (!entry) return res.status(404).json({ success: false, message: 'Entry not found' });
-        
-        const delta = {
-            loggedCount: -1,
-            ratingCount: entry.rating > 0 ? -1 : 0,
-            ratingValue: -entry.rating
-        };
-        updateMediaStats(entry.externalId, entry.type, delta);
-        
-        // XP System integration
-        let xpGained = 0;
-        let updatedUser = null;
-        
-        // Deduct for removal
-        updatedUser = await deductXP(req.user._id, 1); // For log
-        xpGained -= 1;
-        if (entry.rating > 0) {
-            updatedUser = await deductXP(req.user._id, 1); // For rating
-            xpGained -= 1;
-        }
+        const result = await withRetryTransaction(async (session) => {
+            const entry = await MovieEntry.findOneAndDelete({ _id: req.params.id, userId: req.user._id }).session(session);
+            if (!entry) throw new Error('Entry not found');
+            
+            const delta = {
+                loggedCount: -1,
+                ratingCount: entry.rating > 0 ? -1 : 0,
+                ratingValue: -entry.rating
+            };
+            await updateMediaStats(entry.externalId, entry.type, delta, session);
+            
+            await deductXP(req.user._id, 1, session); // For log
+            let updatedUser = req.user;
+            if (entry.rating > 0) {
+                updatedUser = await deductXP(req.user._id, 1, session); // For rating
+            } else {
+                updatedUser = await awardXP(req.user._id, 0, session); // Just to get state
+            }
+            return { updatedUser };
+        });
 
         res.json({ 
             success: true, 
             message: 'Entry removed',
-            xpGained,
-            xp: updatedUser?.xp,
-            level: updatedUser?.level,
-            badge: updatedUser?.badge
+            xp: result.updatedUser?.xp,
+            level: result.updatedUser?.level,
+            badge: result.updatedUser?.badge
         });
 
         movieCache.clear();
     } catch (error) {
+        console.error('Movie Delete Log Error:', error);
         res.status(500).json({ success: false, message: 'Delete failed' });
     }
 });

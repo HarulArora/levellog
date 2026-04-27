@@ -3,7 +3,7 @@ import axios from 'axios';
 const apiClient = axios.create({
     timeout: 30000, // Increased to 30 seconds
     headers: {
-        'Connection': 'close',
+        // 'Connection': 'close',
         'User-Agent': 'LevelLog/1.0 (Coding Assistant Integration)'
     }
 });

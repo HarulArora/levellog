@@ -6,6 +6,8 @@ import Notification from '../models/Notification.js'
 import { protect } from '../middleware/auth.js'
 import { awardXP, deductXP } from '../utils/xp.js'
 import { censorText } from '../utils/moderation.js'
+import { logEngagement } from '../utils/engagement.js'
+import { withRetryTransaction } from '../utils/transaction.js'
 
 const router = express.Router()
 
@@ -61,45 +63,55 @@ router.get('/:igdbId', async (req, res) => {
 router.post('/:igdbId', protect, async (req, res) => {
     try {
         const { text, parentId, replyToUserId, gameTitle } = req.body
-        if (!text?.trim()) return res.status(400).json({ success: false, message: 'Comment text is required' })
+        if (!text?.trim()) {
+            return res.status(400).json({ success: false, message: 'Comment text is required' })
+        }
 
-        const comment = await Comment.create({
-            igdbId: Number(req.params.igdbId),
-            userId: req.user._id,
-            text: censorText(text.trim()),
-            parentId: parentId || null
+        const result = await withRetryTransaction(async (session) => {
+            const commentArray = await Comment.create([{
+                igdbId: Number(req.params.igdbId),
+                userId: req.user._id,
+                text: censorText(text.trim()),
+                parentId: parentId || null
+            }], { session })
+            const comment = commentArray[0]
+
+            // Log engagement
+            await logEngagement(req.params.igdbId, 'game', 'comment', req.user._id, { session })
+
+            const updatedUser = await awardXP(req.user._id, 1, session)
+
+            if (parentId) {
+                const notifMeta = {
+                    igdbId: Number(req.params.igdbId),
+                    gameTitle: gameTitle || '',
+                    commentId: comment._id,
+                    parentId,
+                    preview: text.trim().slice(0, 80),
+                }
+                if (replyToUserId && replyToUserId.toString() !== req.user._id.toString()) {
+                    await Notification.create([{ recipient: replyToUserId, sender: req.user._id, type: 'comment_reply', meta: notifMeta }], { session })
+                }
+                const parentComment = await Comment.findById(parentId).session(session).lean()
+                if (parentComment &&
+                    parentComment.userId.toString() !== req.user._id.toString() &&
+                    parentComment.userId.toString() !== replyToUserId?.toString()) {
+                    await Notification.create([{ recipient: parentComment.userId, sender: req.user._id, type: 'comment_reply', meta: notifMeta }], { session })
+                }
+            }
+            return { comment, updatedUser }
         })
 
-        const populated = await Comment.findById(comment._id)
+        const populated = await Comment.findById(result.comment._id)
             .populate('userId', 'username avatar badge level')
-
-        const updatedUser = await awardXP(req.user._id, 1)
-
-        if (parentId) {
-            const notifMeta = {
-                igdbId: Number(req.params.igdbId),
-                gameTitle: gameTitle || '',
-                commentId: comment._id,
-                parentId,
-                preview: text.trim().slice(0, 80),
-            }
-            if (replyToUserId && replyToUserId.toString() !== req.user._id.toString()) {
-                await Notification.create({ recipient: replyToUserId, sender: req.user._id, type: 'comment_reply', meta: notifMeta })
-            }
-            const parentComment = await Comment.findById(parentId).lean()
-            if (parentComment &&
-                parentComment.userId.toString() !== req.user._id.toString() &&
-                parentComment.userId.toString() !== replyToUserId?.toString()) {
-                await Notification.create({ recipient: parentComment.userId, sender: req.user._id, type: 'comment_reply', meta: notifMeta })
-            }
-        }
 
         res.status(201).json({
             success: true, comment: populated,
             message: 'Comment posted · +1 XP',
-            xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge
+            xp: result.updatedUser.xp, level: result.updatedUser.level, badge: result.updatedUser.badge
         })
     } catch (err) {
+        console.error('Game Comment Post Error:', err)
         res.status(500).json({ success: false, message: err.message })
     }
 })
@@ -128,38 +140,36 @@ router.delete('/:id', protect, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid comment ID format' })
         }
 
-        const comment = await Comment.findById(req.params.id)
-        
-        if (!comment) {
-            return res.status(404).json({ success: false, message: 'Comment not found (it may have been already deleted)' })
-        }
+        const result = await withRetryTransaction(async (session) => {
+            const comment = await Comment.findById(req.params.id).session(session)
+            if (!comment) throw new Error('Comment not found')
 
-        if (comment.userId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ success: false, message: 'Not authorized to delete this comment' })
-        }
-
-        if (!comment.parentId) {
-            const replies = await Comment.find({ parentId: comment._id })
-            for (const reply of replies) {
-                await Promise.all([
-                    CommentLike.deleteMany({ commentId: reply._id }),
-                    deductXP(reply.userId.toString(), 1),
-                ])
+            if (comment.userId.toString() !== req.user._id.toString()) {
+                throw new Error('Not authorized to delete this comment')
             }
-            await Comment.deleteMany({ parentId: comment._id })
-        }
 
-        await Promise.all([
-            comment.deleteOne(),
-            CommentLike.deleteMany({ commentId: comment._id }),
-        ])
+            if (!comment.parentId) {
+                const replies = await Comment.find({ parentId: comment._id }).session(session)
+                for (const reply of replies) {
+                    await CommentLike.deleteMany({ commentId: reply._id }).session(session)
+                    await deductXP(reply.userId.toString(), 1, session)
+                }
+                await Comment.deleteMany({ parentId: comment._id }).session(session)
+            }
 
-        const updatedUser = await deductXP(req.user._id, 1)
+            await CommentLike.deleteMany({ commentId: comment._id }).session(session)
+            await comment.deleteOne({ session })
+
+            const updatedUser = await deductXP(req.user._id, 1, session)
+            return { updatedUser }
+        })
+
         res.json({
             success: true, message: 'Comment deleted · -1 XP',
-            xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge
+            xp: result.updatedUser.xp, level: result.updatedUser.level, badge: result.updatedUser.badge
         })
     } catch (err) {
+        console.error('Game Comment Delete Error:', err)
         res.status(500).json({ success: false, message: err.message })
     }
 })

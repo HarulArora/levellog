@@ -1,21 +1,27 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import apiClient from '../utils/apiClient.js';
 import { LRUCache } from 'lru-cache';
 import AnimeEntry from '../models/AnimeEntry.js';
 import AnimeComment from '../models/AnimeComment.js';
+import AnimeCommentLike from '../models/AnimeCommentLike.js';
 import AnimeLike from '../models/AnimeLike.js';
 import AnimeWishlist from '../models/AnimeWishlist.js';
+import MediaStats from '../models/MediaStats.js';
+import Ranking from '../models/Ranking.js';
 import { protect, protectOptional } from '../middleware/auth.js';
 import { awardXP, deductXP } from '../utils/xp.js';
 import { updateMediaStats, getBulkStats } from '../utils/stats.js';
+import { logEngagement } from '../utils/engagement.js';
+import { withRetryTransaction } from '../utils/transaction.js';
 
 const router = express.Router();
 const JIKAN_BASE_URL = 'https://api.jikan.moe/v4';
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_BASE_URL = 'http://api.themoviedb.org/3';
 
 const jikanCache = new LRUCache({
     max: 200,
-    ttl: 1000 * 60 * 60 // 1 hour
+    ttl: 1000 * 60 * 60 * 12 // 12 hours
 });
 
 const fetchMediaStats = getBulkStats;
@@ -71,16 +77,67 @@ router.get('/home', async (req, res) => {
         const cacheKey = `home-${type}-v2`;
         if (jikanCache.has(cacheKey)) return res.json({ success: true, ...jikanCache.get(cacheKey) });
 
-        const requestConfig = { retry: 3, retryDelay: 2000 };
-        const [trendingRes, topRes, upcomingRes] = await Promise.all([
-            apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { ...requestConfig, params: { limit: 15, filter: type === 'manga' ? 'publishing' : 'airing', sfw: true } }).catch(() => ({ data: { data: [] } })),
-            apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { ...requestConfig, params: { limit: 15, filter: 'bypopularity', sfw: true } }).catch(() => ({ data: { data: [] } })),
-            apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { ...requestConfig, params: { limit: 15, filter: 'upcoming', sfw: true } }).catch(() => ({ data: { data: [] } }))
+        const [trendingRankings, topRatedRankings, upcomingRankings] = await Promise.all([
+            Ranking.find({ contentType: type, rankType: 'trending' }).sort({ rankPosition: 1 }).limit(15),
+            Ranking.find({ contentType: type, rankType: 'top_rated' }).sort({ rankPosition: 1 }).limit(15),
+            type === 'anime' ? Ranking.find({ contentType: type, rankType: 'coming_soon' }).sort({ rankPosition: 1 }).limit(15) : []
         ]);
 
-        const trending = (trendingRes.data?.data || []).map(item => formatJikanItem(item, type)).slice(0, 12);
-        const topRated = (topRes.data?.data || []).map(item => formatJikanItem(item, type)).slice(0, 12);
-        const upcoming = (upcomingRes.data?.data || []).map(item => formatJikanItem(item, type)).slice(0, 12);
+        let trending = trendingRankings.map(r => ({
+            mal_id: parseInt(r.contentId),
+            externalId: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            year: r.year,
+            genres: r.genres || [],
+            type: type
+        }));
+
+        let topRated = topRatedRankings.map(r => ({
+            mal_id: parseInt(r.contentId),
+            externalId: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            year: r.year,
+            genres: r.genres || [],
+            type: type
+        }));
+
+        let upcoming = upcomingRankings.map(r => ({
+            mal_id: parseInt(r.contentId),
+            externalId: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            year: r.year,
+            genres: r.genres || [],
+            type: type
+        }));
+
+        // 4. Backfill/Fallback for Trending/Top/Upcoming if Ranking has less than 15 items
+        if (trending.length < 15 || topRated.length < 15 || (type === 'anime' && upcoming.length < 15)) {
+            const [trendFallback, topFallback, soonFallback] = await Promise.all([
+                trending.length < 15 ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: type === 'manga' ? 'publishing' : 'airing', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } },
+                topRated.length < 15 ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: 'bypopularity', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } },
+                (type === 'anime' && upcoming.length < 15) ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: 'upcoming', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } }
+            ]);
+
+            const mergeUnique = (existing, fetchedRaw) => {
+                const fetched = (fetchedRaw || []).map(item => formatJikanItem(item, type));
+                const ids = new Set(existing.map(i => i.externalId));
+                const merged = [...existing];
+                for (const item of fetched) {
+                    if (!ids.has(item.externalId) && merged.length < 15) {
+                        merged.push(item);
+                        ids.add(item.externalId);
+                    }
+                }
+                return merged;
+            };
+
+            if (trending.length < 15) trending = mergeUnique(trending, trendFallback.data?.data);
+            if (topRated.length < 15) topRated = mergeUnique(topRated, topFallback.data?.data);
+            if (upcoming.length < 15) upcoming = mergeUnique(upcoming, soonFallback.data?.data);
+        }
 
         // Aggregate stats
         const allIds = [...trending, ...topRated, ...upcoming].map(i => i.externalId);
@@ -88,9 +145,12 @@ router.get('/home', async (req, res) => {
 
         const sections = [
             { title: `Trending ${type === 'manga' ? 'Manga' : 'Anime'}`, items: trending },
-            { title: `Top Rated ${type === 'manga' ? 'Manga' : 'Anime'}`, items: topRated },
-            { title: `Upcoming ${type === 'manga' ? 'Manga' : 'Anime'}`, items: upcoming }
+            { title: `Top Rated ${type === 'manga' ? 'Manga' : 'Anime'}`, items: topRated }
         ];
+
+        if (type === 'anime') {
+            sections.push({ title: 'Upcoming Anime', items: upcoming });
+        }
 
         const result = { sections, stats };
         jikanCache.set(cacheKey, result);
@@ -102,7 +162,7 @@ router.get('/home', async (req, res) => {
 });
 
 // ── SEARCH ──
-router.get('/search', async (req, res) => {
+router.get('/search', protectOptional, async (req, res) => {
     try {
         const { q, type = 'anime', limit = 24 } = req.query;
         if (!q) return res.status(400).json({ success: false, message: 'Query is required' });
@@ -118,7 +178,20 @@ router.get('/search', async (req, res) => {
 
         const results = (response.data?.data || []).map(item => formatJikanItem(item, type));
         const stats = await fetchMediaStats(results.map(r => r.externalId), type);
-        const result = { results, stats };
+        // ── FETCH USER RATINGS IF AUTHENTICATED ──
+        let userRatings = {}
+        if (req.user && results.length > 0) {
+            const userEntries = await AnimeEntry.find({
+                userId: req.user._id,
+                externalId: { $in: results.map(r => r.externalId) },
+                type
+            }).select('externalId rating')
+            userEntries.forEach(e => {
+                if (e.rating > 0) userRatings[e.externalId] = e.rating
+            })
+        }
+
+        const result = { results, stats, userRatings };
         jikanCache.set(cacheKey, result);
         res.json({ success: true, ...result });
     } catch (error) {
@@ -225,19 +298,21 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
 
         if (!anime) {
             const requestConfig = { retry: 3, retryDelay: 1000 };
-            const [mainRes, picsRes, recsRes, videoRes, charRes, staffRes, streamingRes] = await Promise.all([
+            const [mainRes, picsRes, recsRes, videoRes, charRes, staffRes, streamingRes, externalRes] = await Promise.all([
                 apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/full`, requestConfig),
                 apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/pictures`, requestConfig).catch(() => ({ data: { data: [] } })),
                 apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/recommendations`, requestConfig).catch(() => ({ data: { data: [] } })),
                 apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/videos`, requestConfig).catch(() => ({ data: { data: {} } })),
                 apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/characters`, requestConfig).catch(() => ({ data: { data: [] } })),
                 apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/staff`, requestConfig).catch(() => ({ data: { data: [] } })),
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/streaming`, requestConfig).catch(() => ({ data: { data: [] } }))
+                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/streaming`, requestConfig).catch(() => ({ data: { data: [] } })),
+                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/external`, requestConfig).catch(() => ({ data: { data: [] } }))
             ]);
 
             const rawData = mainRes.data.data;
             anime = formatJikanItem(rawData, type);
             anime.streamingLinks = streamingRes.data.data || [];
+            anime.externalLinks = externalRes.data.data || [];
 
             // ── TMDB WATCH PROVIDER INTEGRATION ──
             try {
@@ -245,7 +320,11 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
                 // Search both tv and movie since some anime are films
                 const animeTitle = anime.title;
                 const tmdbSearch = await apiClient.get(`${TMDB_BASE_URL}/search/multi`, {
-                    params: { query: animeTitle, include_adult: false },
+                    params: { 
+                        api_key: process.env.TMDB_API_KEY,
+                        query: animeTitle, 
+                        include_adult: false 
+                    },
                     retry: 2
                 });
 
@@ -255,7 +334,9 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
                 );
 
                 if (bestMatch) {
-                    const providersRes = await apiClient.get(`${TMDB_BASE_URL}/${bestMatch.media_type}/${bestMatch.id}/watch/providers`);
+                    const providersRes = await apiClient.get(`${TMDB_BASE_URL}/${bestMatch.media_type}/${bestMatch.id}/watch/providers`, {
+                        params: { api_key: process.env.TMDB_API_KEY }
+                    });
                     anime.watchProviders = providersRes.data.results || {};
                 }
             } catch (tmdbErr) {
@@ -319,27 +400,24 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
             // We can't easily re-fetch without performance hit, but we can ensure the property is defined.
         }
 
-        const [statsAgg, like, wishlist] = await Promise.all([
-            AnimeEntry.aggregate([
-                { $match: { externalId: parseInt(id), type } },
-                { $group: { _id: '$externalId', avgRating: { $avg: { $cond: [{ $gt: ['$rating', 0] }, '$rating', null] } }, ratingCount: { $sum: { $cond: [{ $gt: ['$rating', 0] }, 1, 0] } }, loggedCount: { $sum: 1 } }}
-            ]),
+        const [mediaStats, like, wishlist] = await Promise.all([
+            MediaStats.findOne({ externalId: parseInt(id), type }),
             userId ? AnimeLike.findOne({ userId, externalId: parseInt(id), type }) : null,
             userId ? AnimeWishlist.findOne({ userId, externalId: parseInt(id), type }) : null
         ]);
 
-        const likeCount = await AnimeLike.countDocuments({ externalId: parseInt(id), type });
-        const wishlistCount = await AnimeWishlist.countDocuments({ externalId: parseInt(id), type });
-
-        const stats = statsAgg[0] ? {
-            avgRating: statsAgg[0].avgRating ? parseFloat(statsAgg[0].avgRating.toFixed(1)) : null,
-            ratingCount: statsAgg[0].ratingCount,
-            loggedCount: statsAgg[0].loggedCount,
-            likeCount,
-            wishlistCount
-        } : { avgRating: null, ratingCount: 0, loggedCount: 0, likeCount, wishlistCount };
+        const stats = mediaStats ? {
+            avgRating: mediaStats.avgRating,
+            ratingCount: mediaStats.ratingCount,
+            loggedCount: mediaStats.loggedCount,
+            likeCount: mediaStats.likeCount,
+            wishlistCount: mediaStats.wishlistCount
+        } : { avgRating: null, ratingCount: 0, loggedCount: 0, likeCount: 0, wishlistCount: 0 };
 
         res.json({ success: true, anime, stats, userStatus: { liked: !!like, wishlisted: !!wishlist } });
+
+        // Log view engagement
+        logEngagement(id, type, 'view', userId);
     } catch (error) {
         console.error('Anime Detail Error:', error.message);
         res.status(500).json({ success: false, message: 'Detail failed' });
@@ -350,27 +428,43 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
 router.post('/like', protect, async (req, res) => {
     try {
         const { externalId, title, cover, type, genre } = req.body;
-        const existing = await AnimeLike.findOne({ userId: req.user._id, externalId: parseInt(externalId), type });
-        if (existing) {
-            await existing.deleteOne();
-            updateMediaStats(externalId, type, { likeCount: -1 });
-            await deductXP(req.user._id, 1);
-            return res.json({ success: true, liked: false, message: 'Like removed · -1 XP' });
-        }
-        await AnimeLike.create({ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre });
-        updateMediaStats(externalId, type, { likeCount: 1 });
-        const updatedUser = await awardXP(req.user._id, 1);
-        res.json({ 
-            success: true, 
-            liked: true, 
-            message: 'Liked · +1 XP',
-            xp: updatedUser?.xp,
-            level: updatedUser?.level,
-            badge: updatedUser?.badge
+        
+        const result = await withRetryTransaction(async (session) => {
+            const existing = await AnimeLike.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
+            
+            if (existing) {
+                await existing.deleteOne({ session });
+                await updateMediaStats(externalId, type, { likeCount: -1 }, session);
+                const updatedUser = await deductXP(req.user._id, 1, session);
+                
+                return { 
+                    liked: false, 
+                    message: 'Like removed · -1 XP',
+                    xp: updatedUser?.xp,
+                    level: updatedUser?.level,
+                    badge: updatedUser?.badge
+                };
+            }
+            
+            await AnimeLike.create([{ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre }], { session });
+            await updateMediaStats(externalId, type, { likeCount: 1 }, session);
+            await logEngagement(externalId, type, 'like', req.user._id, session);
+            
+            const updatedUser = await awardXP(req.user._id, 1, session);
+            return { 
+                liked: true, 
+                message: 'Liked · +1 XP',
+                xp: updatedUser?.xp,
+                level: updatedUser?.level,
+                badge: updatedUser?.badge
+            };
         });
-        jikanCache.delete(`home-${type}`);
-        jikanCache.delete(`detail-${type}-${externalId}`);
+
+        res.json({ success: true, ...result });
+        
+        jikanCache.clear();
     } catch (error) {
+        console.error('Anime Like Error:', error);
         res.status(500).json({ success: false, message: 'Like failed' });
     }
 });
@@ -378,34 +472,59 @@ router.post('/like', protect, async (req, res) => {
 router.post('/wishlist', protect, async (req, res) => {
     try {
         const { externalId, title, cover, type, genre } = req.body;
-        const existing = await AnimeWishlist.findOne({ userId: req.user._id, externalId: parseInt(externalId), type });
-        if (existing) {
-            await existing.deleteOne();
-            updateMediaStats(externalId, type, { wishlistCount: -1 });
-            return res.json({ success: true, wishlisted: false });
-        }
-        await AnimeWishlist.create({ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre });
-        updateMediaStats(externalId, type, { wishlistCount: 1 });
-        res.json({ success: true, wishlisted: true });
-        jikanCache.delete(`home-${type}`);
-        jikanCache.delete(`detail-${type}-${externalId}`);
+        const result = await withRetryTransaction(async (session) => {
+            const existing = await AnimeWishlist.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
+            if (existing) {
+                await existing.deleteOne({ session });
+                await updateMediaStats(externalId, type, { wishlistCount: -1 }, session);
+                return { wishlisted: false };
+            }
+            await AnimeWishlist.create([{ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre }], { session });
+            await updateMediaStats(externalId, type, { wishlistCount: 1 }, session);
+            await logEngagement(externalId, type, 'wishlist', req.user._id, session);
+            return { wishlisted: true };
+        });
+        res.json({ success: true, ...result });
+        jikanCache.clear();
     } catch (error) {
         res.status(500).json({ success: false, message: 'Wishlist failed' });
     }
 });
 
 // ── COMMENTS ──
-router.get('/comments/:id', async (req, res) => {
+router.get('/comments/:id', protectOptional, async (req, res) => {
     try {
         const { id } = req.params;
         const { type = 'anime' } = req.query;
+        const userId = req.user?._id;
+
         const comments = await AnimeComment.find({ externalId: parseInt(id), type, parentId: null })
             .populate('userId', 'username avatar badge level')
             .sort({ createdAt: -1 });
         
         const commentsWithReplies = await Promise.all(comments.map(async (c) => {
             const replies = await AnimeComment.find({ parentId: c._id }).populate('userId', 'username avatar badge level').sort({ createdAt: 1 });
-            return { ...c.toObject(), replies };
+            
+            // If user is logged in, check if they liked/disliked this comment and its replies
+            let userLike = null;
+            if (userId) {
+                userLike = await AnimeCommentLike.findOne({ commentId: c._id, userId });
+            }
+
+            const repliesWithStatus = await Promise.all(replies.map(async (r) => {
+                let rUserLike = null;
+                if (userId) {
+                    rUserLike = await AnimeCommentLike.findOne({ commentId: r._id, userId });
+                }
+                return { ...r.toObject(), liked: rUserLike?.type === 'like', disliked: rUserLike?.type === 'dislike' };
+            }));
+
+            return { 
+                ...c.toObject(), 
+                replies: repliesWithStatus,
+                liked: userLike?.type === 'like',
+                disliked: userLike?.type === 'dislike'
+            };
         }));
 
         res.json({ success: true, comments: commentsWithReplies });
@@ -417,24 +536,36 @@ router.get('/comments/:id', async (req, res) => {
 router.post('/comments/:id', protect, async (req, res) => {
     try {
         const { id } = req.params;
-        const { text, parentId, type = 'anime' } = req.body;
-        const comment = await AnimeComment.create({
-            userId: req.user._id,
-            externalId: parseInt(id),
-            type,
-            text,
-            parentId: parentId || null
+        const { text, type, parentId } = req.body;
+        
+        const result = await withRetryTransaction(async (session) => {
+            const comment = await AnimeComment.create([{
+                externalId: parseInt(id),
+                userId: req.user._id,
+                text,
+                type: type || 'anime',
+                parentId: parentId || null
+            }], { session });
+
+            const populated = await AnimeComment.findById(comment[0]._id)
+                .populate('userId', 'username avatar badge level')
+                .session(session);
+
+            const updatedUser = await awardXP(req.user._id, 1, session);
+            await logEngagement(id, type || 'anime', 'comment', req.user._id, { session });
+            
+            return { comment: populated, updatedUser };
         });
-        const updatedUser = await awardXP(req.user._id, 1);
+
         res.json({ 
             success: true, 
-            comment,
-            message: 'Comment posted · +1 XP',
-            xp: updatedUser?.xp,
-            level: updatedUser?.level,
-            badge: updatedUser?.badge
+            comment: result.comment,
+            xp: result.updatedUser?.xp,
+            level: result.updatedUser?.level,
+            badge: result.updatedUser?.badge
         });
     } catch (error) {
+        console.error('Anime Comment Post Error:', error);
         res.status(500).json({ success: false, message: 'Comment post failed' });
     }
 });
@@ -446,7 +577,7 @@ router.put('/comments/:commentId', protect, async (req, res) => {
         const comment = await AnimeComment.findOneAndUpdate(
             { _id: commentId, userId: req.user._id },
             { text, edited: true },
-            { new: true }
+            { returnDocument: 'after' }
         );
         if (!comment) return res.status(404).json({ success: false, message: 'Comment not found or unauthorized' });
         res.json({ success: true, comment });
@@ -455,29 +586,120 @@ router.put('/comments/:commentId', protect, async (req, res) => {
     }
 });
 
+router.post('/comments/:commentId/like', protect, async (req, res) => {
+    try {
+        const { commentId } = req.params;
+        const { type: likeType } = req.body;
+        const userId = req.user._id;
+
+        const result = await withRetryTransaction(async (session) => {
+            const comment = await AnimeComment.findById(commentId).session(session);
+            if (!comment) throw new Error('Comment not found');
+
+            const existing = await AnimeCommentLike.findOne({ commentId, userId }).session(session);
+
+            let likeDiff = 0;
+            let dislikeDiff = 0;
+
+            if (existing) {
+                if (existing.type === likeType) {
+                    await existing.deleteOne({ session });
+                    if (likeType === 'like') {
+                        likeDiff = -1;
+                    } else {
+                        dislikeDiff = -1;
+                    }
+                } else {
+                    existing.type = likeType;
+                    await existing.save({ session });
+                    if (likeType === 'like') {
+                        likeDiff = 1;
+                        dislikeDiff = -1;
+                    } else {
+                        likeDiff = -1;
+                        dislikeDiff = 1;
+                    }
+                }
+            } else {
+                await AnimeCommentLike.create([{ commentId, userId, type: likeType }], { session });
+                if (likeType === 'like') {
+                    likeDiff = 1;
+                } else {
+                    dislikeDiff = 1;
+                }
+            }
+
+            comment.likeCount = Math.max(0, (comment.likeCount || 0) + likeDiff);
+            comment.dislikeCount = Math.max(0, (comment.dislikeCount || 0) + dislikeDiff);
+            await comment.save({ session });
+
+            return { 
+                liked: existing?.type === likeType ? false : (likeType === 'like'),
+                disliked: existing?.type === likeType ? false : (likeType === 'dislike'),
+                likeCount: comment.likeCount,
+                dislikeCount: comment.dislikeCount
+            };
+        });
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        console.error('Anime Comment Like Error:', error);
+        res.status(500).json({ success: false, message: 'Action failed' });
+    }
+});
+
 router.delete('/comments/:commentId', protect, async (req, res) => {
     try {
         const { commentId } = req.params;
-        const comment = await AnimeComment.findOneAndDelete({ _id: commentId, userId: req.user._id });
-        if (!comment) return res.status(404).json({ success: false, message: 'Comment not found or unauthorized' });
         
-        // Also delete replies
-        await AnimeComment.deleteMany({ parentId: commentId });
-        
-        const updatedUser = await deductXP(req.user._id, 1);
+        const result = await withRetryTransaction(async (session) => {
+            const comment = await AnimeComment.findOne({ _id: commentId, userId: req.user._id }).session(session);
+            if (!comment) throw new Error('Comment not found');
+
+            const replies = await AnimeComment.find({ parentId: comment._id }).session(session);
+            for (const reply of replies) {
+                await deductXP(reply.userId, 1, session);
+            }
+            await AnimeComment.deleteMany({ parentId: comment._id }, { session });
+            await AnimeCommentLike.deleteMany({ commentId: comment._id }, { session });
+            await comment.deleteOne({ session });
+            const updatedUser = await deductXP(req.user._id, 1, session);
+            
+            return { updatedUser };
+        });
+
         res.json({ 
             success: true, 
-            message: 'Comment deleted · -1 XP',
-            xp: updatedUser?.xp,
-            level: updatedUser?.level,
-            badge: updatedUser?.badge
+            message: 'Comment deleted',
+            xp: result.updatedUser?.xp,
+            level: result.updatedUser?.level,
+            badge: result.updatedUser?.badge
         });
     } catch (error) {
+        console.error('Anime Comment Delete Error:', error);
         res.status(500).json({ success: false, message: 'Delete failed' });
     }
 });
 
 // ── LIBRARY / LOGGING ──
+router.get('/user/:userId', async (req, res) => {
+    try {
+        const library = await AnimeEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 });
+        
+        // Populate legacy fields for frontend compatibility
+        const sanitizedLibrary = library.map(entry => {
+            const obj = entry.toObject();
+            if (!obj.cover && obj.coverImage) obj.cover = obj.coverImage;
+            if (!obj.type && obj.mediaType) obj.type = obj.mediaType;
+            return obj;
+        });
+
+        res.json({ success: true, games: sanitizedLibrary }); // Named "games" for profile component compatibility
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch library' });
+    }
+});
+
 router.get('/library', protect, async (req, res) => {
     try {
         const library = await AnimeEntry.find({ userId: req.user._id }).sort({ updatedAt: -1 });
@@ -500,90 +722,87 @@ router.post('/log', protect, async (req, res) => {
     try {
         let { externalId, type, status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre } = req.body;
         
-        const oldEntry = await AnimeEntry.findOne({ userId: req.user._id, externalId: parseInt(externalId), type });
-        const isNew = !oldEntry;
+        const result = await withRetryTransaction(async (session) => {
+            const oldEntry = await AnimeEntry.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
+            const isNew = !oldEntry;
 
-        const updateData = { status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre };
-        const entry = await AnimeEntry.findOneAndUpdate(
-            { userId: req.user._id, externalId: parseInt(externalId), type },
-            updateData,
-            { upsert: true, returnDocument: 'after' }
-        );
-        
-        const delta = {
-            loggedCount: isNew ? 1 : 0,
-            ratingCount: (isNew && rating > 0) ? 1 : (!isNew && (oldEntry.rating || 0) === 0 && rating > 0) ? 1 : (!isNew && (oldEntry.rating || 0) > 0 && rating === 0) ? -1 : 0,
-            ratingValue: rating - (oldEntry?.rating || 0)
-        };
-        updateMediaStats(externalId, type, delta);
-        
-        // XP System integration
-        let xpGained = 0;
-        let updatedUser = null;
-        if (isNew) {
-            updatedUser = await awardXP(req.user._id, 1);
-            xpGained += 1;
-        }
-        if (delta.ratingCount === 1) {
-            updatedUser = await awardXP(req.user._id, 1);
-            xpGained += 1;
-        }
-        if (delta.ratingCount === -1) {
-            updatedUser = await deductXP(req.user._id, 1);
-            xpGained -= 1;
-        }
+            const updateData = { status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre };
+            const entry = await AnimeEntry.findOneAndUpdate(
+                { userId: req.user._id, externalId: parseInt(externalId), type },
+                updateData,
+                { upsert: true, returnDocument: 'after', session }
+            );
+            
+            const delta = {
+                loggedCount: isNew ? 1 : 0,
+                ratingCount: (isNew && rating > 0) ? 1 : (!isNew && (oldEntry.rating || 0) === 0 && rating > 0) ? 1 : (!isNew && (oldEntry.rating || 0) > 0 && rating === 0) ? -1 : 0,
+                ratingValue: rating - (oldEntry?.rating || 0)
+            };
+            await updateMediaStats(externalId, type, delta, session);
+            
+            let updatedUser = req.user;
+            if (isNew) {
+                updatedUser = await awardXP(req.user._id, 1, session);
+            }
+            if (delta.ratingCount === 1) {
+                updatedUser = await awardXP(req.user._id, 1, session);
+                await logEngagement(externalId, type, 'rating', req.user._id, session);
+            }
+            if (delta.ratingCount === -1) {
+                updatedUser = await deductXP(req.user._id, 1, session);
+            }
+            return { entry, updatedUser };
+        });
 
         res.json({ 
             success: true, 
-            entry,
-            xpGained,
-            xp: updatedUser?.xp,
-            level: updatedUser?.level,
-            badge: updatedUser?.badge
+            entry: result.entry,
+            xp: result.updatedUser?.xp,
+            level: result.updatedUser?.level,
+            badge: result.updatedUser?.badge
         });
 
         jikanCache.clear();
     } catch (error) {
+        console.error('Anime Log Error:', error);
         res.status(500).json({ success: false, message: 'Log failed' });
     }
 });
 
 router.delete('/log/:id', protect, async (req, res) => {
     try {
-        const entry = await AnimeEntry.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
-        if (!entry) return res.status(404).json({ success: false, message: 'Entry not found' });
-        res.json({ success: true, message: 'Entry removed' });
+        const result = await withRetryTransaction(async (session) => {
+            const entry = await AnimeEntry.findOneAndDelete({ _id: req.params.id, userId: req.user._id }).session(session);
+            if (!entry) throw new Error('Entry not found');
 
-        const delta = {
-            loggedCount: -1,
-            ratingCount: (entry.rating || 0) > 0 ? -1 : 0,
-            ratingValue: -(entry.rating || 0)
-        };
-        updateMediaStats(entry.externalId, entry.type, delta);
-        
-        // XP System integration
-        let xpGained = 0;
-        let updatedUser = null;
-        
-        // Deduct for removal
-        updatedUser = await deductXP(req.user._id, 1); // For log
-        xpGained -= 1;
-        if ((entry.rating || 0) > 0) {
-            updatedUser = await deductXP(req.user._id, 1); // For rating
-            xpGained -= 1;
-        }
+            const delta = {
+                loggedCount: -1,
+                ratingCount: (entry.rating || 0) > 0 ? -1 : 0,
+                ratingValue: -(entry.rating || 0)
+            };
+            await updateMediaStats(entry.externalId, entry.type, delta, session);
+            
+            await deductXP(req.user._id, 1, session); // For log
+            let updatedUser = req.user;
+            if ((entry.rating || 0) > 0) {
+                updatedUser = await deductXP(req.user._id, 1, session); // For rating
+            } else {
+                updatedUser = await awardXP(req.user._id, 0, session);
+            }
+            return { updatedUser };
+        });
 
         res.json({ 
             success: true, 
             message: 'Entry removed',
-            xpGained,
-            xp: updatedUser?.xp,
-            level: updatedUser?.level,
-            badge: updatedUser?.badge
+            xp: result.updatedUser?.xp,
+            level: result.updatedUser?.level,
+            badge: result.updatedUser?.badge
         });
 
         jikanCache.clear();
     } catch (error) {
+        console.error('Anime Delete Log Error:', error);
         res.status(500).json({ success: false, message: 'Delete failed' });
     }
 });

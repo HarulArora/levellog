@@ -4,6 +4,7 @@ import { useSection } from '../../context/SectionContext'
 
 const AnimeCard = memo(({ anime, onDelete, onEdit }) => {
     const navigate = useNavigate()
+    const isManga = anime.type === 'manga' || anime.mediaType === 'manga'
 
     const statusConfig = {
         watching: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Watching' },
@@ -30,7 +31,7 @@ const AnimeCard = memo(({ anime, onDelete, onEdit }) => {
 
     const handleCardClick = () => {
         if (anime.externalId) {
-            navigate(`/anime/${anime.externalId}`)
+            navigate(`/${isManga ? 'manga' : 'anime'}/${anime.externalId}`)
         }
     }
 
@@ -45,7 +46,7 @@ const AnimeCard = memo(({ anime, onDelete, onEdit }) => {
                         ${anime.externalId ? 'cursor-pointer' : 'cursor-default'}`}
             style={{ animation: 'fadeUp 0.3s ease backwards' }}
         >
-            <div className="aspect-[3/4] relative overflow-hidden bg-[#18181f] shrink-0">
+            <div className="aspect-video relative overflow-hidden bg-[#18181f] shrink-0">
                 {imageUrl ? (
                     <img 
                         src={imageUrl} 
@@ -77,7 +78,7 @@ const AnimeCard = memo(({ anime, onDelete, onEdit }) => {
                 )}
             </div>
 
-            <div className="p-3 flex flex-col flex-1">
+            <div className="p-2.5 flex flex-col flex-1">
                 <div className="font-semibold text-sm mb-2 truncate text-white
                                 group-hover:text-[#c8ff57] transition-colors">
                     {anime.title}
@@ -93,28 +94,28 @@ const AnimeCard = memo(({ anime, onDelete, onEdit }) => {
                     )}
                 </div>
 
-                <div className="mt-auto flex justify-between items-end pb-2">
-                    <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider">
-                        {anime.genres?.[0] || anime.genre}
-                    </span>
+                <div className="mt-auto flex justify-between items-end">
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[100px]">
+                            {anime.genres?.[0] || anime.genre}
+                        </span>
+                        {(isManga ? anime.chaptersRead : anime.episodesWatched) > 0 && (
+                            <span className="text-[#c8ff57] font-mono text-[9px] uppercase tracking-widest">
+                                {isManga ? '📖' : '📺'} {isManga ? anime.chaptersRead : anime.episodesWatched} {isManga ? 'ch' : 'ep'} tracked
+                            </span>
+                        )}
+                    </div>
 
                     {anime.rating > 0 ? (
                         <span
-                            className="font-black text-lg text-[#c8ff57] leading-none tracking-wide"
+                            className="font-black text-2xl text-[#c8ff57] leading-none tracking-wide"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                         >
                             {anime.rating}
-                            <small className="font-mono text-[10px] text-[#7a7a90] font-normal">
-                                /10
-                            </small>
                         </span>
                     ) : (
                         <span className="text-[#7a7a90] font-mono text-xs">—</span>
                     )}
-                </div>
-
-                <div className="pt-2 border-t border-[#2a2a35] text-[#94a3b8] font-mono text-[10px]">
-                    {anime.episodesWatched > 0 ? `📺 ${anime.episodesWatched} ep tracked` : String.fromCharCode(160)}
                 </div>
 
                 <div className="mt-2 flex gap-1">

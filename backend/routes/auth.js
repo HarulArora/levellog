@@ -64,6 +64,8 @@ const userPayload = (user) => ({
     username: user.username,
     email: user.email,
     isPrivate: user.isPrivate,
+    isLikesPublic: user.isLikesPublic,
+    isWishlistPublic: user.isWishlistPublic,
     avatar: user.avatar || '',
     bio: user.bio || '',
     xp: user.xp || 0,
@@ -71,6 +73,7 @@ const userPayload = (user) => ({
     badge: user.badge || '🎮',
     googleId: user.googleId || null,
     hasPassword: !!user.password,
+    settings: user.settings || { libraryViewMode: 'grid' }
 })
 
 // ── GET /api/auth/check-username ─────────────────────────────────────────────
@@ -602,6 +605,33 @@ router.patch('/set-password', protect, async (req, res) => {
     }
 })
 
+// ── PATCH /api/auth/privacy ──────────────────────────────────────────────────
+router.patch('/privacy', protect, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+        user.isPrivate = !user.isPrivate
+        await user.save()
+        res.json({ success: true, user: userPayload(user) })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
+// ── PATCH /api/auth/privacy-settings ──────────────────────────────────────────
+router.patch('/privacy-settings', protect, async (req, res) => {
+    try {
+        const { isLikesPublic, isWishlistPublic } = req.body
+        const update = {}
+        if (typeof isLikesPublic !== 'undefined') update.isLikesPublic = isLikesPublic
+        if (typeof isWishlistPublic !== 'undefined') update.isWishlistPublic = isWishlistPublic
+
+        const user = await User.findByIdAndUpdate(req.user._id, { $set: update }, { returnDocument: 'after' })
+        res.json({ success: true, user: userPayload(user) })
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message })
+    }
+})
+
 // ── PATCH /api/auth/change-password ──────────────────────────────────────────
 router.patch('/change-password', protect, async (req, res) => {
     try {
@@ -674,11 +704,14 @@ router.get('/profile/:username', async (req, res) => {
         if (user.xp < followerCount || user.followerCount !== followerCount) {
             const missingXP = Math.max(0, followerCount - user.xp)
             if (missingXP > 0) {
-                await awardXP(user._id, missingXP)
-                userObj.xp = (user.xp || 0) + missingXP
+                const updatedUser = await awardXP(user._id, missingXP)
+                userObj.xp = updatedUser.xp
+                userObj.level = updatedUser.level
+                userObj.badge = updatedUser.badge
             }
             if (user.followerCount !== followerCount) {
                 await User.findByIdAndUpdate(user._id, { $set: { followerCount } })
+                userObj.followerCount = followerCount
             }
         }
 
@@ -775,6 +808,74 @@ router.patch('/privacy', protect, async (req, res) => {
     }
 })
 
+// ── PATCH /api/auth/settings ──────────────────────────────────────────────────
+router.patch('/settings', protect, async (req, res) => {
+    try {
+        const { libraryViewMode } = req.body
+        const user = await User.findById(req.user._id)
+        if (!user) return res.status(404).json({ success: false, message: 'User not found' })
+
+        if (libraryViewMode) user.settings.libraryViewMode = libraryViewMode
+        
+        await user.save()
+        res.json({ success: true, settings: user.settings })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to update settings', error: error.message })
+    }
+})
+
+// ── GET /api/auth/activity/:userId ──────────────────────────────────────────
+router.get('/activity/:userId', protect, async (req, res) => {
+    try {
+        const Game = (await import('../models/Game.js')).default
+        const MovieEntry = (await import('../models/MovieEntry.js')).default
+        const AnimeEntry = (await import('../models/AnimeEntry.js')).default
+
+        const [games, movies, anime] = await Promise.all([
+            Game.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(20).lean(),
+            MovieEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(20).lean(),
+            AnimeEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(20).lean()
+        ])
+
+        const activity = []
+
+        games.forEach(g => {
+            const info = { title: g.title, cover: g.cover, id: g._id, igdbId: g.igdbId, mediaType: 'game' }
+            if (g.status === 'completed') activity.push({ type: 'completed', game: info, rating: g.rating, time: g.updatedAt })
+            else if (g.status === 'playing') activity.push({ type: 'playing', game: info, time: g.updatedAt })
+            else if (g.status === 'dropped') activity.push({ type: 'dropped', game: info, time: g.updatedAt })
+            else if (g.status === 'planned') activity.push({ type: 'planned', game: info, time: g.createdAt })
+            else if (g.status === 'paused') activity.push({ type: 'paused', game: info, time: g.updatedAt })
+            if (g.rating > 0 && g.status !== 'completed') activity.push({ type: 'rated', game: info, rating: g.rating, time: g.updatedAt })
+        })
+
+        movies.forEach(m => {
+            const info = { title: m.title, cover: m.cover, id: m._id, externalId: m.externalId, mediaType: m.type }
+            if (m.status === 'completed') activity.push({ type: 'completed', movie: info, rating: m.rating, time: m.updatedAt })
+            else if (m.status === 'playing') activity.push({ type: 'playing', movie: info, time: m.updatedAt })
+            else if (m.status === 'dropped') activity.push({ type: 'dropped', movie: info, time: m.updatedAt })
+            else if (m.status === 'planned') activity.push({ type: 'planned', movie: info, time: m.createdAt })
+            else if (m.status === 'paused') activity.push({ type: 'paused', movie: info, time: m.updatedAt })
+            if (m.rating > 0 && m.status !== 'completed') activity.push({ type: 'rated', movie: info, rating: m.rating, time: m.updatedAt })
+        })
+
+        anime.forEach(a => {
+            const info = { title: a.title, cover: a.cover, id: a._id, externalId: a.externalId, mediaType: a.type || a.mediaType }
+            if (a.status === 'completed') activity.push({ type: 'completed', anime: info, rating: a.rating, time: a.updatedAt })
+            else if (a.status === 'playing') activity.push({ type: 'playing', anime: info, time: a.updatedAt })
+            else if (a.status === 'dropped') activity.push({ type: 'dropped', anime: info, time: a.updatedAt })
+            else if (a.status === 'planned') activity.push({ type: 'planned', anime: info, time: a.createdAt })
+            else if (a.status === 'paused') activity.push({ type: 'paused', anime: info, time: a.updatedAt })
+            if (a.rating > 0 && a.status !== 'completed') activity.push({ type: 'rated', anime: info, rating: a.rating, time: a.updatedAt })
+        })
+
+        activity.sort((a, b) => new Date(b.time) - new Date(a.time))
+        res.json({ success: true, activity: activity.slice(0, 30) })
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch activity', error: error.message })
+    }
+})
+
 // ── GET /api/auth/feed ────────────────────────────────────────────────────────
 router.get('/feed', protect, async (req, res) => {
     try {
@@ -787,14 +888,36 @@ router.get('/feed', protect, async (req, res) => {
             return res.json({ success: true, games: [], message: 'Follow some users to see their games here' })
 
         const Game = (await import('../models/Game.js')).default
-        const games = await Game.find({ userId: { $in: followingIds } })
-            .sort({ createdAt: -1 })
-            .limit(20)
-            .populate('userId', 'username avatar badge level')
-            .select('title cover status rating igdbId createdAt userId')
-            .lean()
+        const MovieEntry = (await import('../models/MovieEntry.js')).default
+        const AnimeEntry = (await import('../models/AnimeEntry.js')).default
+        
+        const [games, movies, anime] = await Promise.all([
+            Game.find({ userId: { $in: followingIds } })
+                .sort({ createdAt: -1 })
+                .limit(15)
+                .populate('userId', 'username avatar badge level')
+                .lean(),
+            MovieEntry.find({ userId: { $in: followingIds } })
+                .sort({ createdAt: -1 })
+                .limit(15)
+                .populate('userId', 'username avatar badge level')
+                .lean(),
+            AnimeEntry.find({ userId: { $in: followingIds } })
+                .sort({ createdAt: -1 })
+                .limit(15)
+                .populate('userId', 'username avatar badge level')
+                .lean()
+        ])
 
-        res.json({ success: true, games })
+        const combined = [
+            ...games.map(g => ({ ...g, mediaType: 'game' })),
+            ...movies.map(m => ({ ...m, mediaType: m.type })),
+            ...anime.map(a => ({ ...a, mediaType: a.type || a.mediaType }))
+        ]
+
+        combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+        res.json({ success: true, games: combined.slice(0, 30) })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch feed', error: error.message })
     }

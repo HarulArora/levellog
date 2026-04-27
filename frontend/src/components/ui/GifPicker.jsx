@@ -100,7 +100,7 @@ const GifPicker = ({ onSelect, onClose }) => {
     // Initial fetch
     useEffect(() => {
         fetchGifs('', true)
-    }, []) // Only on mount
+    }, [fetchGifs]) // Only on mount, but depends on stable fetchGifs
 
     // Handle search with debounce
     useEffect(() => {
@@ -127,7 +127,7 @@ const GifPicker = ({ onSelect, onClose }) => {
         return () => {
             if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
         }
-    }, [search, trending])
+    }, [search, trending, fetchGifs])
 
     // Intersection Observer for Infinite Scroll
     useEffect(() => {

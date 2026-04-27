@@ -9,6 +9,11 @@ const userSchema = new mongoose.Schema(
         bio: { type: String, default: '', maxlength: 150 },
         avatar: { type: String, default: '' },
         isPrivate: { type: Boolean, default: false },
+        settings: {
+            libraryViewMode: { type: String, enum: ['grid', 'list'], default: 'grid' }
+        },
+        isLikesPublic: { type: Boolean, default: true },
+        isWishlistPublic: { type: Boolean, default: true },
 
         // ── Cached counters (replaces arrays) ──────────────────────
         followerCount: { type: Number, default: 0 },

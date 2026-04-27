@@ -7,7 +7,10 @@ import logger from '../utils/logger.js'
 import apiClient from '../utils/apiClient.js'
 import { shortPlatform, normalizeCover } from '../utils/helpers.js'
 import GlobalList from '../models/GlobalList.js'
+import Ranking from '../models/Ranking.js'
+import GlobalStats from '../models/GlobalStats.js'
 import { syncIGDBLists } from '../tasks/igdbSync.js'
+import { protectOptional } from '../middleware/auth.js'
 
 const router = express.Router()
 
@@ -20,20 +23,20 @@ const igdbCache = new LRUCache({
 const inFlightRequests = new Map()
 
 // ── GET /api/igdb/search?q=query ──
-router.get('/search', async (req, res) => {
+router.get('/search', protectOptional, async (req, res) => {
     try {
         const query = req.query.q
         if (!query) return res.status(400).json({ success: false, message: 'Query is required' })
-        
+
         const cacheKey = `search-${query}`
         if (igdbCache.has(cacheKey)) return res.json({ success: true, ...igdbCache.get(cacheKey) })
-        
+
         // 🚀 Pooling check
         if (inFlightRequests.has(cacheKey)) {
             const data = await inFlightRequests.get(cacheKey)
             return res.json({ success: true, games: data })
         }
-        
+
         const performSearch = async () => {
             const raw = await searchGames(query)
             const normCover = (c) => normalizeCover(c)
@@ -65,7 +68,36 @@ router.get('/search', async (req, res) => {
         const finalGames = await fetchPromise
         inFlightRequests.delete(cacheKey)
 
-        res.json({ success: true, games: finalGames })
+        // ── FETCH COMMUNITY STATS FOR SEARCH RESULTS ──
+        const allIds = finalGames.map(g => g.id).filter(Boolean)
+        let stats = {}
+        if (allIds.length > 0) {
+            const reviewData = await Game.aggregate([
+                { $match: { igdbId: { $in: allIds }, rating: { $gt: 0 } } },
+                { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
+            ])
+            allIds.forEach(id => {
+                const review = reviewData.find(r => r._id === id)
+                stats[id] = {
+                    avgRating: review ? parseFloat(review.avg.toFixed(1)) : null,
+                    ratingCount: review?.count || 0
+                }
+            })
+        }
+
+        // ── FETCH USER RATINGS IF AUTHENTICATED ──
+        let userRatings = {}
+        if (req.user && allIds.length > 0) {
+            const userGames = await Game.find({
+                userId: req.user._id,
+                igdbId: { $in: allIds }
+            }).select('igdbId rating')
+            userGames.forEach(g => {
+                if (g.rating > 0) userRatings[g.igdbId] = g.rating
+            })
+        }
+
+        res.json({ success: true, games: finalGames, stats, userRatings })
     } catch (error) {
         res.status(500).json({ success: false, message: 'IGDB search failed', error: error.message })
     }
@@ -77,7 +109,7 @@ router.get('/discover', async (req, res) => {
         const { genre, page = 1, limit = 24 } = req.query
         const pageNum = Math.max(1, parseInt(page) || 1)
         const limitNum = Math.min(50, parseInt(limit) || 24)
-        
+
         const offset = (pageNum - 1) * limitNum
 
         const genreFilter = genre && genre.toLowerCase() !== 'all'
@@ -129,7 +161,7 @@ router.get('/discover', async (req, res) => {
 
             const total = countData.count || 0
             const totalPages = Math.ceil(total / limitNum)
-            
+
             igdbResult = { rawGames, total, totalPages }
             igdbCache.set(igdbDataCacheKey, igdbResult, { ttl: 1000 * 60 * 60 * 12 }) // Static data stays 12h
         }
@@ -171,16 +203,16 @@ export const fetchGameDetailById = async (gameId) => {
     try {
         const cacheKey = `game-detail-${gameId}`
 
-    if (igdbCache.has(cacheKey)) {
-        return igdbCache.get(cacheKey)
-    }
+        if (igdbCache.has(cacheKey)) {
+            return igdbCache.get(cacheKey)
+        }
 
-    if (inFlightRequests.has(cacheKey)) {
-        return await inFlightRequests.get(cacheKey)
-    }
+        if (inFlightRequests.has(cacheKey)) {
+            return await inFlightRequests.get(cacheKey)
+        }
 
-    const performFetch = async () => {
-        const token = await getAccessToken()
+        const performFetch = async () => {
+            const token = await getAccessToken()
             const response = await apiClient.post('https://api.igdb.com/v4/games', `
             fields name, cover.url, summary, genres.name,
                    platforms.name, first_release_date,
@@ -348,56 +380,96 @@ router.get('/coming-soon', async (req, res) => {
 // for all returned game IDs in one batch. Result cached for 12 h.
 router.get('/home', async (req, res) => {
     try {
-        let [trendingDoc, topRatedDoc, comingSoonDoc] = await Promise.all([
-            GlobalList.findOne({ key: 'trending' }),
-            GlobalList.findOne({ key: 'top-rated' }),
-            GlobalList.findOne({ key: 'coming-soon' })
-        ])
+        // 1. Fetch Trending from Rankings
+        const trendingRankings = await Ranking.find({ contentType: 'game', rankType: 'trending' }).sort({ rankPosition: 1 }).limit(15);
+        let trending = (trendingRankings || []).map(r => ({
+            id: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            genre: r.genres?.[0] || 'Game',
+            releaseDate: r.year ? `Jan 1, ${r.year}` : null
+        }));
 
-        // If any list is empty, trigger a background sync and use fallback or wait
-        if (!trendingDoc || !topRatedDoc || !comingSoonDoc) {
-            await syncIGDBLists()
-            // Re-fetch after sync
-            ;[trendingDoc, topRatedDoc, comingSoonDoc] = await Promise.all([
-                GlobalList.findOne({ key: 'trending' }),
-                GlobalList.findOne({ key: 'top-rated' }),
-                GlobalList.findOne({ key: 'coming-soon' })
-            ])
+        // 2. Fetch Top Rated from Rankings
+        const topRatedRankings = await Ranking.find({ contentType: 'game', rankType: 'top_rated' }).sort({ rankPosition: 1 }).limit(15);
+        let topRated = (topRatedRankings || []).map(r => ({
+            id: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            genre: r.genres?.[0] || 'Game',
+            releaseDate: r.year ? `Jan 1, ${r.year}` : null
+        }));
+
+        // 4. Fetch Coming Soon from Rankings
+        const comingSoonRankings = await Ranking.find({ contentType: 'game', rankType: 'coming_soon' }).sort({ rankPosition: 1 }).limit(15);
+        let comingSoon = (comingSoonRankings || []).map(r => ({
+            id: parseInt(r.contentId),
+            title: r.title,
+            cover: r.cover,
+            genre: r.genres?.[0] || 'Game',
+            releaseDate: r.year ? `Jan 1, ${r.year}` : null
+        }));
+
+        // 5. Backfill/Fallback to IGDB API if Rankings have less than 15 items
+        if (trending.length < 15 || topRated.length < 15 || comingSoon.length < 15) {
+            try {
+                const token = await getAccessToken();
+                const now = Math.floor(Date.now() / 1000);
+                const headers = { 'Client-ID': process.env.IGDB_CLIENT_ID, 'Authorization': `Bearer ${token}`, 'Content-Type': 'text/plain' };
+                
+                const fetchList = async (body) => {
+                    const res = await apiClient.post('https://api.igdb.com/v4/games', body, { headers });
+                    return (res.data || []).map(g => ({
+                        id: g.id,
+                        title: g.name,
+                        cover: normalizeCover(g.cover?.url),
+                        genre: g.genres?.[0]?.name || 'Game',
+                        releaseDate: g.first_release_date
+                            ? new Date(g.first_release_date * 1000).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric'
+                            })
+                            : null
+                    }));
+                };
+
+                const [trendLive, topLive, soonLive] = await Promise.all([
+                    trending.length < 15 ? fetchList(`fields name, cover.url, genres.name, rating, rating_count; where rating > 70 & rating_count > 50 & cover != null; sort rating_count desc; limit 50;`) : [],
+                    topRated.length < 15 ? fetchList(`fields name, cover.url, genres.name, rating, rating_count; where rating > 85 & rating_count > 20 & cover != null; sort rating desc; limit 50;`) : [],
+                    comingSoon.length < 15 ? fetchList(`fields name, cover.url, genres.name, first_release_date; where first_release_date >= ${now} & cover != null; sort first_release_date asc; limit 50;`) : []
+                ]);
+
+                // Helper to merge and unique
+                const mergeUnique = (existing, fetched) => {
+                    const ids = new Set(existing.map(i => i.id));
+                    const merged = [...existing];
+                    for (const item of fetched) {
+                        if (!ids.has(item.id) && merged.length < 15) {
+                            merged.push(item);
+                            ids.add(item.id);
+                        }
+                    }
+                    return merged;
+                };
+
+                if (trending.length < 15) trending = mergeUnique(trending, trendLive);
+                if (topRated.length < 15) topRated = mergeUnique(topRated, topLive);
+                if (comingSoon.length < 15) comingSoon = mergeUnique(comingSoon, soonLive);
+            } catch (err) { logger.error('[IGDB Home] Backfill failed:', err.message); }
         }
 
-        const trending = trendingDoc?.games || []
-        const topRated = topRatedDoc?.games || []
-        const comingSoon = comingSoonDoc?.games || []
-
-        // ── FRESH STATS FETCHING (NOT CACHED) ──
-        const allIds = [...trending, ...topRated].map(g => g.id).filter(Boolean)
-        let gameStats = {}
+        // 6. Fetch Fresh Stats for all items
+        const allIds = [...trending, ...topRated, ...comingSoon].map(g => g.id).filter(Boolean);
+        let gameStats = {};
         if (allIds.length > 0) {
-            const [reviewData, likeCounts, logCounts] = await Promise.all([
-                Game.aggregate([
-                    { $match: { igdbId: { $in: allIds }, rating: { $gt: 0 } } },
-                    { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
-                ]),
-                GameLike.aggregate([
-                    { $match: { igdbId: { $in: allIds } } },
-                    { $group: { _id: '$igdbId', count: { $sum: 1 } } }
-                ]),
-                Game.aggregate([
-                    { $match: { igdbId: { $in: allIds } } },
-                    { $group: { _id: '$igdbId', count: { $sum: 1 } } }
-                ])
-            ])
-            allIds.forEach(id => {
-                const review = reviewData.find(r => r._id === id)
-                const like = likeCounts.find(l => l._id === id)
-                const log = logCounts.find(l => l._id === id)
-                gameStats[id] = {
-                    avgRating: review ? parseFloat(review.avg.toFixed(1)) : null,
-                    ratingCount: review?.count || 0,
-                    likeCount: like?.count || 0,
-                    loggedCount: log?.count || 0
-                }
-            })
+            const stats = await GlobalStats.find({ igdbId: { $in: allIds } });
+            (stats || []).forEach(s => {
+                gameStats[s.igdbId] = {
+                    avgRating: s.avgRating,
+                    ratingCount: s.ratingCount,
+                    likeCount: s.likeCount,
+                    loggedCount: s.loggedCount
+                };
+            });
         }
 
         res.json({ success: true, trending, topRated, comingSoon, gameStats })

@@ -23,12 +23,12 @@ export const getLevelInfo = (xp) => {
     return { current, next }
 }
 
-export const awardXP = async (userId, amount = 1) => {
+export const awardXP = async (userId, amount = 1, session = null) => {
     // Atomic increment to prevent race conditions
     const user = await User.findByIdAndUpdate(
         userId,
         { $inc: { xp: amount } },
-        { returnDocument: 'after' }
+        { returnDocument: 'after', session }
     )
     if (!user) return
 
@@ -38,7 +38,8 @@ export const awardXP = async (userId, amount = 1) => {
         // Use updateOne to bypass full document validation (avoids legacy data validation errors)
         await User.updateOne(
             { _id: userId },
-            { $set: { level: current.level, badge: current.badge } }
+            { $set: { level: current.level, badge: current.badge } },
+            { session }
         )
         user.level = current.level
         user.badge = current.badge
@@ -48,21 +49,22 @@ export const awardXP = async (userId, amount = 1) => {
 
 // XP never goes below 0. Level recalculates automatically.
 // Unlocked content is preserved in DB but locked in route-level checks.
-export const deductXP = async (userId, amount = 1) => {
+export const deductXP = async (userId, amount = 1, session = null) => {
     // We fetch first to ensure we don't go below 0
-    const user = await User.findById(userId)
+    const user = await User.findById(userId).session(session)
     if (!user) return
 
     const newXP = Math.max(0, (user.xp || 0) - amount)
     
     // Update atomically
-    await User.updateOne({ _id: userId }, { $set: { xp: newXP } })
+    await User.updateOne({ _id: userId }, { $set: { xp: newXP } }, { session })
     
     const { current } = getLevelInfo(newXP)
     if (user.level !== current.level || user.badge !== current.badge) {
         await User.updateOne(
             { _id: userId },
-            { $set: { level: current.level, badge: current.badge } }
+            { $set: { level: current.level, badge: current.badge } },
+            { session }
         )
     }
     

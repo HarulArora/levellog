@@ -36,7 +36,7 @@ function NavbarSectionAdapter() {
         { name: 'HOME', path: getSectionPath('home') },
         { name: 'DISCOVER', path: getSectionPath('discover') },
         { name: 'LIBRARY', path: getSectionPath('library') },
-        { name: 'FRIENDS', path: '/search' },
+        { name: 'FRIENDS', path: '/friends' },
         { name: 'LEADERBOARD', path: '/leaderboard' },
     ]
 
@@ -129,7 +129,7 @@ function NavbarSectionAdapter() {
                         user ? (
                             <>
                                 <Link to="/universal-search" onClick={handleLinkClick} className="p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
-                                    <Search size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
+                                    <Search size={20} className="text-white group-hover:text-[#c8ff57] transition-colors" />
                                 </Link>
 
                                 <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">

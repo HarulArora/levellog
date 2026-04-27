@@ -49,7 +49,9 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     // Find rank dynamically
     const userRankInfo = topUsers.find(u => u._id === comment.userId?._id || u._id === comment.userId?.id)
     const rank = userRankInfo?.rank
-    const isTop4 = rank && rank <= 4
+
+    const currentUserRankInfo = topUsers.find(u => u._id === currentUser?.id || u._id === currentUser?._id)
+    const currentUserRank = currentUserRankInfo?.rank
 
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [showGifPicker, setShowGifPicker] = useState(false)
@@ -97,7 +99,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
             }
         }
         fetchLikeState()
-    }, [comment._id, currentUser])
+    }, [comment._id, currentUser, comment.likes, comment.dislikes])
 
     const isOwn = currentUser && (
         comment.userId?._id === currentUser.id ||
@@ -401,7 +403,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                             <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm relative">
                                 {showBurst && (
                                     <div className="rank-like-burst">
-                                        {rank === 1 ? '👑' : rank === 2 ? '🪽' : rank === 3 ? '⭐' : rank === 4 ? '⚔️' : '🐥'}
+                                        {currentUserRank === 1 ? '👑' : currentUserRank === 2 ? '🪽' : currentUserRank === 3 ? '🎖️' : currentUserRank === 4 ? '⚔️' : '🍿'}
                                     </div>
                                 )}
                                 <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg transition-all active:scale-95
@@ -511,7 +513,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
 function GameDetail() {
     const { igdbId } = useParams()
     const navigate = useNavigate()
-    const { user } = useAuth()
+    const { user, updateUser } = useAuth()
     const { games: userGames, addGame, updateGame } = useGamesContext()
 
     const [activeTab, setActiveTab] = useState('overview')
@@ -621,7 +623,7 @@ function GameDetail() {
     })
 
     const fetchPlatformStats = refetchContext
-    const fetchComments = refetchComments
+    // const fetchComments = refetchComments
 
     useEffect(() => {
         const handler = (e) => {
@@ -671,12 +673,16 @@ function GameDetail() {
                 igdbId: parseInt(igdbId), gameTitle: game.title, gameCover: game.cover, genre: game.genre
             })
             setLiked(res.data.liked)
-            if (res.data.liked) showXpToast('❤️ Liked! +1 XP', 'gain')
+            if (res.data.liked) {
+                showXpToast('❤️ Liked! +1 XP', 'gain')
+                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+            }
             else showXpToast('💔 Unliked · -1 XP', 'loss')
             
             // Silent refetch to sync stats (counts etc) in background
             await refetchContext(true) 
         } catch (err) {
+            console.error('Like error:', err)
             setLiked(wasLiked) // Revert on failure
             if (oldData) setContextData(oldData)
         } finally { setLiking(false) }
@@ -717,6 +723,7 @@ function GameDetail() {
             
             await refetchContext(true)
         } catch (err) {
+            console.error('Wishlist error:', err)
             setWishlisted(wasWishlisted) // Revert on failure
             if (oldData) setContextData(oldData)
         } finally { setWishing(false) }
@@ -728,7 +735,9 @@ function GameDetail() {
         try {
             const res = await api.get('/lists/me')
             setCustomLists(res.data.customLists || [])
-        } catch (err) { } finally { setLoadingLists(false) }
+        } catch (err) {
+            console.error('Error fetching context:', err)
+        } finally { setLoadingLists(false) }
     }
 
     const handleAddToList = async (listId, listName) => {
@@ -740,7 +749,10 @@ function GameDetail() {
             showListToast(`Added to "${listName}"`)
             invalidateCache(`lists_${user.id || user._id}`)
             setShowListModal(false)
-        } catch (err) { showListToast('Failed to add to list', 'error') }
+        } catch (err) { 
+            console.error('Add to list error:', err)
+            showListToast('Failed to add to list', 'error') 
+        }
     }
 
     const handlePostComment = async () => {
@@ -955,18 +967,13 @@ function GameDetail() {
 
                             {/* Scores */}
                             <div className="flex flex-wrap gap-8 mb-8">
-                                {game.criticScore && (
-                                    <div>
-                                        <div className="font-black text-4xl text-[#c8ff57] leading-none"
-                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.criticScore}</div>
-                                        <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Critic Score</div>
-                                    </div>
-                                )}
                                 <div>
-                                    <div className="font-black text-4xl text-[#5c9fff] leading-none"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                        {stats?.avgRating > 0 ? stats.avgRating : '—'}
-                                        {stats?.avgRating > 0 && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>}
+                                    <div className="flex items-center gap-2">
+                                        <div className="font-black text-4xl text-[#5c9fff] leading-none"
+                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                            {stats?.avgRating > 0 ? stats.avgRating : '—'}
+                                            {stats?.avgRating > 0 && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>}
+                                        </div>
                                     </div>
                                     <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
                                         Avg Rating {stats?.ratingCount > 0 && <span className="ml-1 text-[#7a7a90]">({stats.ratingCount})</span>}
@@ -1349,9 +1356,10 @@ function GameDetail() {
                                                 <div className="font-mono text-[9px] text-[#7a7a90] mt-1">View details</div>
                                             </div>
                                             {similarStats[sg.id]?.avgRating ? (
-                                                <div className="font-black text-lg text-[#5c9fff] flex-shrink-0"
+                                                <div className="flex items-center gap-1 font-black text-lg text-[#5c9fff] flex-shrink-0"
                                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                                    {similarStats[sg.id].avgRating}
+
+                                                    <span>{similarStats[sg.id].avgRating}</span>
                                                     <small className="font-mono text-[9px] text-[#7a7a90] font-normal">/10</small>
                                                 </div>
                                             ) : null}
@@ -1375,7 +1383,10 @@ function GameDetail() {
                             setShowAddModal(false)
                             await fetchPlatformStats(true) // Silent reload to update counts
                             return { success: true }
-                        } catch (err) { return { success: false } }
+                        } catch (err) { 
+                            console.error('Log error:', err)
+                            return { success: false } 
+                        }
                     }}
                     preselectedGame={{
                         title: game.title,
@@ -1402,7 +1413,21 @@ function GameDetail() {
                             <button onClick={() => setShowListModal(false)} className="text-[#7a7a90] hover:text-white text-xl">✕</button>
                         </div>
                         <div className="p-5">
-                            {loadingLists ? (
+                            {user?.level < 2 ? (
+                                <div className="flex flex-col items-center gap-4 py-8 text-center">
+                                    <div className="w-14 h-14 bg-[#1a1a25] border border-[#3a3a4a] rounded-full flex items-center justify-center mb-2">
+                                        <span className="text-2xl">🔒</span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="font-black text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Feature Locked</div>
+                                        <div className="font-mono text-[10px] text-[#7a7a90] max-w-[200px] leading-relaxed">Reach Level 2 to create and use custom collections.</div>
+                                    </div>
+                                    <button onClick={() => setShowListModal(false)}
+                                        className="mt-2 px-6 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:text-white hover:border-white transition-all">
+                                        GOT IT
+                                    </button>
+                                </div>
+                            ) : loadingLists ? (
                                 <div className="text-center py-8 font-mono text-xs text-[#7a7a90]">Loading lists...</div>
                             ) : customLists.length === 0 ? (
                                 <div className="flex flex-col items-center gap-3 py-8">

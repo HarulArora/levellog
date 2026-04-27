@@ -9,7 +9,7 @@ import { useFollow } from '../context/FollowContext'
 import { useLeaderboard } from '../context/LeaderboardContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import FollowListModal from '../components/profile/FollowListModal'
-import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List, Trophy } from 'lucide-react'
+import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List, Trophy, Heart, Bookmark, ChevronDown, Monitor, Film, Tv, BookOpen, Layers, Star } from 'lucide-react'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
 function Profile() {
@@ -22,6 +22,7 @@ function Profile() {
     const [xpToast, setXpToast] = useState(null)
     const [activeTab, setActiveTab] = useState('games')
     const [selectedList, setSelectedList] = useState(null)
+    const [profileMediaType, setProfileMediaType] = useState('game')
     const { topUsers } = useLeaderboard()
 
     // ── CACHED FETCHES ──
@@ -40,22 +41,46 @@ function Profile() {
     const requestSent = followStatus === 'requested'
     const canSeeGames = !user?.isPrivate || isOwnProfile || isFollowing
 
+    const baseEndpoint = profileMediaType === 'game' ? 'games' : 
+                         (profileMediaType === 'anime' || profileMediaType === 'manga') ? 'anime' : 'movies';
+
     const { data: gamesData } = useCachedFetch(
-        user?._id && canSeeGames ? `profile_games_${user._id}` : null,
-        user?._id && canSeeGames ? `/games/user/${user._id}` : null,
-        { enabled: !!user?._id && canSeeGames, deps: [user?._id] }
+        user?._id && canSeeGames ? `profile_items_${user._id}_${baseEndpoint}` : null,
+        user?._id && canSeeGames ? `/${baseEndpoint}/user/${user._id}` : null,
+        { enabled: !!user?._id && canSeeGames, deps: [user?._id, baseEndpoint] }
     )
 
     const { data: listsData } = useCachedFetch(
-        user?._id && canSeeGames ? `profile_lists_${user._id}` : null,
-        user?._id && canSeeGames ? `/lists/user/${user._id}` : null,
-        { enabled: !!user?._id && canSeeGames, deps: [user?._id] }
+        user?._id && canSeeGames ? `profile_lists_${user._id}_${profileMediaType}` : null,
+        user?._id && canSeeGames ? `/lists/user/${user._id}?mediaType=${profileMediaType}` : null,
+        { enabled: !!user?._id && canSeeGames, deps: [user?._id, profileMediaType] }
+    )
+
+    const { data: likesData } = useCachedFetch(
+        user?._id && canSeeGames ? `profile_likes_${user._id}_${profileMediaType}` : null,
+        user?._id && canSeeGames ? `/lists/user/${user._id}/likes?mediaType=${profileMediaType}` : null,
+        { enabled: !!user?._id && canSeeGames, deps: [user?._id, profileMediaType] }
+    )
+
+    const { data: wishlistData } = useCachedFetch(
+        user?._id && canSeeGames ? `profile_wishlist_${user._id}_${profileMediaType}` : null,
+        user?._id && canSeeGames ? `/lists/user/${user._id}/wishlist?mediaType=${profileMediaType}` : null,
+        { enabled: !!user?._id && canSeeGames, deps: [user?._id, profileMediaType] }
     )
 
     const loading = profileLoading
     const error = profileError
-    const games = gamesData?.games || []
-    const lists = listsData?.lists || []
+    const rawItems = useMemo(() => gamesData?.games || [], [gamesData])
+    const games = useMemo(() => {
+        if (profileMediaType === 'game') return rawItems;
+        return rawItems.filter(item => {
+            const itemType = item.type || item.mediaType;
+            return itemType === profileMediaType;
+        });
+    }, [rawItems, profileMediaType])
+    const lists = useMemo(() => listsData?.lists || [], [listsData])
+    const likes = useMemo(() => likesData?.likes || [], [likesData])
+    const wishlist = useMemo(() => wishlistData?.wishlist || [], [wishlistData])
     const followLoading = user ? loadingMap[user._id] : false
 
     const showXpToast = (msg, type = 'gain') => {
@@ -79,34 +104,107 @@ function Profile() {
         return lists.filter(l => l.isPublic)
     }, [lists, isOwnProfile])
 
+    const specialLists = useMemo(() => {
+        const result = []
+        
+        // Liked Items
+        if (isOwnProfile || user?.isLikesPublic) {
+            result.push({
+                _id: 'liked',
+                name: 'Liked Items',
+                description: `Items ${user?.username} has liked`,
+                isPublic: user?.isLikesPublic,
+                games: likes,
+                gameCount: likes.length,
+                isSpecial: true,
+                icon: Heart,
+                color: 'text-[#ff5c5c]',
+                bg: 'bg-[#ff5c5c]/15'
+            })
+        }
+
+        // Wishlist
+        if (isOwnProfile || user?.isWishlistPublic) {
+            result.push({
+                _id: 'wishlist',
+                name: 'Wishlist',
+                description: `Items ${user?.username} wants to play/watch`,
+                isPublic: user?.isWishlistPublic,
+                games: wishlist,
+                gameCount: wishlist.length,
+                isSpecial: true,
+                icon: Bookmark,
+                color: 'text-[#5c9fff]',
+                bg: 'bg-[#5c9fff]/15'
+            })
+        }
+
+        return result
+    }, [user, isOwnProfile, likes, wishlist])
+
+    const allCollections = useMemo(() => [...specialLists, ...visibleLists], [specialLists, visibleLists])
+
+    useEffect(() => {
+        const loadFullCustomList = async () => {
+            if (selectedList && !selectedList.isSpecial && selectedList.gameCount > (selectedList.games?.length || 0)) {
+                try {
+                    const res = await api.get(`/lists/custom/${selectedList._id}/game`)
+                    if (res.data.success) {
+                        setSelectedList(res.data.list)
+                    }
+                } catch (err) {
+                    console.error('Failed to load full list:', err)
+                }
+            }
+        }
+        loadFullCustomList()
+    }, [selectedList])
+
     const handleInvalidateAndRefetch = useCallback(() => {
         invalidateCache(`profile_${username}`)
         if (user?._id) {
             invalidateCache(`profile_games_${user._id}`)
-            invalidateCache(`profile_lists_${user._id}`)
+            invalidateCache(`profile_lists_${user._id}_${profileMediaType}`)
+            invalidateCache(`profile_likes_${user._id}_${profileMediaType}`)
+            invalidateCache(`profile_wishlist_${user._id}_${profileMediaType}`)
         }
         refetchProfile(true) // 🚀 Silent refetch (background)
-    }, [username, user?._id, refetchProfile])
+    }, [username, user?._id, refetchProfile, profileMediaType])
 
     // ── STATS ──
     const stats = useMemo(() => {
-        // Fallback to manual calculation if gameStats is missing (legacy support)
-        const s = user?.gameStats || {}
+        const isGame = profileMediaType === 'game';
+        const s = isGame ? (user?.gameStats || {}) : {};
+        
+        const total = isGame ? (s.total ?? games.length) : games.length;
+        const completed = isGame ? (s.completed ?? games.filter(g => g.status === 'completed').length) : games.filter(g => g.status === 'completed').length;
+        const playing = isGame ? (s.playing ?? games.filter(g => g.status === 'playing').length) : games.filter(g => g.status === 'playing').length;
+        const planned = isGame ? (s.planned ?? games.filter(g => g.status === 'planned').length) : games.filter(g => g.status === 'planned').length;
+        const dropped = isGame ? (s.dropped ?? games.filter(g => g.status === 'dropped').length) : games.filter(g => g.status === 'dropped').length;
+        const paused = isGame ? (s.paused ?? games.filter(g => g.status === 'paused').length) : games.filter(g => g.status === 'paused').length;
+        
+        let secondaryMetric = 0;
+        if (profileMediaType === 'game') secondaryMetric = s.totalHours ?? games.reduce((sum, g) => sum + (g.hours || 0), 0);
+        else if (profileMediaType === 'anime') secondaryMetric = games.reduce((sum, g) => sum + (g.episodesWatched || 0), 0);
+        else if (profileMediaType === 'manga') secondaryMetric = games.reduce((sum, g) => sum + (g.chaptersRead || 0), 0);
+        
+        const ratedItems = games.filter(g => g.rating > 0);
+        const avgRating = isGame && s.avgRating ? s.avgRating : (ratedItems.length > 0 
+            ? (ratedItems.reduce((sum, g) => sum + g.rating, 0) / ratedItems.length).toFixed(1)
+            : null);
+            
         return {
-            total: s.total ?? games.length,
-            completed: s.completed ?? games.filter(g => g.status === 'completed').length,
-            playing: s.playing ?? games.filter(g => g.status === 'playing').length,
-            planned: s.planned ?? games.filter(g => g.status === 'planned').length,
-            dropped: s.dropped ?? games.filter(g => g.status === 'dropped').length,
-            paused: s.paused ?? games.filter(g => g.status === 'paused').length,
-            hours: s.totalHours ?? games.reduce((sum, g) => sum + (g.hours || 0), 0),
-            avgRating: s.avgRating ?? (games.filter(g => g.rating > 0).length > 0
-                ? (games.filter(g => g.rating > 0).reduce((sum, g) => sum + g.rating, 0) /
-                    games.filter(g => g.rating > 0).length).toFixed(1)
-                : null),
-            rated: s.ratingCount ?? games.filter(g => g.rating > 0).length,
+            total,
+            completed,
+            playing,
+            planned,
+            dropped,
+            paused,
+            secondaryMetric,
+            avgRating,
+            rated: ratedItems.length,
         }
-    }, [user, games])
+    }, [user, games, profileMediaType])
 
     const recentGames = games.slice(0, 6)
 
@@ -370,10 +468,26 @@ function Profile() {
                 {canSeeGames && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-[#2a2a35]">
                         {[
-                            { label: 'Games', value: stats.total, color: 'text-[#c8ff57]' },
-                            { label: 'Completed', value: stats.completed, color: 'text-[#5c9fff]' },
-                            { label: 'Playing', value: stats.playing, color: 'text-[#c8ff57]' },
-                            { label: 'Hours', value: stats.hours, color: 'text-[#ff9f5c]' },
+                            { 
+                                label: profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1), 
+                                value: stats.total, 
+                                color: 'text-[#c8ff57]' 
+                            },
+                            { 
+                                label: 'Completed', 
+                                value: stats.completed, 
+                                color: 'text-[#5c9fff]' 
+                            },
+                            { 
+                                label: profileMediaType === 'game' ? 'Playing' : 'Playing', // Keep label but dynamic if needed
+                                value: stats.playing, 
+                                color: 'text-[#c8ff57]' 
+                            },
+                            { 
+                                label: profileMediaType === 'game' ? 'Hours' : profileMediaType === 'anime' ? 'Episodes' : profileMediaType === 'manga' ? 'Chapters' : 'Rated', 
+                                value: profileMediaType === 'game' ? stats.secondaryMetric : (profileMediaType === 'anime' || profileMediaType === 'manga') ? stats.secondaryMetric : stats.rated, 
+                                color: 'text-[#ff9f5c]' 
+                            },
                         ].map(stat => (
                             <div key={stat.label} className="text-center">
                                 <div className={`font-black text-3xl leading-none tracking-wider ${stat.color}`}
@@ -393,9 +507,9 @@ function Profile() {
             {canSeeGames && (
                 <div className="flex gap-1 mb-4 flex-wrap">
                     {[
-                        { id: 'games', label: <><Gamepad2 size={14} className="mr-1" /> Recent Games</> },
+                        { id: 'games', label: <><Gamepad2 size={14} className="mr-1" /> Games</> },
                         { id: 'stats', label: <><BarChart2 size={14} className="mr-1" /> Stats</> },
-                        ...(canSeeGames ? [{ id: 'lists', label: <><List size={14} className="mr-1" /> Lists</> }] : []),
+                        ...(canSeeGames ? [{ id: 'lists', label: <><Layers size={14} className="mr-1" /> Collections</> }] : []),
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -444,27 +558,41 @@ function Profile() {
                             )}
                         </div>
                     ) : recentGames.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                            {recentGames.map(game => {
-                                const sc = statusConfig[game.status] || statusConfig.planned
-                                const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_BIG)
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {recentGames.map(item => {
+                                const sc = statusConfig[item.status] || statusConfig.planned
+                                const isGame = profileMediaType === 'game'
+                                const imageUrl = isGame 
+                                    ? getIGDBImage(item.cover || (item.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${item.steamId}/header.jpg` : null), SIZES.COVER_BIG)
+                                    : (item.cover || item.coverImage)
+                                
+                                const itemId = item.igdbId || item.externalId
+                                const pathMap = {
+                                    game: `/game/${itemId}`,
+                                    anime: `/anime/${itemId}`,
+                                    manga: `/manga/${itemId}`,
+                                    movie: `/movies/${itemId}`,
+                                    tv: `/tv/${itemId}`
+                                }
+                                const detailPath = pathMap[profileMediaType] || '#'
+
                                 return (
                                     <Link
-                                        key={game._id}
-                                        to={game.igdbId ? `/game/${game.igdbId}` : '#'}
+                                        key={item._id}
+                                        to={detailPath}
                                         className="bg-[#18181f] border border-[#2a2a35] rounded-lg overflow-hidden
                                                    hover:border-[#c8ff57]/50 transition-all group"
                                     >
                                         <div className="h-[120px] bg-cover bg-center bg-[#2a2a35] relative flex items-center justify-center"
                                             style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}>
                                             {!imageUrl && (
-                                                <Gamepad2 size={32} className="text-[#3a3a4a]" />
+                                                isGame ? <Gamepad2 size={32} className="text-[#3a3a4a]" /> : <Film size={32} className="text-[#3a3a4a]" />
                                             )}
                                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all" />
                                         </div>
                                         <div className="p-2">
                                             <div className="text-white font-semibold text-xs truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
-                                                {game.title}
+                                                {item.title}
                                             </div>
                                             <span className={`font-mono text-[9px] uppercase tracking-wider px-1 py-[1px] rounded-sm ${sc.bg} ${sc.color}`}>
                                                 {sc.label}
@@ -476,7 +604,7 @@ function Profile() {
                         </div>
                     ) : (
                         <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">
-                            No games ponded yet
+                            No {profileMediaType}s logged yet
                         </div>
                     )}
                 </div>
@@ -484,12 +612,35 @@ function Profile() {
 
             {/* ── Stats Tab ── */}
             {canSeeGames && activeTab === 'stats' && (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-6">
+                    {/* Media Type Selector */}
+                    <div className="flex gap-2 p-1 bg-[#111118] border border-[#2a2a35] rounded-xl self-start">
+                        {[
+                            { id: 'game', label: 'Games', icon: Gamepad2 },
+                            { id: 'movie', label: 'Movies', icon: Film },
+                            { id: 'tv', label: 'TV Shows', icon: Tv },
+                            { id: 'anime', label: 'Anime', icon: Monitor },
+                            { id: 'manga', label: 'Manga', icon: BookOpen }
+                        ].map(m => (
+                            <button
+                                key={m.id}
+                                onClick={() => { setProfileMediaType(m.id); setSelectedList(null) }}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-[10px] uppercase tracking-widest transition-all
+                                           ${profileMediaType === m.id 
+                                                ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]' 
+                                                : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
+                            >
+                                <m.icon size={14} />
+                                <span className="hidden sm:inline">{m.label}</span>
+                            </button>
+                        ))}
+                    </div>
+
                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
                         <div className="flex items-center justify-between mb-5">
                             <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest">Overview</div>
                             {isOwnProfile && (
-                                <button onClick={() => navigate('/stats')}
+                                <button onClick={() => navigate(`/stats?tab=stats&media=${profileMediaType}`)}
                                     className="font-mono text-[10px] text-[#c8ff57] hover:underline uppercase tracking-wider">
                                     View Full Stats →
                                 </button>
@@ -497,10 +648,22 @@ function Profile() {
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             {[
-                                { label: 'Total Games', value: stats.total, color: 'text-[#c8ff57]' },
-                                { label: 'Hours Played', value: `${stats.hours}h`, color: 'text-[#ff9f5c]' },
-                                { label: 'Avg Rating', value: stats.avgRating ? `${stats.avgRating}/10` : '—', color: 'text-[#5c9fff]' },
-                                { label: 'Rated', value: stats.rated, color: 'text-[#c45cff]' },
+                                { label: `Total ${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)}`, value: stats.total, color: 'text-[#c8ff57]' },
+                                { 
+                                    label: profileMediaType === 'game' ? 'Hours Played' : profileMediaType === 'anime' ? 'Episodes' : profileMediaType === 'manga' ? 'Chapters' : 'Avg Rating', 
+                                    value: profileMediaType === 'game' ? `${stats.secondaryMetric}h` : (profileMediaType === 'anime' || profileMediaType === 'manga') ? stats.secondaryMetric : (stats.avgRating ? `${stats.avgRating}/10` : '—'), 
+                                    color: 'text-[#ff9f5c]' 
+                                },
+                                { 
+                                    label: (profileMediaType === 'movie' || profileMediaType === 'tv') ? 'Rated' : 'Avg Rating', 
+                                    value: (profileMediaType === 'movie' || profileMediaType === 'tv') ? stats.rated : (stats.avgRating ? `${stats.avgRating}/10` : '—'), 
+                                    color: 'text-[#5c9fff]' 
+                                },
+                                { 
+                                    label: (profileMediaType === 'movie' || profileMediaType === 'tv') ? 'Top Genre' : 'Rated', 
+                                    value: (profileMediaType === 'movie' || profileMediaType === 'tv') ? (games.length > 0 ? (games[0].genre || 'N/A') : '—') : stats.rated, 
+                                    color: 'text-[#c45cff]' 
+                                },
                             ].map(s => (
                                 <div key={s.label} className="text-center bg-[#18181f] border border-[#2a2a35] rounded-lg p-4">
                                     <div className={`font-black text-3xl leading-none tracking-wider ${s.color}`}
@@ -546,9 +709,32 @@ function Profile() {
                 </div>
             )}
 
-            {/* ── Lists Tab ── */}
+            {/* ── Collections Tab ── */}
             {canSeeGames && activeTab === 'lists' && (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-6">
+                    {/* Media Type Selector */}
+                    <div className="flex gap-2 p-1 bg-[#111118] border border-[#2a2a35] rounded-xl self-start">
+                        {[
+                            { id: 'game', label: 'Games', icon: Gamepad2 },
+                            { id: 'movie', label: 'Movies', icon: Film },
+                            { id: 'tv', label: 'TV Shows', icon: Tv },
+                            { id: 'anime', label: 'Anime', icon: Monitor },
+                            { id: 'manga', label: 'Manga', icon: BookOpen }
+                        ].map(m => (
+                            <button
+                                key={m.id}
+                                onClick={() => { setProfileMediaType(m.id); setSelectedList(null) }}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-[10px] uppercase tracking-widest transition-all
+                                           ${profileMediaType === m.id 
+                                                ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]' 
+                                                : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
+                            >
+                                <m.icon size={14} />
+                                <span className="hidden sm:inline">{m.label}</span>
+                            </button>
+                        ))}
+                    </div>
+
                     {selectedList && (
                         <button onClick={() => setSelectedList(null)}
                             className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors font-mono text-xs flex items-center gap-1 self-start">
@@ -569,40 +755,60 @@ function Profile() {
                                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                                 {selectedList.name}
                                             </h2>
-                                            <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm
-                                                             ${selectedList.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
-                                                {selectedList.isPublic ? 'Public' : 'Private'}
-                                            </span>
+                                            {selectedList.isSpecial ? (
+                                                <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#c8ff57]/15 text-[#c8ff57]`}>
+                                                    System List
+                                                </span>
+                                            ) : (
+                                                <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm
+                                                                 ${selectedList.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
+                                                    {selectedList.isPublic ? 'Public' : 'Private'}
+                                                </span>
+                                            )}
                                         </div>
                                         {selectedList.description && (
                                             <div className="font-mono text-xs text-[#7a7a90] mt-1">{selectedList.description}</div>
                                         )}
                                         <div className="font-mono text-[10px] text-[#7a7a90] mt-1">
-                                            {selectedList.games?.length || 0} games
+                                            {selectedList.games?.length || 0} {profileMediaType === 'game' ? 'games' : 'items'}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             {selectedList.games?.length > 0 ? (
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                    {selectedList.games.map((game, i) => (
-                                        <Link key={`${game.igdbId}-${i}`} to={game.igdbId ? `/game/${game.igdbId}` : '#'}
-                                            className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden hover:border-[#c8ff57]/50 transition-all group">
-                                            {game.gameCover ? (
-                                                <img src={game.gameCover} alt={game.gameTitle}
-                                                    className="w-full h-[140px] object-cover group-hover:opacity-90 transition-opacity" />
-                                            ) : (
-                                                <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center">
-                                                    <Gamepad2 size={40} className="text-[#3a3a4a]" />
-                                                </div>
-                                            )}
+                                    {selectedList.games.map((game, i) => {
+                                        const gameId = game.igdbId || game.externalId
+                                        const detailPath = profileMediaType === 'game' ? `/game/${gameId}` : `/${profileMediaType === 'tv' ? 'tv' : profileMediaType === 'movie' ? 'movies' : profileMediaType}/${gameId}`
+                                        
+                                        return (
+                                            <Link key={`${gameId}-${i}`} to={detailPath}
+                                                className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden hover:border-[#c8ff57]/50 transition-all group">
+                                            <div className="relative">
+                                                {game.gameCover ? (
+                                                    <img src={game.gameCover} alt={game.gameTitle}
+                                                        className="w-full h-[140px] object-cover group-hover:opacity-90 transition-opacity" />
+                                                ) : (
+                                                    <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center">
+                                                        <Gamepad2 size={40} className="text-[#3a3a4a]" />
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Community Average Rating Badge */}
+                                                {profileMediaType === 'game' && game.avgRating > 0 && (
+                                                    <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1 py-0.5 shadow-xl z-10">
+                                                        <span className="font-black text-[10px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="p-2">
                                                 <div className="text-white font-semibold text-xs truncate group-hover:text-[#c8ff57] transition-colors">
                                                     {game.gameTitle}
                                                 </div>
                                             </div>
                                         </Link>
-                                    ))}
+                                        )
+                                    }) }
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-16 gap-3 bg-[#111118] border border-[#2a2a35] rounded-lg">
@@ -612,46 +818,52 @@ function Profile() {
                             )}
                         </div>
                     ) : (
-                        visibleLists.length > 0 ? (
-                            visibleLists.map(list => (
+                        allCollections.length > 0 ? (
+                            allCollections.map(list => (
                                 <div key={list._id} onClick={() => setSelectedList(list)}
                                     className="bg-[#111118] border border-[#2a2a35] rounded-lg hover:border-[#c8ff57]/30 transition-all overflow-hidden cursor-pointer">
                                     <div className="flex items-center gap-4 p-4">
-                                        <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center flex-shrink-0">
-                                            <List size={20} className="text-[#c8ff57]" />
+                                        <div className={`w-12 h-12 rounded-lg ${list.bg || 'bg-[#c8ff57]/15'} flex items-center justify-center flex-shrink-0`}>
+                                            {list.icon ? <list.icon size={20} className={list.color || 'text-[#c8ff57]'} /> : <List size={20} className="text-[#c8ff57]" />}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <div className="text-white font-semibold text-sm truncate">{list.name}</div>
-                                                <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm
-                                                                 ${list.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
-                                                    {list.isPublic ? 'Public' : 'Private'}
-                                                </span>
+                                                {list.isSpecial ? (
+                                                    <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#c8ff57]/15 text-[#c8ff57]">
+                                                        System
+                                                    </span>
+                                                ) : (
+                                                    <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm
+                                                                     ${list.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
+                                                        {list.isPublic ? 'Public' : 'Private'}
+                                                    </span>
+                                                )}
                                             </div>
                                             {list.description && (
                                                 <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5 truncate">{list.description}</div>
                                             )}
                                             <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5">
-                                                {list.games?.length || 0} games
+                                                {list.gameCount || 0} {profileMediaType === 'game' ? 'games' : 'items'}
                                             </div>
                                         </div>
                                         <span className="font-mono text-[10px] text-[#7a7a90]">→</span>
                                     </div>
                                     {list.games?.length > 0 && (
                                         <div className="px-4 pb-4 flex gap-2 flex-wrap">
-                                            {list.games.slice(0, 6).map((game, i) => (
-                                                game.gameCover ? (
-                                                    <img key={`${game.igdbId}-img-${i}`} src={game.gameCover} alt={game.gameTitle}
+                                            {list.games.slice(0, 6).map((item, i) => (
+                                                item.gameCover ? (
+                                                    <img key={`${item.igdbId || item.externalId}-img-${i}`} src={item.gameCover} alt={item.gameTitle}
                                                         className="w-10 h-14 object-cover rounded hover:opacity-80 transition-all" />
                                                 ) : (
-                                                    <div key={`${game.igdbId}-none-${i}`} className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center">
+                                                    <div key={`${item.igdbId || item.externalId}-none-${i}`} className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center">
                                                         <Gamepad2 size={16} className="text-[#7a7a90]" />
                                                     </div>
                                                 )
                                             ))}
-                                            {list.games.length > 6 && (
+                                            {list.gameCount > 6 && (
                                                 <div className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center font-mono text-[9px] text-[#7a7a90]">
-                                                    +{list.games.length - 6}
+                                                    +{list.gameCount - 6}
                                                 </div>
                                             )}
                                         </div>
@@ -660,10 +872,10 @@ function Profile() {
                             ))
                         ) : (
                             <div className="flex flex-col items-center justify-center py-16 gap-3 bg-[#111118] border border-[#2a2a35] rounded-lg">
-                                <List size={40} className="text-[#2a2a35] mb-2" strokeWidth={1.5} />
-                                <div className="text-white font-semibold text-sm">No public lists</div>
-                                <div className="text-[#7a7a90] font-mono text-[10px] text-center">
-                                    {user.username} hasn't made any public lists yet
+                                <Layers size={40} className="text-[#2a2a35] mb-2" strokeWidth={1.5} />
+                                <div className="text-white font-semibold text-sm">No collections found</div>
+                                <div className="text-[#7a7a90] font-mono text-[10px] text-center px-4">
+                                    No public {profileMediaType} collections are available to show.
                                 </div>
                             </div>
                         )

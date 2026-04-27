@@ -1,17 +1,25 @@
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { invalidateCache } from '../utils/cache'
-import { Search as SearchIcon, X, Check, Loader2, List, Trash2, Heart, Target, Sparkles, Flame, Star, Rocket, Gamepad2, Diamond, Crown, Joystick } from 'lucide-react'
+import { Search as SearchIcon, X, Loader2, Heart, Target, Gamepad2, Tv, Film, BookOpen, Layers, Star } from 'lucide-react'
+import { Helmet } from 'react-helmet-async'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 12
-
 const MAX_CUSTOM_LISTS = 2
 
-// ── Pure helpers (defined outside components — never recreated) ───────────────
+const MEDIA_TYPES = [
+    { id: 'game', label: 'Games', icon: Gamepad2, color: '#c8ff57' },
+    { id: 'anime', label: 'Anime', icon: Tv, color: '#ff5c5c' },
+    { id: 'manga', label: 'Manga', icon: BookOpen, color: '#ffbd5c' },
+    { id: 'movie', label: 'Movies', icon: Film, color: '#5c9fff' },
+    { id: 'tv', label: 'TV Shows', icon: Layers, color: '#bd5cff' },
+]
+
+// ── Pure helpers ──────────────────────────────────────────────────────────────
 const filterByQuery = (items, query, key = 'gameTitle') => {
     if (!query.trim()) return items
     const q = query.toLowerCase()
@@ -34,10 +42,10 @@ function SearchBar({ value, onChange, placeholder = 'Search...' }) {
                 value={value}
                 onChange={e => onChange(e.target.value)}
                 placeholder={placeholder}
-                className="w-full bg-[#111118]/80 backdrop-blur-sm border border-[#2a2a35] rounded-xl
+                className="w-full bg-[#111118] border border-[#2a2a35] rounded-xl
                            px-3 py-2.5 pl-10 text-sm text-white font-mono
                            focus:outline-none focus:border-[#c8ff57]/50
-                           placeholder:text-[#7a7a90] transition-all shadow-sm focus:shadow-[#c8ff57]/5"
+                           placeholder:text-[#7a7a90] transition-all shadow-sm"
             />
             {value && (
                 <button
@@ -90,34 +98,54 @@ function Pagination({ currentPage, total, onPageChange }) {
     )
 }
 
-function GameGrid({ games, onRemove, removeLabel = '✕', navigate }) {
+function MediaGrid({ items, onRemove, mediaType, navigate }) {
+    const getPath = (id) => {
+        if (mediaType === 'game') return `/game/${id}`
+        return `/${mediaType === 'tv' ? 'tv' : mediaType === 'movie' ? 'movies' : mediaType}/${id}`
+    }
+
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
-            {games.map(game => (
-                <div key={game.igdbId ?? game._id} className="relative group">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {items.map(item => (
+                <div key={item.igdbId ?? item._id} className="relative group">
                     <div
-                        onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
-                        className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden
-                                   hover:border-[#c8ff57]/50 transition-all cursor-pointer"
+                        onClick={() => item.igdbId && navigate(getPath(item.igdbId))}
+                        className="bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden
+                                   hover:border-[#c8ff57]/50 transition-all cursor-pointer group/card"
                     >
-                        {game.gameCover ? (
-                            <img src={game.gameCover.replace('t_cover_small', 't_cover_big').replace('t_thumb', 't_cover_big')} alt={game.gameTitle}
-                                loading="lazy"
-                                className="w-full h-[140px] object-cover" />
-                        ) : (
-                            <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center text-3xl">🎮</div>
-                        )}
-                        <div className="p-2 text-center">
-                            <div className="text-white font-semibold text-[10px] leading-tight line-clamp-2 h-[28px]">{game.gameTitle}</div>
-                            {game.releaseYear && <div className="font-mono text-[8px] text-[#7a7a90] mt-1">{game.releaseYear}</div>}
+                        <div className="aspect-[3/4] relative overflow-hidden">
+                            {item.gameCover ? (
+                                <img src={item.gameCover.replace('t_cover_small', 't_cover_big').replace('t_thumb', 't_cover_big')} alt={item.gameTitle}
+                                    loading="lazy"
+                                    className="w-full h-full object-cover transition-transform group-hover/card:scale-110 duration-500" />
+                            ) : (
+                                <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-3xl opacity-20">
+                                    {mediaType === 'game' ? '🎮' : mediaType === 'anime' ? '⛩️' : '🎬'}
+                                </div>
+                            )}
+                            
+                            {/* Community Average Rating Badge */}
+                            {mediaType === 'game' && item.avgRating > 0 && (
+                                <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1.5 py-0.5 shadow-xl z-10">
+                                    <Star size={9} className="text-[#5c9fff] fill-current" />
+                                    <span className="font-black text-[11px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
+                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent opacity-0 group-hover/card:opacity-100 transition-opacity flex items-end p-3">
+                                <span className="text-white font-black uppercase text-[10px] tracking-widest" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>View Detail</span>
+                            </div>
+                        </div>
+                        <div className="p-3">
+                            <div className="text-white font-bold text-xs leading-tight line-clamp-2 h-[32px] group-hover/card:text-[#c8ff57] transition-colors">{item.gameTitle}</div>
+                            <div className="font-mono text-[9px] text-[#4a4a5e] mt-1 uppercase tracking-wider">{item.genre || mediaType}</div>
                         </div>
                     </div>
                     {onRemove && (
                         <button
-                            onClick={() => onRemove(game.igdbId)}
-                            className="absolute top-1 right-1 w-6 h-6 bg-[#ff5c5c] rounded-full text-white
-                                       text-[10px] hidden group-hover:flex items-center justify-center font-bold"
-                        >{removeLabel}</button>
+                            onClick={() => onRemove(item.igdbId)}
+                            className="absolute -top-2 -right-2 w-7 h-7 bg-[#ff5c5c] rounded-full text-white
+                                       shadow-lg flex items-center justify-center font-bold scale-0 group-hover:scale-100 transition-transform hover:bg-white hover:text-[#ff5c5c]"
+                        ><X size={14} /></button>
                     )}
                 </div>
             ))}
@@ -125,44 +153,62 @@ function GameGrid({ games, onRemove, removeLabel = '✕', navigate }) {
     )
 }
 
-function EmptyState({ icon, text }) {
+function EmptyState({ icon, title, text }) {
     return (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="text-4xl">{icon}</div>
-            <div className="text-[#7a7a90] font-mono text-sm text-center">{text}</div>
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+            <div className="w-20 h-20 bg-[#111118] border border-[#2a2a35] border-dashed rounded-full flex items-center justify-center text-4xl mb-2 opacity-50">
+                {icon}
+            </div>
+            <div>
+                <h3 className="text-white font-black text-xl uppercase mb-1" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{title}</h3>
+                <div className="text-[#7a7a90] font-mono text-sm max-w-xs">{text}</div>
+            </div>
+        </div>
+    )
+}
+
+function Toggle({ enabled, onToggle, label, sublabel, color = '#c8ff57' }) {
+    return (
+        <div className="flex items-center justify-between p-4 bg-[#111118]/50 border border-[#2a2a35] rounded-2xl hover:border-[#3a3a4a] transition-all">
+            <div>
+                <div className="text-white font-bold text-[10px] uppercase tracking-[0.1em]">{label}</div>
+                {sublabel && <div className="text-[#4a4a5e] text-[9px] font-mono uppercase mt-0.5">{sublabel}</div>}
+            </div>
+            <button 
+                onClick={(e) => { e.stopPropagation(); onToggle() }}
+                className={`w-10 h-5 rounded-full relative transition-all duration-300 ${enabled ? '' : 'bg-[#2a2a35]'}`}
+                style={{ backgroundColor: enabled ? color : '#2a2a35' }}
+            >
+                <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all duration-300 shadow-sm ${enabled ? 'left-6' : 'left-1'}`} />
+            </button>
         </div>
     )
 }
 
 // ── ListDetail ────────────────────────────────────────────────────────────────
-function ListDetail({ list, onBack, onUpdate, showToast, deleteConfirmGame, setDeleteConfirmGame }) {
+function ListDetail({ list, onBack, onUpdate, showToast, mediaType }) {
     const navigate = useNavigate()
     const [editMode, setEditMode] = useState(false)
     const [editForm, setEditForm] = useState({ name: list.name, description: list.description || '', isPublic: list.isPublic })
     const [saving, setSaving] = useState(false)
-    const [showAddGame, setShowAddGame] = useState(false)
+    const [showAddMedia, setShowAddMedia] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const [searchResults, setSearchResults] = useState([])
     const [searching, setSearching] = useState(false)
     const [currentList, setCurrentList] = useState(list)
-    const [loadingGames, setLoadingGames] = useState(false)
+    const [loadingMedia, setLoadingMedia] = useState(false)
+    const [mediaSearch, setMediaSearch] = useState('')
+    const [mediaPage, setMediaPage] = useState(1)
 
-    // Search + pagination within the list's existing games
-    const [listSearch, setListSearch] = useState('')
-    const [listPage, setListPage] = useState(1)
-
-    // Fetch full list content on mount if it's only a preview
     useEffect(() => {
         const loadFull = async () => {
             if (list.gameCount > (list.games?.length || 0)) {
-                setLoadingGames(true)
+                setLoadingMedia(true)
                 try {
                     const res = await api.get(`/lists/custom/${list._id}/game`)
-                    if (res.data.success) {
-                        setCurrentList(res.data.list)
-                    }
+                    if (res.data.success) setCurrentList(res.data.list)
                 } catch { showToast('Failed to load full list', 'error') }
-                finally { setLoadingGames(false) }
+                finally { setLoadingMedia(false) }
             } else {
                 setCurrentList(list)
             }
@@ -170,16 +216,12 @@ function ListDetail({ list, onBack, onUpdate, showToast, deleteConfirmGame, setD
         loadFull()
     }, [list, showToast])
 
-    // Reset page when search changes
-    useEffect(() => { setListPage(1) }, [listSearch])
+    useEffect(() => { setMediaPage(1) }, [mediaSearch])
 
-    const filteredGames = useMemo(
-        () => filterByQuery(currentList.games || [], listSearch),
-        [currentList.games, listSearch]
-    )
-    const pagedGames = useMemo(() => paginate(filteredGames, listPage), [filteredGames, listPage])
+    const filteredItems = useMemo(() => filterByQuery(currentList.games || [], mediaSearch), [currentList.games, mediaSearch])
+    const pagedItems = useMemo(() => paginate(filteredItems, mediaPage), [filteredItems, mediaPage])
 
-    const handleSaveEdit = useCallback(async () => {
+    const handleSaveEdit = async () => {
         if (!editForm.name.trim()) return
         setSaving(true)
         try {
@@ -187,222 +229,160 @@ function ListDetail({ list, onBack, onUpdate, showToast, deleteConfirmGame, setD
             if (res.data.success) {
                 setCurrentList(prev => ({ ...prev, ...editForm }))
                 setEditMode(false)
-                showToast('List updated!')
+                showToast('Collection updated!')
                 onUpdate()
             }
-        } catch { showToast('Failed to update list', 'error') }
+        } catch { showToast('Failed to update collection', 'error') }
         finally { setSaving(false) }
-    }, [editForm, currentList._id, showToast, onUpdate])
+    }
 
-    const handleRemoveGame = useCallback(async () => {
-        if (!deleteConfirmGame) return
-        const { igdbId } = deleteConfirmGame
+    const handleRemoveItem = async (id) => {
         try {
-            await api.put(`/lists/custom/${currentList._id}/game`, { igdbId, action: 'remove' })
-            setCurrentList(prev => ({ ...prev, games: prev.games.filter(g => g.igdbId !== igdbId) }))
-            showToast('Game removed')
+            await api.put(`/lists/custom/${currentList._id}/game`, { igdbId: id, action: 'remove' })
+            setCurrentList(prev => ({ ...prev, games: prev.games.filter(g => g.igdbId !== id) }))
+            showToast('Item removed')
             onUpdate()
-            invalidateCache('lists_')
-        } catch { showToast('Failed to remove game', 'error') }
-        finally { setDeleteConfirmGame(null) }
-    }, [currentList._id, deleteConfirmGame, showToast, onUpdate, setDeleteConfirmGame])
+        } catch { showToast('Failed to remove item', 'error') }
+    }
 
-    // Debounced IGDB search
-    const searchTimer = useMemo(() => ({ id: null }), [])
-    const handleSearchGames = useCallback((q) => {
+    const handleSearchMedia = useCallback((q) => {
         setSearchQuery(q)
-        clearTimeout(searchTimer.id)
         if (q.trim().length < 2) { setSearchResults([]); return }
-        searchTimer.id = setTimeout(async () => {
+        const timer = setTimeout(async () => {
             setSearching(true)
             try {
-                const res = await api.get(`/igdb/search?q=${encodeURIComponent(q)}`)
+                let res;
+                if (mediaType === 'game') res = await api.get(`/igdb/search?q=${q}`)
+                else if (mediaType === 'anime' || mediaType === 'manga') res = await api.get(`/anime/search?q=${q}&type=${mediaType}`)
+                else res = await api.get(`/movies/search?q=${q}&type=${mediaType}`)
+                
                 const alreadyInList = new Set(currentList.games.map(g => String(g.igdbId)))
-                setSearchResults(
-                    (res.data.games || [])
-                        .map(g => ({ igdbId: g.igdbId, gameTitle: g.title, gameCover: g.cover }))
-                        .filter(g => !alreadyInList.has(String(g.igdbId)))
-                )
+                const results = (res.data.games || res.data.results || []).map(g => ({
+                    igdbId: g.igdbId || g.externalId || g.id,
+                    gameTitle: g.title,
+                    gameCover: g.cover
+                }))
+                setSearchResults(results.filter(g => !alreadyInList.has(String(g.igdbId))))
             } catch { setSearchResults([]) }
             finally { setSearching(false) }
-        }, 300)
-    }, [currentList.games, searchTimer])
+        }, 500)
+        return () => clearTimeout(timer)
+    }, [currentList.games, mediaType])
 
-    const handleAddGame = useCallback(async (game) => {
-        // Optimistic update
-        setCurrentList(prev => ({ ...prev, games: [...prev.games, game] }))
-        setSearchResults(prev => prev.filter(g => g.igdbId !== game.igdbId))
-        showToast('Game added!')
-
+    const handleAddItem = async (item) => {
         try {
             await api.put(`/lists/custom/${currentList._id}/game`, {
-                igdbId: game.igdbId, gameTitle: game.gameTitle,
-                gameCover: game.gameCover, action: 'add'
+                igdbId: item.igdbId, gameTitle: item.gameTitle,
+                gameCover: item.gameCover, action: 'add'
             })
+            setCurrentList(prev => ({ ...prev, games: [...prev.games, item] }))
+            setSearchResults(prev => prev.filter(g => g.igdbId !== item.igdbId))
+            showToast('Item added!')
             onUpdate()
-            invalidateCache('lists_')
-        } catch { 
-            // Rollback on failure
-            setCurrentList(prev => ({ ...prev, games: prev.games.filter(g => g.igdbId !== game.igdbId) }))
-            showToast('Failed to add game', 'error') 
-        }
-    }, [currentList._id, showToast, onUpdate])
+        } catch { showToast('Failed to add item', 'error') }
+    }
 
     return (
-        <div className="flex flex-col gap-4">
-            <button onClick={onBack}
-                className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors font-mono text-xs flex items-center gap-1 mb-2">
-                ← Back
+        <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <button onClick={onBack} className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors font-mono text-xs flex items-center gap-2 group">
+                <span className="group-hover:-translate-x-1 transition-transform">←</span> Back to Collections
             </button>
 
-            {/* List Header */}
-            <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
+            <div className="bg-[#111118] border border-[#2a2a35] rounded-2xl p-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-05 pointer-events-none">
+                    <Layers size={120} />
+                </div>
                 {editMode ? (
-                    <div className="flex flex-col gap-3">
-                        <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <label className="font-mono text-[9px] text-[#7a7a90] uppercase tracking-widest">Name</label>
-                                <span className={`font-mono text-[9px] ${editForm.name.length >= 50 ? 'text-[#ff5c5c]' : 'text-[#7a7a90]'}`}>{editForm.name.length}/50</span>
+                    <div className="flex flex-col gap-6 relative z-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest mb-2">Collection Name</label>
+                                <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                                    className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#c8ff57]" />
                             </div>
-                            <input type="text" value={editForm.name}
-                                maxLength={50}
-                                onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
-                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white
-                                           focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90]"
-                                placeholder="List name" />
+                            <div>
+                                <label className="block font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest mb-2">Visibility</label>
+                                <Toggle 
+                                    enabled={editForm.isPublic} 
+                                    onToggle={() => setEditForm(p => ({ ...p, isPublic: !p.isPublic }))}
+                                    label={editForm.isPublic ? 'Public' : 'Private'}
+                                    sublabel="Anyone can view this list"
+                                />
+                            </div>
                         </div>
                         <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <label className="font-mono text-[9px] text-[#7a7a90] uppercase tracking-widest">Description</label>
-                                <span className={`font-mono text-[9px] ${editForm.description.length >= 200 ? 'text-[#ff5c5c]' : 'text-[#7a7a90]'}`}>{editForm.description.length}/200</span>
-                            </div>
-                            <textarea value={editForm.description} rows={2}
-                                maxLength={200}
-                                onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
-                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white resize-none
-                                           focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90]"
-                                placeholder="Description (optional)" />
+                            <label className="block font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest mb-2">Description</label>
+                            <textarea value={editForm.description} rows={3} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#c8ff57] resize-none" />
                         </div>
-                        <div className="flex items-center gap-3">
-                            <button onClick={() => setEditForm(p => ({ ...p, isPublic: !p.isPublic }))}
-                                className={`w-10 h-5 rounded-full transition-all flex-shrink-0 ${editForm.isPublic ? 'bg-[#c8ff57]' : 'bg-[#2a2a35]'}`}>
-                                <div className={`w-4 h-4 rounded-full bg-white transition-all mx-0.5 ${editForm.isPublic ? 'translate-x-5' : 'translate-x-0'}`} />
+                        <div className="flex gap-3">
+                            <button onClick={handleSaveEdit} disabled={saving} className="flex-1 bg-[#c8ff57] text-black font-black uppercase text-xs tracking-widest py-4 rounded-xl hover:bg-[#d4ff6e] transition-all">
+                                {saving ? 'Saving...' : 'Save Changes'}
                             </button>
-                            <span className="font-mono text-xs text-[#7a7a90]">{editForm.isPublic ? 'Public' : 'Private'}</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={handleSaveEdit} disabled={saving}
-                                className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-xs rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-40">
-                                {saving ? 'Saving...' : 'Save'}
-                            </button>
-                            <button onClick={() => setEditMode(false)}
-                                className="px-4 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
-                                Cancel
-                            </button>
+                            <button onClick={() => setEditMode(false)} className="px-8 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest rounded-xl hover:text-white transition-all">Cancel</button>
                         </div>
                     </div>
                 ) : (
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-4 min-w-0">
-                            <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center text-2xl flex-shrink-0">📋</div>
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <h2 className="font-black text-xl text-white tracking-widest uppercase break-words overflow-hidden"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{currentList.name}</h2>
-                                    <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm flex-shrink-0
-                                                     ${currentList.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
-                                        {currentList.isPublic ? 'Public' : 'Private'}
-                                    </span>
-                                </div>
-                                {currentList.description && (
-                                    <p className="text-[#a0a0b8] font-mono text-xs leading-relaxed max-w-2xl break-words whitespace-pre-wrap mt-1">{currentList.description}</p>
-                                )}
-                                <div className="font-mono text-[10px] text-[#7a7a90] mt-1">{currentList.games?.length || 0} games</div>
+                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <h2 className="font-black text-4xl text-white uppercase tracking-tight" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{currentList.name}</h2>
+                                <span className={`px-2 py-0.5 rounded font-mono text-[9px] uppercase tracking-wider
+                                                 ${currentList.isPublic ? 'bg-[#c8ff57]/10 text-[#c8ff57] border border-[#c8ff57]/20' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
+                                    {currentList.isPublic ? 'Public' : 'Private'}
+                                </span>
+                            </div>
+                            <p className="text-[#7a7a90] text-sm max-w-2xl">{currentList.description || 'No description provided.'}</p>
+                            <div className="flex items-center gap-4 mt-6">
+                                <span className="font-mono text-[10px] text-[#c8ff57] uppercase tracking-widest px-2 py-1 bg-[#c8ff57]/10 rounded border border-[#c8ff57]/20">{currentList.games?.length || 0} items</span>
+                                <span className="font-mono text-[10px] text-[#4a4a5e] uppercase tracking-widest">Created {new Date(currentList.createdAt).toLocaleDateString()}</span>
                             </div>
                         </div>
-                        <button onClick={() => setEditMode(true)}
-                            className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors font-mono text-xs border border-[#2a2a35]
-                                       hover:border-[#c8ff57] rounded px-3 py-1.5 flex-shrink-0">
-                            ✏ Edit
-                        </button>
+                        <button onClick={() => setEditMode(true)} className="px-6 py-3 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest rounded-xl hover:border-[#c8ff57] hover:text-white transition-all">Edit Details</button>
                     </div>
                 )}
             </div>
 
-            {/* Add Games */}
-            <button onClick={() => setShowAddGame(v => !v)}
-                className="w-full py-3 border border-dashed border-[#c8ff57]/40 text-[#c8ff57]
-                           font-mono text-xs rounded-lg hover:border-[#c8ff57] hover:bg-[#c8ff57]/05
-                           transition-all flex items-center justify-center gap-2">
-                <span className="text-lg">+</span> {showAddGame ? 'Close Search' : 'Add Games'}
-            </button>
+            <div className="flex flex-col md:flex-row gap-4">
+                <SearchBar value={mediaSearch} onChange={setMediaSearch} placeholder={`Search in this ${mediaType} list...`} />
+                <button onClick={() => setShowAddMedia(v => !v)} className={`px-6 py-3 rounded-xl font-mono text-[10px] uppercase tracking-widest border transition-all ${showAddMedia ? 'bg-[#ff5c5c]/10 border-[#ff5c5c]/20 text-[#ff5c5c]' : 'bg-[#c8ff57]/10 border-[#c8ff57]/20 text-[#c8ff57]'}`}>
+                    {showAddMedia ? 'Close Search' : `Add ${mediaType === 'game' ? 'Game' : 'Media'}`}
+                </button>
+            </div>
 
-            {showAddGame && (
-                <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-4 flex flex-col gap-3">
-                    <div className="mb-1">
-                        <SearchBar
-                            value={searchQuery}
-                            onChange={handleSearchGames}
-                            placeholder="Search in Database..."
-                        />
-                    </div>
-                    {searching && <div className="font-mono text-[10px] text-[#7a7a90]">Searching...</div>}
-                    {!searching && searchResults.length > 0 && (
-                        <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
-                            {searchResults.map(game => (
-                                <div key={game.igdbId}
-                                    className="flex items-center gap-3 p-2 bg-[#18181f] border border-[#2a2a35] rounded-lg hover:border-[#c8ff57]/30 transition-all">
-                                    {game.gameCover
-                                        ? <img src={game.gameCover} alt={game.gameTitle} loading="lazy" className="w-10 h-14 object-cover rounded" />
-                                        : <div className="w-10 h-14 bg-[#2a2a35] rounded flex items-center justify-center text-lg">🎮</div>
-                                    }
+            {showAddMedia && (
+                <div className="bg-[#111118] border border-[#2a2a35] rounded-2xl p-6 animate-in zoom-in-95 duration-200">
+                    <input type="text" value={searchQuery} onChange={e => handleSearchMedia(e.target.value)} placeholder={`Search ${mediaType} database...`} className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-[#c8ff57] mb-4" />
+                    {searching ? <div className="flex items-center justify-center py-8"><Loader2 className="animate-spin text-[#c8ff57]" /></div> : (
+                        <div className="max-h-[350px] overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-2">
+                            {searchResults.length > 0 ? searchResults.map(item => (
+                                <div key={item.igdbId} className="flex items-center gap-4 p-3 bg-[#0d0d14] border border-[#2a2a35] rounded-xl hover:border-[#c8ff57]/30 transition-all">
+                                    <img src={item.gameCover} alt="" className="w-12 h-16 object-cover rounded-lg flex-shrink-0 shadow-lg" />
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-white text-xs font-semibold truncate">{game.gameTitle}</div>
+                                        <div className="text-white text-sm font-bold truncate tracking-wide">{item.gameTitle}</div>
+                                        <div className="text-[#4a4a5e] text-[10px] font-mono uppercase mt-1">Found in database</div>
                                     </div>
-                                    <button onClick={() => handleAddGame(game)}
-                                        className="px-3 py-1.5 bg-[#c8ff57] text-black font-bold text-[10px] rounded hover:bg-[#d4ff6e] transition-all flex-shrink-0">
-                                        + Add
-                                    </button>
+                                    <button onClick={() => handleAddItem(item)} className="px-4 py-2 bg-[#c8ff57] text-black font-black uppercase text-[10px] tracking-widest rounded-lg hover:bg-[#d4ff6e] transition-all flex-shrink-0 shadow-md">Add</button>
                                 </div>
-                            ))}
+                            )) : searchQuery.trim().length >= 2 && !searching && (
+                                <div className="py-10 text-center font-mono text-[10px] text-[#4a4a5e] uppercase tracking-widest">No results found for "{searchQuery}"</div>
+                            )}
                         </div>
-                    )}
-                    {!searching && searchQuery.length >= 2 && searchResults.length === 0 && (
-                        <div className="font-mono text-[10px] text-[#7a7a90]">No results found.</div>
                     )}
                 </div>
             )}
 
-            {/* Games in list — search + pagination */}
-            {loadingGames ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="animate-spin text-[#c8ff57]" />
-                    <div className="text-[#7a7a90] font-mono text-sm">Loading full list...</div>
-                </div>
-            ) : (currentList.games?.length > 0) ? (
+            {loadingMedia ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-[#c8ff57]" /></div> : (
                 <>
-                    <div className="mb-4">
-                        <SearchBar
-                            value={listSearch}
-                            onChange={setListSearch}
-                            placeholder="Search in this list..."
-                        />
-                    </div>
-                    {filteredGames.length > 0 ? (
+                    {filteredItems.length > 0 ? (
                         <>
-                            <GameGrid games={pagedGames} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'custom' })} navigate={navigate} />
-                            <Pagination
-                                currentPage={listPage}
-                                total={filteredGames.length}
-                                onPageChange={setListPage}
-                            />
+                            <MediaGrid items={pagedItems} onRemove={handleRemoveItem} mediaType={mediaType} navigate={navigate} />
+                            <Pagination currentPage={mediaPage} total={filteredItems.length} onPageChange={setMediaPage} />
                         </>
                     ) : (
-                        <EmptyState icon={<SearchIcon size={40} className="text-[#2a2a35]" strokeWidth={1} />} text={`No games match "${listSearch}"`} />
+                        <EmptyState icon={mediaType === 'game' ? '🎮' : '🎬'} title="Empty Collection" text={`No items found in this ${mediaType} collection.`} />
                     )}
                 </>
-            ) : (
-                <EmptyState icon="📋" text='No games in this list yet. Use "Add Games" above.' />
             )}
         </div>
     )
@@ -412,29 +392,25 @@ function ListDetail({ list, onBack, onUpdate, showToast, deleteConfirmGame, setD
 function Lists() {
     const { user } = useAuth()
     const navigate = useNavigate()
-
+    const [searchParams, setSearchParams] = useSearchParams()
+    
+    const mediaType = searchParams.get('type') || 'game'
     const [activeTab, setActiveTab] = useState('lists')
     const [selectedListId, setSelectedListId] = useState(null)
     const [showCreateModal, setShowCreateModal] = useState(false)
-    const [deleteConfirmList, setDeleteConfirmList] = useState(null)
-    const [deleteConfirmGame, setDeleteConfirmGame] = useState(null)
     const [createForm, setCreateForm] = useState({ name: '', description: '', isPublic: true })
     const [creating, setCreating] = useState(false)
-    const [createError, setCreateError] = useState('')
     const [toast, setToast] = useState(null)
 
-    // Data for tabs
     const [fullLikes, setFullLikes] = useState(null)
     const [fullWish, setFullWish] = useState(null)
     const [loadingTab, setLoadingTab] = useState(false)
 
-    // Per-tab search + pagination state
     const [likedSearch, setLikedSearch] = useState('')
     const [likedPage, setLikedPage] = useState(1)
     const [wishSearch, setWishSearch] = useState('')
     const [wishPage, setWishPage] = useState(1)
 
-    // Reset pages on search change
     useEffect(() => { setLikedPage(1) }, [likedSearch])
     useEffect(() => { setWishPage(1) }, [wishSearch])
 
@@ -445,505 +421,367 @@ function Lists() {
 
     const userId = user?.id || user?._id
     const { data: listBundle, loading, refetch: refetchLists, setData: setListBundle } = useCachedFetch(
-        userId ? `lists_${userId}` : null,
-        userId ? '/lists/me' : null,
-        { enabled: !!userId, ttl: 60 * 1000 } 
+        userId ? `lists_${userId}_${mediaType}` : null,
+        userId ? `/lists/me?mediaType=${mediaType}` : null,
+        { enabled: !!userId, ttl: 30 * 1000 } 
     )
 
     const fetchData = useCallback(async (silent = true) => {
-        invalidateCache(userId ? `lists_${userId}` : '')
-        // Reset full tab data to force fresh fetch
         setFullLikes(null)
         setFullWish(null)
         await refetchLists(silent)
-    }, [userId, refetchLists])
+    }, [refetchLists])
 
-    const { 
-        customLists = [], 
-        likesCount = 0, 
-        wishlistCount = 0, 
-        likesPreview = [], 
-        wishlistPreview = [], 
-        user: userData 
-    } = listBundle || {}
+    useEffect(() => {
+        fetchData(false)
+        setActiveTab('lists')
+        setSelectedListId(null)
+    }, [mediaType])
 
-    const selectedList = useMemo(() => 
-        selectedListId ? customLists.find(l => l._id === selectedListId) : null
-    , [selectedListId, customLists])
+    const { customLists = [], likesCount = 0, wishlistCount = 0, likesPreview = [], wishlistPreview = [] } = listBundle || {}
 
+    const selectedList = useMemo(() => selectedListId ? customLists.find(l => l._id === selectedListId) : null, [selectedListId, customLists])
     const filteredLikes = useMemo(() => filterByQuery(fullLikes || [], likedSearch), [fullLikes, likedSearch])
     const pagedLikes = useMemo(() => paginate(filteredLikes, likedPage), [filteredLikes, likedPage])
-
     const filteredWish = useMemo(() => filterByQuery(fullWish || [], wishSearch), [fullWish, wishSearch])
     const pagedWish = useMemo(() => paginate(filteredWish, wishPage), [filteredWish, wishPage])
 
-    const xp = userData?.xp || 0
-    const userLevel = userData?.level || 1
-    const canCreateList = userLevel >= 2
-    const atListLimit = customLists.length >= MAX_CUSTOM_LISTS
-
-    const handleCreateList = useCallback(async () => {
-        if (!createForm.name.trim()) { setCreateError('List name is required'); return }
+    const handleCreateList = async () => {
+        if (!createForm.name.trim()) return
         setCreating(true)
-        setCreateError('')
         try {
-            const res = await api.post('/lists/custom', createForm)
+            const res = await api.post('/lists/custom', { ...createForm, mediaType })
             if (res.data.success) {
-                showToast('List created!')
+                showToast('Collection created!')
                 setShowCreateModal(false)
                 setCreateForm({ name: '', description: '', isPublic: true })
                 fetchData()
             }
         } catch (err) {
-            setCreateError(err.response?.data?.message || 'Failed to create list')
+            showToast(err.response?.data?.message || 'Failed to create collection', 'error')
         } finally { setCreating(false) }
-    }, [createForm, showToast, fetchData])
+    }
 
-    const handleDeleteList = useCallback(async (id) => {
+    const handleDeleteList = async (id) => {
+        if (!window.confirm('Delete this collection?')) return
         try {
             await api.delete(`/lists/custom/${id}`)
-            showToast('List deleted')
-            setDeleteConfirmList(null)
-            if (selectedListId === id) setSelectedListId(null)
+            showToast('Collection deleted')
             fetchData()
         } catch { showToast('Failed to delete', 'error') }
-    }, [selectedListId, showToast, fetchData])
+    }
 
-    const handleRemoveLike = useCallback(async () => {
-        if (!deleteConfirmGame) return
-        const { igdbId } = deleteConfirmGame
-        
+    const handleRemoveLike = async (id) => {
         try {
-            // OPTIMISTIC REMOVE from both summary and full data
-            if (fullLikes) setFullLikes(prev => prev.filter(g => g.igdbId !== igdbId))
-            setListBundle(prev => ({ 
-                ...prev, 
-                likesPreview: prev.likesPreview.filter(g => g.igdbId !== igdbId),
-                likesCount: Math.max(0, prev.likesCount - 1)
-            }))
-            
-            await api.post('/lists/like', { igdbId })
+            if (fullLikes) setFullLikes(prev => prev.filter(g => g.igdbId !== id))
+            setListBundle(prev => ({ ...prev, likesPreview: prev.likesPreview.filter(g => g.igdbId !== id), likesCount: Math.max(0, prev.likesCount - 1) }))
+            await api.post('/lists/like', { igdbId: id, mediaType })
             showToast('Like removed')
-            invalidateCache(`game_stats_v2_${igdbId}`)
-        } catch { 
-            showToast('Failed to remove like', 'error') 
-            fetchData() // Rollback by refetching
-        }
-        finally { setDeleteConfirmGame(null) }
-    }, [deleteConfirmGame, fullLikes, setListBundle, showToast, fetchData])
+            invalidateCache(`stats_${id}_${mediaType}`)
+        } catch { showToast('Failed to remove like', 'error'); fetchData() }
+    }
 
-    const handleRemoveWishlist = useCallback(async () => {
-        if (!deleteConfirmGame) return
-        const { igdbId } = deleteConfirmGame
-        
+    const handleRemoveWishlist = async (id) => {
         try {
-            // OPTIMISTIC REMOVE
-            if (fullWish) setFullWish(prev => prev.filter(g => g.igdbId !== igdbId))
-            setListBundle(prev => ({ 
-                ...prev, 
-                wishlistPreview: prev.wishlistPreview.filter(g => g.igdbId !== igdbId),
-                wishlistCount: Math.max(0, prev.wishlistCount - 1)
-            }))
-
-            await api.post('/lists/wishlist', { igdbId })
+            if (fullWish) setFullWish(prev => prev.filter(g => g.igdbId !== id))
+            setListBundle(prev => ({ ...prev, wishlistPreview: prev.wishlistPreview.filter(g => g.igdbId !== id), wishlistCount: Math.max(0, prev.wishlistCount - 1) }))
+            await api.post('/lists/wishlist', { igdbId: id, mediaType })
             showToast('Wishlist updated')
-            invalidateCache(`game_stats_v2_${igdbId}`)
-        } catch { 
-            showToast('Failed to update wishlist', 'error') 
-            fetchData()
-        }
-        finally { setDeleteConfirmGame(null) }
-    }, [deleteConfirmGame, fullWish, setListBundle, showToast, fetchData])
+            invalidateCache(`stats_${id}_${mediaType}`)
+        } catch { showToast('Failed to update wishlist', 'error'); fetchData() }
+    }
 
-    const handleRemoveGameFromCustom = useCallback(async () => {
-        if (!deleteConfirmGame || !selectedListId) return
-        const { igdbId } = deleteConfirmGame
+    const handleToggleGlobalPrivacy = async (field, value) => {
         try {
-            await api.put(`/lists/custom/${selectedListId}/game`, { igdbId, action: 'remove' })
-            showToast('Game removed')
-            fetchData()
-        } catch { showToast('Failed to remove game', 'error') }
-        finally { setDeleteConfirmGame(null) }
-    }, [deleteConfirmGame, selectedListId, showToast, fetchData])
+            await api.patch('/auth/privacy-settings', { [field]: value })
+            setListBundle(prev => ({
+                ...prev,
+                user: { ...prev.user, [field]: value }
+            }))
+            showToast('Privacy updated!')
+        } catch (err) {
+            showToast('Failed to update privacy', 'error')
+        }
+    }
 
-    const handleTabChange = useCallback(async (id) => {
+    const handleToggleListPrivacy = async (list) => {
+        try {
+            const newStatus = !list.isPublic
+            const res = await api.put(`/lists/custom/${list._id}`, { isPublic: newStatus })
+            if (res.data.success) {
+                setListBundle(prev => ({
+                    ...prev,
+                    customLists: prev.customLists.map(l => l._id === list._id ? { ...l, isPublic: newStatus } : l)
+                }))
+                showToast('Visibility updated')
+            }
+        } catch { showToast('Failed to update visibility', 'error') }
+    }
+
+    const handleTabChange = async (id) => {
         setActiveTab(id)
         setSelectedListId(null)
-
         if (id === 'liked' && !fullLikes) {
             setLoadingTab(true)
             try {
-                const res = await api.get('/lists/likes')
+                const res = await api.get(`/lists/likes?mediaType=${mediaType}`)
                 if (res.data.success) setFullLikes(res.data.likes)
             } catch { showToast('Failed to load likes', 'error') }
             finally { setLoadingTab(false) }
         }
-
         if (id === 'wishlist' && !fullWish) {
             setLoadingTab(true)
             try {
-                const res = await api.get('/lists/wishlist')
+                const res = await api.get(`/lists/wishlist?mediaType=${mediaType}`)
                 if (res.data.success) setFullWish(res.data.wishlist)
             } catch { showToast('Failed to load wishlist', 'error') }
             finally { setLoadingTab(false) }
         }
-    }, [fullLikes, fullWish, showToast])
+    }
 
     if (!user) return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-            <div className="text-5xl">📋</div>
-            <div className="text-white font-black text-2xl tracking-widest uppercase"
-                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Login to view your lists</div>
-            <button onClick={() => navigate('/login')}
-                className="px-6 py-3 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all">
-                Login
-            </button>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-6">
+            <div className="w-24 h-24 bg-[#111118] border border-[#2a2a35] rounded-full flex items-center justify-center text-5xl opacity-50 mb-4">📋</div>
+            <div>
+                <h2 className="text-white font-black text-3xl uppercase mb-2 tracking-tight" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>My Collections</h2>
+                <p className="text-[#7a7a90] font-mono text-sm max-w-sm mx-auto mb-8 leading-relaxed">Sign in to organize your games, movies, and anime into custom collections.</p>
+                <button onClick={() => navigate('/login')} className="px-10 py-4 bg-[#c8ff57] text-black font-black uppercase text-xs tracking-[0.2em] rounded-xl hover:bg-[#d4ff6e] transition-all shadow-lg">Sign In Now</button>
+            </div>
         </div>
     )
-
-    if (loading && !listBundle) return (
-        <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-[#7a7a90] font-mono text-sm">Loading...</div>
-        </div>
-    )
-
-    const tabs = [
-        { id: 'lists', label: 'My Lists', count: customLists.length + 2 },
-        { id: 'liked', label: 'Liked Games', count: likesCount },
-        { id: 'wishlist', label: 'Wishlist', count: wishlistCount },
-    ]
 
     return (
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 md:px-10 py-8 md:py-10">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-24 min-h-screen relative">
+            <Helmet>
+                <title>My Collections | QuestDuck</title>
+            </Helmet>
 
-            {/* Toast */}
-            {toast && (
-                <div className={`fixed bottom-8 md:bottom-12 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
-                                ${toast.type === 'error'
-                        ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]'
-                        : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
-                    {toast.msg}
-                </div>
-            )}
+            {/* Media Selector */}
+            <div className="flex items-center gap-2 mb-12 overflow-x-auto pb-4 no-scrollbar">
+                {MEDIA_TYPES.map(m => (
+                    <button
+                        key={m.id}
+                        onClick={() => setSearchParams({ type: m.id })}
+                        className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl border font-mono text-[10px] uppercase tracking-widest transition-all flex-shrink-0
+                                   ${mediaType === m.id ? 'bg-white text-black border-white shadow-xl' : 'bg-[#111118] text-[#4a4a5e] border-[#2a2a35] hover:border-[#7a7a90] hover:text-white'}`}
+                    >
+                        <m.icon size={14} /> {m.label}
+                    </button>
+                ))}
+            </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#2a2a35]">
-                <div className="flex items-center gap-4">
-                    <h2 className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        {selectedList ? selectedList.name : 'My Lists'}
-                    </h2>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
+                <div>
+                    <h1 className="font-black text-6xl text-white uppercase tracking-tighter" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        MY <span className="text-[#c8ff57]">{MEDIA_TYPES.find(m => m.id === mediaType)?.label}</span>
+                    </h1>
+                    {customLists.length >= 2 && activeTab === 'lists' && (
+                        <div className="font-mono text-[9px] text-[#7a7a90] uppercase tracking-widest mt-2 flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-500">
+                            <div className="w-1 h-1 rounded-full bg-[#c8ff57]" />
+                            Max 2 custom collections reached
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex bg-[#111118] border border-[#2a2a35] p-1.5 rounded-2xl shadow-xl">
+                    <button onClick={() => handleTabChange('lists')}
+                        className={`px-6 py-2.5 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${activeTab === 'lists' ? 'bg-[#2a2a35] text-[#c8ff57] shadow-lg' : 'text-[#4a4a5e] hover:text-white'}`}>
+                        Collections
+                    </button>
+                    <button onClick={() => handleTabChange('liked')}
+                        className={`px-6 py-2.5 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${activeTab === 'liked' ? 'bg-[#2a2a35] text-[#ff5c5c] shadow-lg' : 'text-[#4a4a5e] hover:text-white'}`}>
+                        Liked
+                    </button>
+                    <button onClick={() => handleTabChange('wishlist')}
+                        className={`px-6 py-2.5 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${activeTab === 'wishlist' ? 'bg-[#2a2a35] text-[#5c9fff] shadow-lg' : 'text-[#4a4a5e] hover:text-white'}`}>
+                        Wishlist
+                    </button>
                 </div>
             </div>
 
-            {/* List detail view */}
-            {selectedList && activeTab === 'lists' ? (
-                <ListDetail list={selectedList} onBack={() => setSelectedListId(null)} onUpdate={fetchData} showToast={showToast} deleteConfirmGame={deleteConfirmGame} setDeleteConfirmGame={setDeleteConfirmGame} />
+            {/* Content Area */}
+            {selectedList ? (
+                <ListDetail list={selectedList} mediaType={mediaType} onBack={() => setSelectedListId(null)} onUpdate={fetchData} showToast={showToast} />
             ) : (
-                <>
-                    {/* Tabs */}
-                    <div className="flex gap-2 mb-6 flex-wrap">
-                        {tabs.map(tab => (
-                            <button key={tab.id} onClick={() => handleTabChange(tab.id)}
-                                className={`px-4 py-2 rounded font-mono text-xs uppercase tracking-wider border transition-all
-                                           ${activeTab === tab.id
-                                        ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/06'
-                                        : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'}`}>
-                                {tab.label}
-                                {tab.count !== null && <span className="ml-1.5 opacity-60">({tab.count})</span>}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* ══ MY LISTS ══ */}
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {activeTab === 'lists' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Built-ins */}
-                            {[
-                                { id: 'liked', icon: '❤️', bg: 'bg-[#ff5c5c]/15', label: 'Liked Games', count: likesCount },
-                                { id: 'wishlist', icon: '🎯', bg: 'bg-[#5c9fff]/15', label: 'Wishlist', count: wishlistCount },
-                            ].map(b => (
-                                <div key={b.id} onClick={() => handleTabChange(b.id)}
-                                    className="flex items-center gap-4 p-4 bg-[#111118] border border-[#2a2a35]
-                                               rounded-lg hover:border-[#c8ff57]/30 transition-all cursor-pointer">
-                                    <div className={`w-12 h-12 rounded-lg ${b.bg} flex items-center justify-center text-2xl flex-shrink-0`}>{b.icon}</div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-white font-semibold text-sm">{b.label}</div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5">{b.count} games · Always available</div>
-                                    </div>
-                                    <div className="font-mono text-[10px] text-[#2a2a35] uppercase tracking-wider border border-[#2a2a35] rounded px-2 py-1">Built-in</div>
-                                </div>
-                            ))}
-
-                            {/* Custom lists */}
-                            {customLists.map(list => (
-                                <div key={list._id}
-                                    className="bg-[#111118] border border-[#2a2a35] rounded-lg hover:border-[#c8ff57]/30 transition-all overflow-hidden">
-                                    <div className="flex items-center gap-4 p-4 cursor-pointer" onClick={() => setSelectedListId(list._id)}>
-                                        <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center text-2xl flex-shrink-0">📋</div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <div className="text-white font-semibold text-sm truncate">{list.name}</div>
-                                                <span className={`font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm
-                                                                 ${list.isPublic ? 'bg-[#c8ff57]/15 text-[#c8ff57]' : 'bg-[#2a2a35] text-[#7a7a90]'}`}>
-                                                    {list.isPublic ? 'Public' : 'Private'}
-                                                </span>
-                                            </div>
-                                            {list.description && (
-                                                <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5 line-clamp-2 break-words">{list.description}</div>
-                                            )}
-                                            <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5">{list.games?.length || 0} games · tap to open</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* Create Button with Level 2 logic */}
+                            {listBundle?.user?.level < 2 ? (
+                                <div className="h-56 border-2 border-[#2a2a35] bg-[#111118]/50 rounded-3xl flex flex-col items-center justify-center gap-4 relative group overflow-hidden">
+                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center z-10">
+                                        <div className="w-12 h-12 bg-[#1a1a25] border border-[#3a3a4a] rounded-full flex items-center justify-center mb-2">
+                                            <span className="text-xl">🔒</span>
                                         </div>
-                                        <button onClick={e => { e.stopPropagation(); setDeleteConfirmList(list._id) }}
-                                            className="text-[#7a7a90] hover:text-[#ff5c5c] transition-colors font-mono text-xs px-2 py-1 flex-shrink-0">✕</button>
+                                        <span className="font-mono text-[10px] uppercase tracking-widest text-[#7a7a90]">Reach Level 2 to Unlock</span>
                                     </div>
-                                    {list.games?.length > 0 && (
-                                        <div className="px-4 pb-4 flex gap-2 flex-wrap">
-                                            {list.games.slice(0, 6).map(game => (
-                                                game.gameCover
-                                                    ? <img key={game.igdbId} src={game.gameCover} alt={game.gameTitle} loading="lazy"
-                                                        onClick={() => setSelectedListId(list._id)}
-                                                        className="w-12 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition-all" />
-                                                    : <div key={game.igdbId} className="w-12 h-16 bg-[#2a2a35] rounded flex items-center justify-center text-sm">🎮</div>
-                                            ))}
-                                            {list.games.length > 6 && (
-                                                <div onClick={() => setSelectedListId(list._id)}
-                                                    className="w-12 h-16 bg-[#2a2a35] rounded flex items-center justify-center font-mono text-[10px] text-[#7a7a90] cursor-pointer hover:bg-[#3a3a45] transition-all">
-                                                    +{list.games.length - 6}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                    <Layers size={24} className="text-[#2a2a35]" />
+                                    <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#2a2a35]">Create Collection</span>
                                 </div>
-                            ))}
-
-                            {/* Create CTA */}
-                            {canCreateList ? (
-                                atListLimit ? (
-                                    <div className="w-full py-4 border border-dashed border-[#2a2a35] rounded-lg flex flex-col items-center gap-2 p-5 md:col-span-2">
-                                        <div className="text-2xl">📋</div>
-                                        <div className="text-white font-semibold text-sm">List limit reached</div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] text-center">
-                                            You can have up to {MAX_CUSTOM_LISTS} custom lists.
-                                        </div>
+                            ) : customLists.length < 2 && (
+                                <button 
+                                    onClick={() => setShowCreateModal(true)}
+                                    className="h-56 border-2 border-dashed border-[#2a2a35] rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-[#c8ff57] hover:bg-[#c8ff57]/05 transition-all group">
+                                    <div className="w-14 h-14 bg-[#111118] border border-[#2a2a35] rounded-full flex items-center justify-center group-hover:bg-[#c8ff57] group-hover:text-black transition-all">
+                                        <Layers size={24} />
                                     </div>
-                                ) : (
-                                    <button onClick={() => setShowCreateModal(true)}
-                                        className="w-full py-4 border border-dashed border-[#c8ff57]/40 text-[#c8ff57]
-                                                   font-mono text-xs rounded-lg hover:border-[#c8ff57] hover:bg-[#c8ff57]/05
-                                                   transition-all flex items-center justify-center gap-2 md:col-span-2">
-                                        <span className="text-lg">+</span> Create Custom List ({customLists.length}/{MAX_CUSTOM_LISTS})
-                                    </button>
-                                )
-                            ) : (
-                                <div className="w-full py-5 border border-dashed border-[#2a2a35] rounded-lg flex flex-col items-center gap-2 p-5 md:col-span-2">
-                                    <div className="text-2xl">🔒</div>
-                                    <div className="text-white font-semibold text-sm">Custom List Locked</div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90] text-center max-w-xs">
-                                        Reach <span className="text-[#c8ff57]">Level 2 (5 XP)</span> to unlock.
-                                        You have <span className="text-[#c8ff57]">{xp} XP</span> — need <span className="text-[#c8ff57]">{Math.max(0, 5 - xp)} more</span>.
+                                    <div className="flex flex-col items-center gap-1">
+                                        <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#4a4a5e] group-hover:text-white">Create New Collection</span>
+                                        <span className="font-mono text-[9px] text-[#7a7a90]">{customLists.length}/2 Used</span>
                                     </div>
-                                    <div className="w-full max-w-xs bg-[#2a2a35] rounded-full h-1.5 mt-2">
-                                        <div className="h-full rounded-full bg-[#c8ff57] transition-all"
-                                            style={{ width: `${Math.min((xp / 5) * 100, 100)}%` }} />
-                                    </div>
-                                </div>
+                                </button>
                             )}
+
+                            {/* Built-ins for quick access */}
+                            <div className="flex flex-col gap-3">
+                                <div onClick={() => handleTabChange('liked')} className="h-56 bg-[#111118] border border-[#2a2a35] rounded-3xl p-8 relative overflow-hidden cursor-pointer group hover:border-[#ff5c5c]/40 transition-all shadow-lg flex-1">
+                                    <div className="absolute -right-4 -bottom-4 text-[#ff5c5c] opacity-05 group-hover:scale-110 transition-transform duration-500"><Heart size={160} /></div>
+                                    <div className="relative z-10 flex flex-col h-full">
+                                        <h3 className="font-black text-2xl text-white uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Liked Items</h3>
+                                        <p className="text-[#4a4a5e] text-xs font-mono uppercase tracking-widest mb-auto">Quick access to everything you ❤️</p>
+                                        <div className="flex items-center justify-between mt-4">
+                                            <span className="font-mono text-[10px] text-[#ff5c5c] uppercase tracking-widest">{likesCount} items</span>
+                                            <span className="text-[#ff5c5c] opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 font-bold">OPEN →</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <Toggle 
+                                    enabled={listBundle?.user?.isLikesPublic}
+                                    onToggle={() => handleToggleGlobalPrivacy('isLikesPublic', !listBundle?.user?.isLikesPublic)}
+                                    label="Public Likes"
+                                    sublabel="Show on profile"
+                                    color="#ff5c5c"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-3">
+                                <div onClick={() => handleTabChange('wishlist')} className="h-56 bg-[#111118] border border-[#2a2a35] rounded-3xl p-8 relative overflow-hidden cursor-pointer group hover:border-[#5c9fff]/40 transition-all shadow-lg flex-1">
+                                    <div className="absolute -right-4 -bottom-4 text-[#5c9fff] opacity-05 group-hover:scale-110 transition-transform duration-500"><Target size={160} /></div>
+                                    <div className="relative z-10 flex flex-col h-full">
+                                        <h3 className="font-black text-2xl text-white uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Wishlist</h3>
+                                        <p className="text-[#4a4a5e] text-xs font-mono uppercase tracking-widest mb-auto">Tracking what's next 🎯</p>
+                                        <div className="flex items-center justify-between mt-4">
+                                            <span className="font-mono text-[10px] text-[#5c9fff] uppercase tracking-widest">{wishlistCount} items</span>
+                                            <span className="text-[#5c9fff] opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 font-bold">OPEN →</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <Toggle 
+                                    enabled={listBundle?.user?.isWishlistPublic}
+                                    onToggle={() => handleToggleGlobalPrivacy('isWishlistPublic', !listBundle?.user?.isWishlistPublic)}
+                                    label="Public Wishlist"
+                                    sublabel="Show on profile"
+                                    color="#5c9fff"
+                                />
+                            </div>
+
+                            {customLists.map(list => (
+                                <div key={list._id} onClick={() => setSelectedListId(list._id)}
+                                    className="h-56 bg-[#111118] border border-[#2a2a35] rounded-3xl p-8 relative overflow-hidden cursor-pointer group hover:border-[#c8ff57] transition-all shadow-lg">
+                                    <div className="absolute -right-4 -bottom-4 text-[#c8ff57] opacity-05 group-hover:scale-110 transition-transform duration-500"><Layers size={160} /></div>
+                                    <div className="relative z-10 flex flex-col h-full">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h3 className="font-black text-2xl text-white uppercase truncate group-hover:text-[#c8ff57] transition-colors" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{list.name}</h3>
+                                            <div onClick={e => e.stopPropagation()}>
+                                                <button 
+                                                    onClick={() => handleToggleListPrivacy(list)}
+                                                    className={`px-2 py-1 rounded font-mono text-[8px] uppercase tracking-wider transition-all
+                                                               ${list.isPublic ? 'bg-[#c8ff57]/10 text-[#c8ff57] border border-[#c8ff57]/20' : 'bg-[#2a2a35] text-[#7a7a90] border border-transparent'}`}>
+                                                    {list.isPublic ? 'Public' : 'Private'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p className="text-[#4a4a5e] text-[11px] line-clamp-2 mb-auto leading-relaxed">{list.description || 'Custom collection.'}</p>
+                                        <div className="flex items-center justify-between mt-4">
+                                            <span className="font-mono text-[10px] text-[#4a4a5e] uppercase tracking-widest">{list.games?.length || 0} items</span>
+                                            <div className="flex items-center gap-4">
+                                                <button onClick={e => { e.stopPropagation(); handleDeleteList(list._id) }} className="p-2 text-[#4a4a5e] hover:text-[#ff5c5c] transition-colors"><X size={16} /></button>
+                                                <span className="text-[#c8ff57] opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 font-bold">OPEN →</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
 
-                    {/* ══ LIKED GAMES ══ */}
                     {activeTab === 'liked' && (
                         <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <Heart size={20} className="text-[#ff5c5c]" />
-                                <h3 className="font-black text-lg tracking-widest uppercase text-white"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Liked Games</h3>
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a35] mx-1" />
-                                <span className="font-mono text-[10px] text-[#7a7a90] font-bold uppercase tracking-wider">{likesCount} games</span>
-                            </div>
-                            {loadingTab ? (
-                                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                                    <Loader2 className="animate-spin text-[#c8ff57]" />
-                                    <div className="text-[#7a7a90] font-mono text-sm">Loading likes...</div>
-                                </div>
-                            ) : (fullLikes || []).length > 0 || likesPreview.length > 0 ? (
+                            {loadingTab ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-[#c8ff57]" /></div> : (
                                 <>
-                                    <div className="mb-4">
-                                        <SearchBar value={likedSearch} onChange={setLikedSearch} placeholder="Search liked games..." />
+                                    <div className="flex items-center justify-between mb-8">
+                                        <SearchBar value={likedSearch} onChange={setLikedSearch} placeholder={`Search liked ${mediaType}...`} />
                                     </div>
-                                    {(fullLikes || []).length > 0 ? (
-                                        filteredLikes.length > 0 ? (
-                                            <>
-                                                <GameGrid games={pagedLikes} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'like' })} navigate={navigate} />
-                                                <Pagination currentPage={likedPage} total={filteredLikes.length} onPageChange={setLikedPage} />
-                                            </>
-                                        ) : (
-                                            <EmptyState icon="🔍" text={`No liked games match "${likedSearch}"`} />
-                                        )
+                                    {filteredLikes.length > 0 ? (
+                                        <>
+                                            <MediaGrid items={pagedLikes} onRemove={handleRemoveLike} mediaType={mediaType} navigate={navigate} />
+                                            <Pagination currentPage={likedPage} total={filteredLikes.length} onPageChange={setLikedPage} />
+                                        </>
                                     ) : (
-                                        <GameGrid games={likesPreview} navigate={navigate} />
+                                        <EmptyState icon="❤️" title="No Liked Items" text={`Your favorite ${mediaType} will appear here.` } />
                                     )}
                                 </>
-                            ) : (
-                                <EmptyState icon="❤️" text="No liked games yet." />
                             )}
                         </div>
                     )}
 
-                    {/* ══ WISHLIST ══ */}
                     {activeTab === 'wishlist' && (
                         <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <Target size={20} className="text-[#5c9fff]" />
-                                <h3 className="font-black text-lg tracking-widest uppercase text-white"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Wishlist</h3>
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#2a2a35] mx-1" />
-                                <span className="font-mono text-[10px] text-[#7a7a90] font-bold uppercase tracking-wider">{wishlistCount} games</span>
-                            </div>
-                            {loadingTab ? (
-                                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                                    <Loader2 className="animate-spin text-[#c8ff57]" />
-                                    <div className="text-[#7a7a90] font-mono text-sm">Loading wishlist...</div>
-                                </div>
-                            ) : (fullWish || []).length > 0 || wishlistPreview.length > 0 ? (
+                            {loadingTab ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-[#c8ff57]" /></div> : (
                                 <>
-                                    <div className="mb-4">
-                                        <SearchBar value={wishSearch} onChange={setWishSearch} placeholder="Search wishlist..." />
+                                    <div className="flex items-center justify-between mb-8">
+                                        <SearchBar value={wishSearch} onChange={setWishSearch} placeholder={`Search ${mediaType} wishlist...`} />
                                     </div>
-                                    {(fullWish || []).length > 0 ? (
-                                        filteredWish.length > 0 ? (
-                                            <>
-                                                <GameGrid games={pagedWish} onRemove={(igdbId) => setDeleteConfirmGame({ igdbId, context: 'wishlist' })} navigate={navigate} />
-                                                <Pagination currentPage={wishPage} total={filteredWish.length} onPageChange={setWishPage} />
-                                            </>
-                                        ) : (
-                                            <EmptyState icon="🔍" text={`No wishlist games match "${wishSearch}"`} />
-                                        )
+                                    {filteredWish.length > 0 ? (
+                                        <>
+                                            <MediaGrid items={pagedWish} onRemove={handleRemoveWishlist} mediaType={mediaType} navigate={navigate} />
+                                            <Pagination currentPage={wishPage} total={filteredWish.length} onPageChange={setWishPage} />
+                                        </>
                                     ) : (
-                                        <GameGrid games={wishlistPreview} navigate={navigate} />
+                                        <EmptyState icon="🎯" title="Wishlist Empty" text={`Keep track of ${mediaType} you want to check out later.`} />
                                     )}
                                 </>
-                            ) : (
-                                <EmptyState icon="🎯" text="No games wishlisted yet." />
                             )}
                         </div>
                     )}
-                </>
+                </div>
             )}
 
-            {/* ══ CREATE LIST MODAL ══ */}
+            {/* Create Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                    onClick={e => e.target === e.currentTarget && setShowCreateModal(false)}>
-                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-md">
-                        <div className="flex items-center justify-between p-5 border-b border-[#2a2a35]">
-                            <h3 className="font-black text-lg tracking-widest uppercase text-white"
-                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Create List</h3>
-                            <button onClick={() => setShowCreateModal(false)} className="text-[#7a7a90] hover:text-white text-xl">✕</button>
-                        </div>
-                        <div className="p-5 flex flex-col gap-4">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-5">
+                    <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setShowCreateModal(false)} />
+                    <div className="relative bg-[#111118] border border-[#2a2a35] rounded-3xl w-full max-w-lg p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+                        <h2 className="font-black text-4xl text-white uppercase mb-8 tracking-tight" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Create <span className="text-[#c8ff57]">Collection</span></h2>
+                        <div className="space-y-6">
                             <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">List Name</label>
-                                    <span className={`font-mono text-[10px] opacity-60 ${createForm.name.length >= 50 ? 'text-[#ff5c5c]' : 'text-[#7a7a90]'}`}>
-                                        {createForm.name.length}/50
-                                    </span>
-                                </div>
-                                <input type="text" placeholder="e.g. My Favorite RPGs"
-                                    value={createForm.name}
-                                    maxLength={50}
-                                    onChange={e => setCreateForm({ ...createForm, name: e.target.value })}
-                                    className="w-full bg-[#111118] border border-[#2a2a35] rounded px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#c8ff57]" />
+                                <label className="block font-mono text-[10px] text-[#4a4a5e] uppercase tracking-widest mb-3">Collection Name</label>
+                                <input autoFocus type="text" placeholder="e.g. Masterpieces" value={createForm.name} onChange={e => setCreateForm({ ...createForm, name: e.target.value })}
+                                    className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all" />
                             </div>
-
                             <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Description</label>
-                                    <span className={`font-mono text-[10px] opacity-60 ${createForm.description.length >= 200 ? 'text-[#ff5c5c]' : 'text-[#7a7a90]'}`}>
-                                        {createForm.description.length}/200
-                                    </span>
-                                </div>
-                                <textarea placeholder="Tell us more about this list..."
-                                    value={createForm.description}
-                                    maxLength={200}
-                                    onChange={e => setCreateForm({ ...createForm, description: e.target.value })}
-                                    className="w-full bg-[#111118] border border-[#2a2a35] rounded px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] h-24 resize-none" />
+                                <label className="block font-mono text-[10px] text-[#4a4a5e] uppercase tracking-widest mb-3">Description (Optional)</label>
+                                <textarea placeholder="What's this collection about?" value={createForm.description} onChange={e => setCreateForm({ ...createForm, description: e.target.value })} rows={3}
+                                    className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all resize-none" />
                             </div>
-
-                            <div className="flex items-center gap-3">
-                                <button onClick={() => setCreateForm(p => ({ ...p, isPublic: !p.isPublic }))}
-                                    className={`w-10 h-5 rounded-full transition-all flex-shrink-0 ${createForm.isPublic ? 'bg-[#c8ff57]' : 'bg-[#2a2a35]'}`}>
-                                    <div className={`w-4 h-4 rounded-full bg-white transition-all mx-0.5 ${createForm.isPublic ? 'translate-x-5' : 'translate-x-0'}`} />
+                            <div className="flex gap-4 pt-4">
+                                <button onClick={handleCreateList} disabled={creating || !createForm.name.trim()}
+                                    className="flex-1 bg-[#c8ff57] text-black py-4 rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-[#d4ff6e] transition-all disabled:opacity-50 shadow-lg">
+                                    {creating ? 'Creating...' : 'Create Collection'}
                                 </button>
-                                <span className="font-mono text-xs text-[#7a7a90]">{createForm.isPublic ? 'Public list' : 'Private list'}</span>
+                                <button onClick={() => setShowCreateModal(false)} className="px-8 border border-[#2a2a35] text-[#4a4a5e] rounded-2xl font-mono text-[10px] uppercase tracking-widest hover:text-white transition-all">Cancel</button>
                             </div>
-                            {createError && (
-                                <div className="font-mono text-xs text-[#ff5c5c] bg-[#ff5c5c]/10 border border-[#ff5c5c]/20 rounded px-3 py-2">
-                                    {createError}
-                                </div>
-                            )}
-                            <button onClick={handleCreateList} disabled={creating}
-                                className="w-full py-3 bg-[#c8ff57] text-black font-bold text-sm rounded
-                                           hover:bg-[#d4ff6e] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-                                {creating ? 'Creating...' : '+ Create List'}
-                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ══ DELETE CONFIRM (LIST) ══ */}
-            {deleteConfirmList && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                    onClick={e => e.target === e.currentTarget && setDeleteConfirmList(null)}>
-                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-sm p-6 flex flex-col gap-4 shadow-2xl">
-                        <div className="text-center">
-                            <div className="text-3xl mb-2">🗑️</div>
-                            <div className="text-white font-semibold text-sm">Delete this list?</div>
-                            <div className="font-mono text-[10px] text-[#7a7a90] mt-1">This cannot be undone. All games in this list will be un-categorized.</div>
-                        </div>
-                        <div className="flex gap-3">
-                            <button onClick={() => setDeleteConfirmList(null)}
-                                className="flex-1 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded
-                                           hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">Cancel</button>
-                            <button onClick={() => handleDeleteList(deleteConfirmList)}
-                                className="flex-1 py-2 bg-[#ff5c5c] text-white font-bold text-xs rounded hover:bg-[#ff3333] transition-all shadow-[0_4px_10px_rgba(255,92,92,0.2)]">
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ══ DELETE CONFIRM (GAME FROM LIST) ══ */}
-            {deleteConfirmGame && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                    onClick={e => e.target === e.currentTarget && setDeleteConfirmGame(null)}>
-                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-sm p-6 flex flex-col gap-4 shadow-2xl">
-                        <div className="text-center">
-                            <div className="text-3xl mb-2">🧊</div>
-                            <div className="text-white font-semibold text-sm">
-                                {deleteConfirmGame.context === 'like' ? 'Remove from Liked?'
-                                    : deleteConfirmGame.context === 'wishlist' ? 'Remove from Wishlist?'
-                                        : 'Remove from this list?'}
-                            </div>
-                            <div className="font-mono text-[10px] text-[#7a7a90] mt-1">This will remove the game from your current selection.</div>
-                        </div>
-                        <div className="flex gap-3">
-                            <button onClick={() => setDeleteConfirmGame(null)}
-                                className="flex-1 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded
-                                           hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">Cancel</button>
-                            <button onClick={() => {
-                                if (deleteConfirmGame.context === 'like') handleRemoveLike()
-                                else if (deleteConfirmGame.context === 'wishlist') handleRemoveWishlist()
-                                else handleRemoveGameFromCustom()
-                            }}
-                                className="flex-1 py-2 bg-[#ff5c5c] text-white font-bold text-xs rounded hover:bg-[#ff3333] transition-all shadow-[0_4px_10px_rgba(255,92,92,0.2)]">
-                                Remove
-                            </button>
-                        </div>
-                    </div>
+            {/* Toast */}
+            {toast && (
+                <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[110] px-8 py-4 rounded-2xl font-mono text-[10px] uppercase tracking-widest border shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-10 duration-500
+                                ${toast.type === 'error' ? 'bg-red-500/20 border-red-500/40 text-red-500' : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
+                    {toast.msg}
                 </div>
             )}
         </div>
