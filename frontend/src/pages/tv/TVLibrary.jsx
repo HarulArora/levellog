@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
 import { Plus, LayoutGrid, List as ListIcon, Filter, Search, Tv, Sparkles, Edit3, Trash2 } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../../context/AuthContext'
-import { useSection } from '../../context/SectionContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import TVCard from '../../components/movies/TVCard'
@@ -11,10 +10,10 @@ import Skeleton from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
 
-const AddMovieModal = lazy(() => import('../../components/library/AddMovieModal'))
+const MovieLogModal = lazy(() => import('../../components/movies/MovieLogModal'))
 
 function TVLibrary() {
-    const { user, updateSettings } = useAuth()
+    const { user, updateSettings, updateUser } = useAuth()
     const navigate = useNavigate()
     
     const [library, setLibrary] = useState([])
@@ -31,7 +30,7 @@ function TVLibrary() {
     const fetchLibrary = async () => {
         try {
             setLoading(true)
-            const res = await api.get('/movies/library')
+            const res = await api.get('/movies/library?type=tv')
             setLibrary(res.data.library || [])
         } catch (err) {
             console.error('Failed to fetch library:', err)
@@ -66,11 +65,17 @@ function TVLibrary() {
         setTimeout(() => setToast(null), 3000)
     }
 
-    const handleLogMovie = async (data) => {
+    const handleLogTV = async (data) => {
         try {
             const res = await api.post('/movies/log', data)
             if (res.data.success) {
                 showToast(res.data.updated ? `"${data.title}" updated!` : `"${data.title}" added to Pond!`)
+                
+                // Update local user XP/Stats
+                if (res.data.xp !== undefined) {
+                    updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                }
+                
                 fetchLibrary()
                 return { success: true }
             }
@@ -83,10 +88,18 @@ function TVLibrary() {
     const handleDelete = async (id) => {
         if (!window.confirm('Remove from library?')) return
         try {
-            await api.delete(`/movies/log/${id}`)
-            showToast('Removed from library')
-            fetchLibrary()
-        } catch (err) {
+            const res = await api.delete(`/movies/log/${id}`)
+            if (res.data.success) {
+                showToast('Removed from library')
+                
+                // Update local user XP/Stats
+                if (res.data.xp !== undefined) {
+                    updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                }
+                
+                fetchLibrary()
+            }
+        } catch {
             showToast('Failed to remove', 'error')
         }
     }
@@ -122,7 +135,7 @@ function TVLibrary() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 {Array.from({ length: 12 }).map((_, i) => (
                     <div key={i} className="space-y-3">
-                        <Skeleton variant="block" width="100%" className="aspect-video" style={{ borderRadius: '12px' }} />
+                        <Skeleton variant="block" width="100%" className="aspect-[3/4]" style={{ borderRadius: '12px' }} />
                         <Skeleton variant="line" width="80%" height="16px" />
                     </div>
                 ))}
@@ -191,20 +204,20 @@ function TVLibrary() {
             <div className="max-w-[1200px] mx-auto px-5 md:px-10 mt-12">
                 {/* Control Panel */}
                 <div className="flex flex-col lg:flex-row gap-6 mb-12 bg-[#111118]/50 backdrop-blur-xl border border-[#2a2a35] p-5 rounded-3xl shadow-2xl">
-                    <div className="flex-1 overflow-x-auto no-scrollbar">
+                    <div className="flex-1 overflow-x-auto no-scrollbar pr-10">
                         <MovieFilterBar activeFilter={filter} onFilter={setFilter} counts={counts} />
                     </div>
                     
                     <div className="flex flex-col sm:flex-row items-center gap-4 border-l border-[#2a2a35] pl-6 ml-2 hidden lg:flex">
                         <div className="relative w-full sm:w-72 group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white group-focus-within:text-[#c8ff57] transition-colors" size={18} />
                             <input 
                                 type="text" 
                                 placeholder="Search your vault..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#7a7a90]"
                             />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
                         </div>
                         
                         <div className="flex bg-[#0d0d14] rounded-2xl border border-[#2a2a35] p-1.5 shadow-inner">
@@ -242,13 +255,14 @@ function TVLibrary() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-[#2a2a35] bg-[#0d0d14]">
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-16">#</th>
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-24">Image</th>
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Title</th>
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Score</th>
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Status</th>
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Progress</th>
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Action</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-16 text-center align-middle">#</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-24 text-center align-middle">Image</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Title</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Score</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Status</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Genre</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Progress</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -294,18 +308,51 @@ function TVLibrary() {
 
             <Suspense fallback={null}>
                 {showAddModal && (
-                    <AddMovieModal 
-                        onClose={() => setShowAddModal(false)} 
-                        onAdd={handleLogMovie}
-                        items={library}
+                    <MovieLogModal 
+                        onClose={() => setShowAddModal(false)}
+                        onAdd={async (formData) => {
+                            try {
+                                const res = await api.post('/movies/log', formData)
+                                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                                setShowAddModal(false)
+                                fetchLibrary()
+                                return { success: true }
+                            } catch { return { success: false } }
+                        }}
+                        onDelete={async (logId) => {
+                            try {
+                                const res = await api.delete(`/movies/log/${logId}`)
+                                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                                setShowAddModal(false)
+                                fetchLibrary()
+                                return { success: true }
+                            } catch { return { success: false } }
+                        }}
                     />
                 )}
                 {editingMovie && (
-                    <AddMovieModal 
+                    <MovieLogModal 
                         onClose={() => setEditingMovie(null)}
-                        onAdd={handleLogMovie}
+                        onAdd={async (formData) => {
+                            try {
+                                const res = await api.post('/movies/log', formData)
+                                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                                setEditingMovie(null)
+                                fetchLibrary()
+                                return { success: true }
+                            } catch { return { success: false } }
+                        }}
+                        onDelete={async (logId) => {
+                            try {
+                                const res = await api.delete(`/movies/log/${logId}`)
+                                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                                setEditingMovie(null)
+                                fetchLibrary()
+                                return { success: true }
+                            } catch { return { success: false } }
+                        }}
+                        preselectedItem={editingMovie}
                         existingEntry={editingMovie}
-                        items={library}
                     />
                 )}
             </Suspense>
@@ -330,16 +377,16 @@ function TVRow({ show, index, onDelete, onEdit }) {
 
     return (
         <tr className="border-b border-[#2a2a35] hover:bg-white/[0.02] transition-colors group">
-            <td className="px-6 py-4">
-                <div className="flex items-center gap-3">
+            <td className="px-6 py-4 align-middle text-center">
+                <div className="flex items-center justify-center gap-3">
                     <div className={`w-1 h-8 rounded-full ${sc.color}`} />
                     <span className="font-mono text-xs text-[#4a4a5e]">{index}</span>
                 </div>
             </td>
-            <td className="px-6 py-4">
+            <td className="px-6 py-4 align-middle">
                 <div 
                     onClick={() => show.externalId && navigate(`/tv/${show.externalId}`)}
-                    className="w-12 h-16 bg-[#1a1a25] rounded-lg overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all"
+                    className="w-12 h-16 bg-[#1a1a25] rounded-lg overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all mx-auto"
                 >
                     {imageUrl ? (
                         <img src={imageUrl} alt="" className="w-full h-full object-cover" />
@@ -348,7 +395,7 @@ function TVRow({ show, index, onDelete, onEdit }) {
                     )}
                 </div>
             </td>
-            <td className="px-6 py-4">
+            <td className="px-6 py-4 align-middle text-center">
                 <div>
                     <h4 
                         onClick={() => show.externalId && navigate(`/tv/${show.externalId}`)}
@@ -356,37 +403,73 @@ function TVRow({ show, index, onDelete, onEdit }) {
                     >
                         {show.title}
                     </h4>
-                    <p className="text-[#4a4a5e] font-mono text-[10px] uppercase tracking-wider mt-0.5">{show.genre}</p>
                 </div>
             </td>
-            <td className="px-6 py-4 text-center">
-                {show.rating > 0 ? (
-                    <div className="flex flex-col items-center">
+            <td className="px-6 py-4 align-middle text-center">
+                <div className="flex items-center justify-center">
+                    {show.rating > 0 ? (
                         <span className="text-[#c8ff57] font-black text-2xl leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{show.rating}</span>
-                    </div>
-                ) : (
-                    <span className="text-[#3a3a4a] font-mono text-xs">—</span>
-                )}
+                    ) : (
+                        <span className="text-[#3a3a4a] font-mono text-xs">—</span>
+                    )}
+                </div>
             </td>
-            <td className="px-6 py-4">
-                <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest ${sc.color.replace('bg-', 'text-')} bg-white/5 border border-white/5`}>
-                    {sc.label}
-                </span>
-            </td>
-            <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                    <div className="h-1 flex-1 max-w-[60px] bg-[#1a1a25] rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full ${sc.color}`} 
-                            style={{ width: `${Math.min(100, (show.episodesWatched / (show.totalEpisodes || 1)) * 100)}%` }} 
-                        />
-                    </div>
-                    <span className="text-[#7a7a90] font-mono text-[10px]">
-                        {show.episodesWatched || 0} / {show.totalEpisodes || '?'}
+            <td className="px-6 py-4 align-middle text-center">
+                <div className="flex items-center justify-center">
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest ${sc.color.replace('bg-', 'text-')} bg-white/5 border border-white/5 leading-none`}>
+                        {sc.label}
                     </span>
                 </div>
             </td>
-            <td className="px-6 py-4 text-center">
+            <td className="px-6 py-4 align-middle text-center">
+                <span className="text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest truncate max-w-[100px] inline-block">
+                    {show.genre || 'Series'}
+                </span>
+            </td>
+            <td className="px-6 py-4 align-middle text-center">
+                <div className="flex flex-col gap-2.5 items-center justify-center min-w-[160px]">
+                    {/* Season Progress */}
+                    {(show.totalSeasons > 0 || show.seasonsWatched > 0) && (
+                        <div className="flex items-center w-full gap-3">
+                            <div className="flex-1 h-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-[#5c9fff] transition-all duration-500" 
+                                    style={{ width: `${Math.min(100, (show.seasonsWatched / (show.totalSeasons || 1)) * 100)}%` }} 
+                                />
+                            </div>
+                            <div className="flex items-center gap-1 w-[65px] font-mono text-[9px]">
+                                <span className="text-[#5c9fff] opacity-50">SEA:</span>
+                                <span className="text-[#5c9fff] tabular-nums">
+                                    {show.seasonsWatched || 0}/{show.totalSeasons || '?'}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Episode Progress (Per Season) */}
+                    <div className="flex items-center w-full gap-3">
+                        <div className="flex-1 h-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#c8ff57] transition-all duration-500" 
+                                style={{ 
+                                    width: `${Math.min(100, (show.episodesWatched / (
+                                        show.seasonLimit || 
+                                        show.seasons?.find(s => s.seasonNumber === parseInt(show.seasonsWatched))?.episodeCount || 
+                                        (show.totalSeasons === 1 ? show.totalEpisodes : 0) || 1
+                                    )) * 100)}%` 
+                                }} 
+                            />
+                        </div>
+                        <div className="flex items-center gap-1 w-[65px] font-mono text-[9px]">
+                            <span className="text-[#7a7a90] opacity-50">EPS:</span>
+                            <span className="text-[#7a7a90] tabular-nums">
+                                {show.episodesWatched || 0}/{show.seasonLimit || show.seasons?.find(s => s.seasonNumber === parseInt(show.seasonsWatched))?.episodeCount || (show.totalSeasons === 1 ? show.totalEpisodes : '?')}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td className="px-6 py-4 align-middle text-center">
                 <div className="flex justify-center gap-2">
                     <button 
                         onClick={() => onEdit()}

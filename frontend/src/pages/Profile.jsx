@@ -9,7 +9,7 @@ import { useFollow } from '../context/FollowContext'
 import { useLeaderboard } from '../context/LeaderboardContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import FollowListModal from '../components/profile/FollowListModal'
-import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List, Trophy, Heart, Bookmark, ChevronDown, Monitor, Film, Tv, BookOpen, Layers, Star } from 'lucide-react'
+import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List, Trophy, Heart, Bookmark, ChevronDown, Monitor, Film, Tv, BookOpen, Layers, Star, History } from 'lucide-react'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
 function Profile() {
@@ -20,7 +20,7 @@ function Profile() {
     const [privacyLoading, setPrivacyLoading] = useState(false)
     const [followModal, setFollowModal] = useState(null)
     const [xpToast, setXpToast] = useState(null)
-    const [activeTab, setActiveTab] = useState('games')
+    const [activeTab, setActiveTab] = useState('recent')
     const [selectedList, setSelectedList] = useState(null)
     const [profileMediaType, setProfileMediaType] = useState('game')
     const { topUsers } = useLeaderboard()
@@ -206,7 +206,7 @@ function Profile() {
         }
     }, [user, games, profileMediaType])
 
-    const recentGames = games.slice(0, 6)
+    const recentGames = games.slice(0, 10)
 
     // ── FOLLOW / UNFOLLOW ──
     const handleFollow = async () => {
@@ -504,10 +504,17 @@ function Profile() {
             </div>
 
             {/* ── Tab Bar ── */}
-            {canSeeGames && (
                 <div className="flex gap-1 mb-4 flex-wrap">
                     {[
-                        { id: 'games', label: <><Gamepad2 size={14} className="mr-1" /> Games</> },
+                        { 
+                            id: 'recent', 
+                            label: (
+                                <>
+                                    <History size={14} className="mr-1" />
+                                    Recent
+                                </>
+                            ) 
+                        },
                         { id: 'stats', label: <><BarChart2 size={14} className="mr-1" /> Stats</> },
                         ...(canSeeGames ? [{ id: 'lists', label: <><Layers size={14} className="mr-1" /> Collections</> }] : []),
                     ].map(tab => (
@@ -522,20 +529,45 @@ function Profile() {
                         </button>
                     ))}
                 </div>
-            )}
 
             {/* ── Games Tab ── */}
-            {(!canSeeGames || activeTab === 'games') && (
-                <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
-                    <h2 className="font-black text-xl tracking-widest uppercase text-white mb-5"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        Recent Games
-                        {canSeeGames && (
-                            <span className="font-mono text-xs text-[#7a7a90] ml-3 normal-case tracking-normal">
-                                {games.length} total
-                            </span>
-                        )}
-                    </h2>
+            {(!canSeeGames || activeTab === 'recent') && (
+                <div className="flex flex-col gap-6">
+                    {/* Media Type Selector */}
+                    {canSeeGames && (
+                        <div className="flex gap-2 p-1 bg-[#111118] border border-[#2a2a35] rounded-xl self-start">
+                            {[
+                                { id: 'game', label: 'Games', icon: Gamepad2 },
+                                { id: 'movie', label: 'Movies', icon: Film },
+                                { id: 'tv', label: 'TV Shows', icon: Tv },
+                                { id: 'anime', label: 'Anime', icon: Monitor },
+                                { id: 'manga', label: 'Manga', icon: BookOpen }
+                            ].map(m => (
+                                <button
+                                    key={m.id}
+                                    onClick={() => { setProfileMediaType(m.id); setSelectedList(null) }}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-[10px] uppercase tracking-widest transition-all
+                                            ${profileMediaType === m.id 
+                                                    ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]' 
+                                                    : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
+                                >
+                                    <m.icon size={14} />
+                                    <span className="hidden sm:inline">{m.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
+                        <h2 className="font-black text-xl tracking-widest uppercase text-white mb-5"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            Recent {profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)}
+                            {canSeeGames && (
+                                <span className="font-mono text-xs text-[#7a7a90] ml-3 normal-case tracking-normal">
+                                    {games.length} total
+                                </span>
+                            )}
+                        </h2>
 
                     {!canSeeGames ? (
                         <div className="flex flex-col items-center justify-center py-16 gap-4">
@@ -592,7 +624,7 @@ function Profile() {
                                         </div>
                                         <div className="p-2">
                                             <div className="text-white font-semibold text-xs truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
-                                                {item.title}
+                                                {item.title_english || item.title}
                                             </div>
                                             <span className={`font-mono text-[9px] uppercase tracking-wider px-1 py-[1px] rounded-sm ${sc.bg} ${sc.color}`}>
                                                 {sc.label}
@@ -608,6 +640,7 @@ function Profile() {
                         </div>
                     )}
                 </div>
+            </div>
             )}
 
             {/* ── Stats Tab ── */}
@@ -795,15 +828,16 @@ function Profile() {
                                                 )}
                                                 
                                                 {/* Community Average Rating Badge */}
-                                                {profileMediaType === 'game' && game.avgRating > 0 && (
-                                                    <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1 py-0.5 shadow-xl z-10">
+                                                {game.avgRating > 0 && (
+                                                    <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1.5 py-0.5 shadow-xl z-10">
+                                                        <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
                                                         <span className="font-black text-[10px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
                                                     </div>
                                                 )}
                                             </div>
                                             <div className="p-2">
                                                 <div className="text-white font-semibold text-xs truncate group-hover:text-[#c8ff57] transition-colors">
-                                                    {game.gameTitle}
+                                                    {game.title_english || game.gameTitle}
                                                 </div>
                                             </div>
                                         </Link>

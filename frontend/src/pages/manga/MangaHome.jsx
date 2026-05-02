@@ -2,6 +2,7 @@ import { useState, useRef, useMemo, useEffect, lazy, Suspense, memo, useCallback
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
+import { useSection } from '../../context/SectionContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, BookOpen, Flame, Plus } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
@@ -12,20 +13,23 @@ import { Helmet } from 'react-helmet-async'
 import { ChevronRight } from 'lucide-react'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
 import StatsBar from '../../components/ui/StatsBar'
+import RecentActivityFeed from '../../components/ui/RecentActivityFeed'
 
 const MangaCard = memo(({ item }) => {
     const navigate = useNavigate()
     
+    const displayTitle = item.title_english || item.title
+
     return (
         <div 
-            onClick={() => navigate(`/manga/${item.externalId}`)}
+            onClick={() => navigate(`/manga/${item.externalId}?type=manga`)}
             className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
         >
             <div className="aspect-[3/4] relative overflow-hidden">
                 {item.cover ? (
                     <img 
                         src={item.cover} 
-                        alt={item.title} 
+                        alt={displayTitle} 
                         loading="lazy"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
@@ -37,10 +41,17 @@ const MangaCard = memo(({ item }) => {
                 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
                 
-                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
+                <div className="absolute top-2 right-2 flex flex-col gap-1.5 items-end z-10">
+                    {Number(item.avgRating) > 0 && (
+                        <div className="bg-black/85 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center justify-center gap-1.5 shadow-xl min-w-[52px]">
+                            <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
+                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.5px' }}>{item.avgRating}</span>
+                        </div>
+                    )}
+                    {Number(item.myRating) > 0 && (
+                        <div className="bg-black/85 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center justify-center gap-1.5 shadow-xl min-w-[52px]">
+                            <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-bold">ME</span>
+                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.5px' }}>{item.myRating}</span>
                         </div>
                     )}
                 </div>
@@ -54,7 +65,7 @@ const MangaCard = memo(({ item }) => {
 
             <div className="p-4">
                 <h3 className="font-bold text-sm text-white truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
-                    {item.title}
+                    {displayTitle}
                 </h3>
                 <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider">{item.year || 'TBA'}</span>
@@ -72,51 +83,23 @@ const MangaCard = memo(({ item }) => {
 
 const AnimeLogModal = lazy(() => import('../../components/anime/AnimeLogModal'))
 
-const timeAgo = (date) => {
-    const seconds = Math.floor((new Date() - new Date(date)) / 1000)
-    if (seconds < 60) return 'just now'
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m ago`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours}h ago`
-    const days = Math.floor(hours / 24)
-    if (days < 7) return `${days}d ago`
-    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
 
-const makeActivityConfig = (navigate) => ({
-    completed: {
-        icon: <Trophy size={16} />, bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
-        getText: (a) => (<>Completed{' '}<span onClick={() => a.anime.externalId && navigate(`/manga/${a.anime.externalId}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span>{a.rating ? ` — rated it ${a.rating}/10` : ''}</>)
-    },
-    playing: {
-        icon: <Play size={16} fill="currentColor" />, bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
-        getText: (a) => (<>Started reading{' '}<span onClick={() => a.anime.externalId && navigate(`/manga/${a.anime.externalId}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span></>)
-    },
-    rated: {
-        icon: <Star size={16} fill="currentColor" />, bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
-        getText: (a) => (<>Rated{' '}<span onClick={() => a.anime.externalId && navigate(`/manga/${a.anime.externalId}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span>{` ${a.rating}/10`}</>)
-    },
-    planned: {
-        icon: <ListChecks size={16} />, bg: 'bg-[#2a2a35] text-[#e8e8f0]',
-        getText: (a) => (<>Added{' '}<span onClick={() => a.anime.externalId && navigate(`/manga/${a.anime.externalId}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span>{' to planned list'}</>)
-    },
-    dropped: {
-        icon: <X size={16} strokeWidth={3} />, bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
-        getText: (a) => (<>Dropped{' '}<span onClick={() => a.anime.externalId && navigate(`/manga/${a.anime.externalId}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span>{a.anime.chaptersRead ? ` after ${a.anime.chaptersRead} ch` : ''}</>)
-    },
-    paused: {
-        icon: <Pause size={16} fill="currentColor" />, bg: 'bg-[#c45cff]/15 text-[#c45cff]',
-        getText: (a) => (<>Paused{' '}<span onClick={() => a.anime.externalId && navigate(`/manga/${a.anime.externalId}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span></>)
-    },
-})
+
+
 
 const HeroBanner = memo(({ animes }) => {
     const isMobile = window.innerWidth < 768
+    const getSmallCover = (url) => {
+        if (!url) return url;
+        if (url.includes('myanimelist.net')) return url.replace('l.webp', '.webp').replace('l.jpg', '.jpg');
+        return url;
+    }
+
     const covers = useMemo(() => {
         if (!Array.isArray(animes)) return []
-        return [...new Set(animes.filter(a => a?.cover).map(a => a.cover))]
+        return [...new Set(animes.filter(a => a?.cover).map(a => getSmallCover(a.cover)))]
     }, [animes])
+
     
     const sizePatterns = useMemo(() => [
         { w: 'w-[180px]', h: 'h-[240px]' }, { w: 'w-[130px]', h: 'h-[170px]' },
@@ -152,12 +135,12 @@ const HeroBanner = memo(({ animes }) => {
     return (
         <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none">
             <div className="absolute top-0 left-0 right-0 h-[55%] flex items-end gap-3 pb-2">
-                <div className="flex gap-3 items-end will-change-transform" style={{ animation: `mosaicLeft ${isMobile ? '25s' : '40s'} linear infinite`, width: 'max-content' }}>
+                <div className="flex gap-3 items-end will-change-transform" style={{ animation: `mosaicLeft ${isMobile ? '25s' : '40s'} linear infinite`, width: 'max-content', backfaceVisibility: 'hidden' }}>
                     {(Array.isArray(row1Tiles) ? [...row1Tiles, ...row1Tiles] : []).map((tile, i) => (
                         <img 
                             key={i} 
                             src={tile.img} 
-                            alt="Manga Cover Mosaic" 
+                            alt="Trending Manga Collection" 
                             width={tile.w.match(/\d+/)[0]}
                             height={tile.h.match(/\d+/)[0]}
                             fetchPriority={i < 4 ? "high" : "low"}
@@ -240,7 +223,7 @@ function MangaSearchBar({ id = 'manga-search' }) {
     return (
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none z-10">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none z-10">
                     <Search size={18} strokeWidth={2.5} />
                 </span>
                 <input
@@ -249,10 +232,10 @@ function MangaSearchBar({ id = 'manga-search' }) {
                     placeholder="Search any manga..."
                     value={query}
                     onChange={handleChange}
-                    className="w-full bg-[#111118] border border-[#2a2a35] rounded-lg
-                                pl-11 pr-24 py-3.5 text-white text-sm
+                    className="w-full bg-[#111118] border border-[#2a2a35] rounded-xl
+                                pl-11 pr-32 py-4 text-white text-sm
                                 focus:outline-none focus:border-[#c8ff57]
-                                placeholder:text-[#94999c] transition-all"
+                                placeholder:text-[#94999c] transition-all shadow-inner"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#a0a0b8] pointer-events-none">
                     {loading ? <span className="text-[#c8ff57] animate-pulse font-bold">searching…</span> : 'QuestDuck'}
@@ -260,27 +243,29 @@ function MangaSearchBar({ id = 'manga-search' }) {
             </div>
 
             {open && (
-                <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-[60] bg-[#111118] border border-[#2a2a35] rounded-xl shadow-2xl overflow-hidden">
+                <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-[60] bg-[#111118] border border-[#2a2a35] rounded-2xl shadow-2xl overflow-hidden">
                     {results.length > 0 ? (
                         <>
                                 <div style={{ maxHeight: '256px', overflowY: 'auto' }} className="overscroll-contain">
-                                    {(results || []).map((item) => (
-                                        <div
-                                            key={item.externalId}
-                                            onClick={() => handleSelect(item)}
-                                            className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a1a25] cursor-pointer border-b border-[#2a2a35] last:border-b-0 transition-colors group"
-                                        >
-                                            <div className="w-8 h-11 rounded bg-[#18181f] flex-shrink-0 overflow-hidden">
-                                                {item.cover ? (
-                                                    <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">📖</div>
-                                                )}
-                                            </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="text-white font-semibold text-sm truncate group-hover:text-[#c8ff57] transition-colors">
-                                                {item.title}
-                                            </div>
+                                    {(results || []).map((item) => {
+                                        const displayTitle = item.title_english || item.title
+                                        return (
+                                            <div
+                                                key={item.externalId}
+                                                onClick={() => handleSelect(item)}
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a1a25] cursor-pointer border-b border-[#2a2a35] last:border-b-0 transition-colors group"
+                                            >
+                                                <div className="w-8 h-11 rounded bg-[#18181f] flex-shrink-0 overflow-hidden">
+                                                    {item.cover ? (
+                                                        <img src={item.cover} alt={displayTitle} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">📖</div>
+                                                    )}
+                                                </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-white font-semibold text-sm truncate group-hover:text-[#c8ff57] transition-colors">
+                                                    {displayTitle}
+                                                </div>
                                             <div className="flex items-center gap-2 mt-0.5">
                                                 {item.year && (
                                                     <span className="font-mono text-[10px] text-[#7a7a90]">{item.year}</span>
@@ -294,7 +279,7 @@ function MangaSearchBar({ id = 'manga-search' }) {
                                         </div>
                                         <span className="text-[#3a3a4a] group-hover:text-[#c8ff57] transition-colors flex-shrink-0">→</span>
                                     </div>
-                                    ))}
+                                )})}
                             </div>
                         </>
                     ) : !loading ? (
@@ -313,13 +298,16 @@ function MangaHome() {
     const navigate = useNavigate()
     const location = useLocation()
     const { topUsers } = useLeaderboard()
+    const { setAnimeSubSection } = useSection()
+
+    useEffect(() => {
+        setAnimeSubSection('manga')
+    }, [setAnimeSubSection])
     
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
     const [userAnime, setUserAnime] = useState([])
-    const [loadingLibrary, setLoadingLibrary] = useState(true)
 
-    const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
     const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type })
         setTimeout(() => setToast(null), 3000)
@@ -328,12 +316,11 @@ function MangaHome() {
     // ── Fetch user library ──
     useEffect(() => {
         const fetchLibrary = async () => {
-            if (!user) { setLoadingLibrary(false); return }
+            if (!user) return
             try {
                 const res = await api.get('/anime/library')
                 setUserAnime(res.data.library || [])
             } catch (err) { console.error(err) }
-            finally { setLoadingLibrary(false) }
         }
         fetchLibrary()
     }, [user, location.key])
@@ -358,15 +345,10 @@ function MangaHome() {
         '/anime/home?type=manga',
         { ttl: 10 * 60 * 1000 }
     )
-    const userId = user?.id || user?._id
-    const { data: activityData } = useCachedFetch(
-        userId ? `manga_activity_${userId}` : null,
-        userId ? `/anime/activity/${userId}` : null,
-        { enabled: !!userId, ttl: 2 * 60 * 1000 }
-    )
 
-    const sections = homeData?.sections || []
-    const activity = activityData?.activity || []
+
+
+    const sections = useMemo(() => homeData?.sections || [], [homeData?.sections])
 
     const userStats = useMemo(() => {
         const filtered = userAnime.filter(a => (a.type || a.mediaType) === 'manga')
@@ -381,6 +363,12 @@ function MangaHome() {
                 : '—'
         }
     }, [userAnime])
+
+    const getMyRating = useCallback((externalId) => {
+        if (!user) return null
+        const match = userAnime.find(a => String(a.externalId) === String(externalId) && (a.type === 'manga' || a.mediaType === 'manga'))
+        return match?.rating > 0 ? match.rating : null
+    }, [user, userAnime])
 
     const userRank = useMemo(() => {
         if (!user) return null
@@ -397,7 +385,7 @@ function MangaHome() {
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
     }), [])
 
-    const allAnime = useMemo(() => {
+    const allManga = useMemo(() => {
         if (!Array.isArray(sections)) return []
         return sections.flatMap(s => Array.isArray(s.items) ? s.items : [])
     }, [sections])
@@ -416,33 +404,27 @@ function MangaHome() {
             </div>
 
             {/* Hero */}
-            <section className="relative py-16 md:py-24 overflow-hidden min-h-[500px] flex items-center">
-                {(allAnime.length > 0 || !loading) && <HeroBanner animes={allAnime} />}
+            <section className="relative py-20 md:py-32 overflow-hidden min-h-[650px] flex items-center">
+                {(allManga.length > 0 || !loading) && <HeroBanner animes={allManga} />}
 
-                <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+                <div className="relative z-10 max-w-[1300px] mx-auto px-5 md:px-10">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_450px] gap-16 lg:gap-24 items-center">
                         <div>
                             <SubSectionToggle 
-                                current="manga"
-                                type="anime"
-                                options={[
-                                    { label: 'Anime', value: 'anime', path: '/anime' },
-                                    { label: 'Manga', value: 'manga', path: '/manga' }
-                                ]}
+                                 current="manga"
+                                 type="anime"
+                                 options={[
+                                     { label: 'Anime', value: 'anime', path: '/anime' },
+                                     { label: 'Manga', value: 'manga', path: '/manga' }
+                                 ]}
                             />
 
-                            <h1 className="font-black uppercase leading-none tracking-wide text-[#c8ff57] mb-2" style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', letterSpacing: '0.2em' }}>
-                                Hatch Your Library
-                            </h1>
                             <h2 className="font-black uppercase leading-none tracking-wide text-white mb-6" style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}>
-                                The Scroll<br />
-                                <span className="text-[#c8ff57]">Pond.</span>
+                                The Manga<br />
+                                <span className="text-[#c8ff57]">Shelf.</span>
                             </h2>
 
-                            <p className="text-[#a0a0b8] text-sm leading-relaxed mb-8 max-w-md">
-                                Track your favorite manga chapters. 
-                                Rate them, manage your backlog, and discover seasonal hits.
-                            </p>
+
 
                             <div className="flex flex-wrap gap-3 mb-10">
                                 {user ? (
@@ -511,10 +493,12 @@ function MangaHome() {
                                     {(recentAnime || []).map(item => {
                                         const sc = statusConfig[item.status] || statusConfig.planned
                                         return (
-                                            <div key={item._id} onClick={() => navigate(`/manga/${item.externalId}`)} className="flex items-center gap-4 bg-[#111118]/80 border border-[#2a2a35] rounded-lg p-3 hover:border-[#c8ff57]/30 transition-all cursor-pointer">
+                                            <div key={item._id} onClick={() => navigate(`/manga/${item.externalId}?type=manga`)} className="flex items-center gap-4 bg-[#111118]/80 border border-[#2a2a35] rounded-lg p-3 hover:border-[#c8ff57]/30 transition-all cursor-pointer">
                                                 <div className="w-14 h-10 rounded bg-[#18181f] bg-cover bg-center flex-shrink-0" style={{ backgroundImage: `url(${item.cover || item.coverImage})` }} />
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="text-white font-semibold text-sm truncate">{item.title}</div>
+                                                    <div className="text-white font-semibold text-sm truncate">
+                                                        {item.title_english || item.title}
+                                                    </div>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <span className={`font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm ${sc.bg} ${sc.color}`}>{sc.label}</span>
                                                         <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#2a2a35] text-[#94999c]">{item.type || item.mediaType}</span>
@@ -601,8 +585,9 @@ function MangaHome() {
                                     </div>
                                     <div 
                                         onClick={() => {
-                                            const type = section.title.toLowerCase().includes('trending') ? 'trending' : 
-                                                         section.title.toLowerCase().includes('top') ? 'top_rated' : 'coming_soon';
+                                            const lowerTitle = section.title.toLowerCase();
+                                            const type = lowerTitle.includes('trending') ? 'trending' : 
+                                                         (lowerTitle.includes('top') || lowerTitle.includes('popular')) ? 'top_rated' : 'coming_soon';
                                             navigate(`/explore/manga/${type}`);
                                         }}
                                         className="flex items-center gap-2 text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest group-hover:text-white transition-colors cursor-pointer"
@@ -615,7 +600,11 @@ function MangaHome() {
                                     {(section.items || []).slice(0, 15).map((item, idx) => (
                                         <MangaCard 
                                             key={`${section.title}-${item.externalId}-${idx}`} 
-                                            item={{ ...item, avgRating: homeData?.stats?.[item.externalId]?.avgRating }} 
+                                            item={{ 
+                                                ...item, 
+                                                avgRating: homeData?.stats?.[item.externalId]?.avgRating,
+                                                myRating: getMyRating(item.externalId)
+                                            }} 
                                         />
                                     ))}
                                 </div>
@@ -624,6 +613,8 @@ function MangaHome() {
                     )}
                 </div>
             </div>
+
+            <RecentActivityFeed defaultMedia="manga" />
 
             {showAddModal && (
                 <Suspense fallback={null}>

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 const SectionContext = createContext();
 
@@ -11,6 +12,8 @@ export const useSection = () => {
 };
 
 export const SectionProvider = ({ children }) => {
+    const { user, updateSettings } = useAuth();
+
     const [activeSection, setActiveSectionState] = useState(() => {
         const path = window.location.pathname;
         if (path.startsWith('/manga') || path.startsWith('/anime')) return 'anime';
@@ -32,6 +35,7 @@ export const SectionProvider = ({ children }) => {
         return localStorage.getItem('levellog_cinema_sub') || 'movie';
     });
 
+
     const setActiveSection = (section) => {
         setActiveSectionState(section);
         localStorage.setItem('levellog_section', section);
@@ -46,6 +50,7 @@ export const SectionProvider = ({ children }) => {
         setCinemaSubSectionState(sub);
         localStorage.setItem('levellog_cinema_sub', sub);
     };
+
 
     // Auto-sync section with URL path changes
     useEffect(() => {

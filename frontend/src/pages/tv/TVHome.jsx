@@ -2,6 +2,7 @@ import { useState, useRef, useMemo, useEffect, lazy, Suspense, memo, useCallback
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
+import { useSection } from '../../context/SectionContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Flame, Plus, Tv, ChevronRight } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
@@ -11,6 +12,7 @@ import { useLeaderboard } from '../../context/LeaderboardContext'
 import { Helmet } from 'react-helmet-async'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
 import StatsBar from '../../components/ui/StatsBar'
+import RecentActivityFeed from '../../components/ui/RecentActivityFeed'
 
 
 
@@ -43,8 +45,14 @@ const RatingDisplay = memo(({ myRating, platformAvg, hasUser }) => {
 
 const HeroBanner = memo(({ movies }) => {
     const isMobile = window.innerWidth < 768
+    const getSmallCover = (url) => {
+        if (!url) return url;
+        if (url.includes('tmdb.org')) return url.replace('/w500/', '/w200/');
+        return url;
+    }
+
     const covers = useMemo(() => 
-        movies.filter(m => m.cover).map(m => m.cover).filter((v, i, a) => a.indexOf(v) === i),
+        movies.filter(m => m.cover).map(m => getSmallCover(m.cover)).filter((v, i, a) => a.indexOf(v) === i),
         [movies]
     )
     
@@ -170,7 +178,7 @@ function TVSearchBar({ id = 'tv-search' }) {
     return (
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none z-10">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none z-10">
                     <Search size={18} strokeWidth={2.5} />
                 </span>
                 <input
@@ -179,10 +187,10 @@ function TVSearchBar({ id = 'tv-search' }) {
                     placeholder="Search any TV show..."
                     value={query}
                     onChange={handleChange}
-                    className="w-full bg-[#111118] border border-[#2a2a35] rounded-lg
-                                pl-11 pr-24 py-3.5 text-white text-sm
+                    className="w-full bg-[#111118] border border-[#2a2a35] rounded-xl
+                                pl-11 pr-32 py-4 text-white text-sm
                                 focus:outline-none focus:border-[#c8ff57]
-                                placeholder:text-[#94999c] transition-all"
+                                placeholder:text-[#94999c] transition-all shadow-inner"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[#a0a0b8] pointer-events-none">
                     {loading ? <span className="text-[#c8ff57] animate-pulse font-bold">searching…</span> : 'QuestDuck'}
@@ -190,7 +198,7 @@ function TVSearchBar({ id = 'tv-search' }) {
             </div>
 
             {open && (
-                <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-[60] bg-[#111118] border border-[#2a2a35] rounded-xl shadow-2xl overflow-hidden">
+                <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-[60] bg-[#111118] border border-[#2a2a35] rounded-2xl shadow-2xl overflow-hidden">
                     {results.length > 0 ? (
                         <>
                                 <div style={{ maxHeight: '256px', overflowY: 'auto' }} className="overscroll-contain">
@@ -243,6 +251,11 @@ function TVHome() {
     const navigate = useNavigate()
     const location = useLocation()
     const { topUsers } = useLeaderboard()
+    const { setCinemaSubSection } = useSection()
+
+    useEffect(() => {
+        setCinemaSubSection('tv')
+    }, [setCinemaSubSection])
     
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
@@ -300,6 +313,12 @@ function TVHome() {
         }
     }, [userMovies])
 
+    const getMyRating = useCallback((externalId) => {
+        if (!user) return null
+        const match = userMovies.find(m => String(m.externalId) === String(externalId) && (m.type === 'tv' || m.mediaType === 'tv'))
+        return match?.rating > 0 ? match.rating : null
+    }, [user, userMovies])
+
     const userRank = useMemo(() => {
         if (!user) return null
         return topUsers.find(tu => tu._id === (user.id || user._id))?.rank
@@ -330,11 +349,11 @@ function TVHome() {
                 </div>
             </div>
 
-            <section className="relative py-16 md:py-24 overflow-hidden min-h-[500px] flex items-center">
+            <section className="relative py-20 md:py-32 overflow-hidden min-h-[650px] flex items-center">
                 {(allMovies.length > 0 || !loading) && <HeroBanner movies={allMovies} />}
 
-                <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+                <div className="relative z-10 max-w-[1300px] mx-auto px-5 md:px-10">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_450px] gap-16 lg:gap-24 items-center">
                         <div>
                             <SubSectionToggle 
                                 current="tv"
@@ -345,9 +364,6 @@ function TVHome() {
                                 ]}
                             />
 
-                            <h1 className="font-black uppercase leading-none tracking-wide text-[#c8ff57] mb-2" style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', letterSpacing: '0.2em' }}>
-                                Hatch Your Watchlist
-                            </h1>
                             <h2 className="font-black uppercase leading-none tracking-wide text-white mb-6" style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}>
                                 The TV<br />
                                 <span className="text-[#c8ff57]">Pond.</span>
@@ -386,13 +402,13 @@ function TVHome() {
                             {user && userMovies.length > 0 ? (
                                 <div className="flex gap-8">
                                     {[
-                                        { value: userStats.total, label: '' },
-                                        { value: userStats.progress, label: 'Episodes' },
-                                        { value: userStats.avgRating, label: 'Avg Rating' }
-                                    ].map(stat => (
-                                        <div key={stat.label}>
-                                            <div className="font-black text-3xl text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stat.value}</div>
-                                            <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider mt-1">{stat.label}</div>
+                                        { val: userStats.total, lab: 'Shows' },
+                                        { val: userStats.progress, lab: 'Episodes' },
+                                        { val: userStats.avgRating, lab: 'Avg Rating' }
+                                    ].map((s, idx) => (
+                                        <div key={idx}>
+                                            <div className="font-black text-3xl text-white leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{s.val}</div>
+                                            <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider mt-1">{s.lab}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -513,8 +529,9 @@ function TVHome() {
                                     </div>
                                     <div 
                                         onClick={() => {
-                                            const type = section.title.toLowerCase().includes('trending') ? 'trending' : 
-                                                         section.title.toLowerCase().includes('top') ? 'top_rated' : 'coming_soon';
+                                            const lowerTitle = section.title.toLowerCase();
+                                            const type = lowerTitle.includes('trending') ? 'trending' : 
+                                                         (lowerTitle.includes('top') || lowerTitle.includes('popular')) ? 'top_rated' : 'coming_soon';
                                             navigate(`/explore/tv/${type}`);
                                         }}
                                         className="flex items-center gap-2 text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest group-hover:text-white transition-colors cursor-pointer"
@@ -537,10 +554,17 @@ function TVHome() {
                                                     <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">📺</div>
                                                 )}
 
-                                                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                                                    {stats[item.externalId]?.avgRating && (
-                                                        <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                                                            <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats[item.externalId].avgRating}</span>
+                                                <div className="absolute top-2 right-2 flex flex-col gap-1.5 items-end z-10">
+                                                    {Number(stats[item.externalId]?.avgRating) > 0 && (
+                                                        <div className="bg-black/85 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center justify-center gap-1.5 shadow-xl min-w-[52px]">
+                                                            <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
+                                                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.5px' }}>{stats[item.externalId].avgRating}</span>
+                                                        </div>
+                                                    )}
+                                                    {getMyRating(item.externalId) && (
+                                                        <div className="bg-black/85 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center justify-center gap-1.5 shadow-xl min-w-[52px]">
+                                                            <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-bold">ME</span>
+                                                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.5px' }}>{getMyRating(item.externalId)}</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -571,6 +595,8 @@ function TVHome() {
                     )}
                 </div>
             </div>
+
+            <RecentActivityFeed defaultMedia="tv" />
 
             {showAddModal && (
                 <Suspense fallback={null}>

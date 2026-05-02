@@ -129,7 +129,7 @@ function NavbarSectionAdapter() {
                         user ? (
                             <>
                                 <Link to="/universal-search" onClick={handleLinkClick} className="p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
-                                    <Search size={20} className="text-white group-hover:text-[#c8ff57] transition-colors" />
+                                    <Search size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
                                 </Link>
 
                                 <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
@@ -258,7 +258,7 @@ function NavbarSectionAdapter() {
                         <>
                         <Link to="/universal-search" onClick={handleLinkClick}
                             className="text-sm font-semibold tracking-widest uppercase text-[#94a3b8] flex items-center gap-3 py-1">
-                            <Search size={18} />
+                            <Search size={18} className="text-[#7a7a90]" />
                             <span>Search</span>
                         </Link>
 

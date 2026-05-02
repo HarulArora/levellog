@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSection } from '../../context/SectionContext'
+
 
 const AnimeCard = memo(({ anime, onDelete, onEdit }) => {
     const navigate = useNavigate()
@@ -31,7 +31,8 @@ const AnimeCard = memo(({ anime, onDelete, onEdit }) => {
 
     const handleCardClick = () => {
         if (anime.externalId) {
-            navigate(`/${isManga ? 'manga' : 'anime'}/${anime.externalId}`)
+            const destType = isManga ? 'manga' : 'anime'
+            navigate(`/${destType}/${anime.externalId}?type=${destType}`)
         }
     }
 

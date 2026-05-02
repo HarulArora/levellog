@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo, useRef, memo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, memo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
-import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { Search, Star } from 'lucide-react'
@@ -117,8 +116,6 @@ const GameCard = memo(({ game, entry, onClick }) => {
     const userRating = entry?.rating
     const statusStyle = status ? STATUS_COLORS[status] : null
 
-    // score color matching the HTML sample
-    const scoreColor = (r) => r >= 8 ? '#c8ff57' : r >= 6 ? '#5c9fff' : '#ff5c5c'
 
     return (
         <div
@@ -167,7 +164,7 @@ const GameCard = memo(({ game, entry, onClick }) => {
                         right: 8,
                         background: 'rgba(0,0,0,0.82)',
                         backdropFilter: 'blur(4px)',
-                        border: '1px solid rgba(92,159,255,0.3)',
+                        border: '1px solid #5c9fff',
                         borderRadius: 4,
                         padding: '3px 6px',
                         display: 'flex',
@@ -176,10 +173,11 @@ const GameCard = memo(({ game, entry, onClick }) => {
                         zIndex: 10,
                         boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
                     }}>
-                        <Star size={9} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                        <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
                         <span style={{
                             fontFamily: "'Bebas Neue', sans-serif",
-                            fontSize: 12,
+                            fontSize: 11,
+                            fontWeight: 900,
                             color: '#5c9fff',
                             letterSpacing: '0.5px',
                             lineHeight: 1
@@ -278,7 +276,6 @@ const GameCard = memo(({ game, entry, onClick }) => {
 })
 
 export default function Discover() {
-    const { user } = useAuth()
     const navigate = useNavigate()
     const { games: userLibrary } = useGamesContext()
 
@@ -358,7 +355,7 @@ export default function Discover() {
         }
 
         setSearchParams(newParams, { replace: true })
-    }, [searchQuery, activeGenre, page])
+    }, [searchQuery, activeGenre, page, searchParams, setSearchParams])
 
     useEffect(() => {
         const q = searchQuery.trim()

@@ -32,7 +32,7 @@ const MangaCard = memo(({ anime: manga, onDelete, onEdit }) => {
 
     const handleCardClick = () => {
         if (manga.externalId) {
-            navigate(`/manga/${manga.externalId}`)
+            navigate(`/manga/${manga.externalId}?type=manga`)
         }
     }
 

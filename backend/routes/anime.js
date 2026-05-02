@@ -37,7 +37,7 @@ const fetchRelationCover = async (type, id) => {
 const formatJikanItem = (item, type) => ({
     id: item.mal_id,
     externalId: item.mal_id,
-    title: item.title || item.name,
+    title: item.title_english || item.title || item.name,
     cover: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
     genre: item.genres?.[0]?.name || 'Media',
     genres: item.genres?.map(g => g.name) || [],
@@ -45,7 +45,7 @@ const formatJikanItem = (item, type) => ({
     score: item.score,
     summary: item.synopsis,
     status: item.status,
-    airingStatus: item.status, // Jikan status is the airing status
+    airingStatus: item.status, 
     episodes: item.episodes,
     chapters: item.chapters,
     studios: item.studios?.map(s => s.name).join(', '),
@@ -54,6 +54,164 @@ const formatJikanItem = (item, type) => ({
     rating: item.rating,
     type: type
 });
+
+const fetchAnilistEnglishTitles = async (malIds, type = 'ANIME') => {
+    if (!malIds || malIds.length === 0) return {};
+    const aniType = type.toUpperCase() === 'MANGA' ? 'MANGA' : 'ANIME';
+    const query = `
+    query ($idMal_in: [Int], $type: MediaType) {
+        Page(page: 1, perPage: 50) {
+            media(idMal_in: $idMal_in, type: $type) {
+                idMal
+                title { english romaji }
+                coverImage { large }
+            }
+        }
+    }`;
+
+    try {
+        const response = await apiClient.post('https://graphql.anilist.co', {
+            query,
+            variables: { idMal_in: malIds, type: aniType }
+        });
+        const mapping = {};
+        response.data.data.Page.media.forEach(m => {
+            mapping[m.idMal] = {
+                title: m.title.english || m.title.romaji,
+                cover: m.coverImage.large
+            };
+        });
+        return mapping;
+    } catch (e) {
+        console.error('AniList Titles Error:', e.message);
+        return {};
+    }
+};
+
+const fetchAnilistFullDetail = async (idMal, type = 'anime') => {
+    try {
+        if (!idMal || isNaN(parseInt(idMal))) {
+            console.error('Invalid idMal passed to fetchAnilistFullDetail:', idMal);
+            return null;
+        }
+
+        const aniType = type.toUpperCase() === 'MANGA' ? 'MANGA' : 'ANIME';
+        const query = `
+        query ($idMal: Int, $type: MediaType) {
+          Media(idMal: $idMal, type: $type) {
+            id
+            idMal
+            title { english romaji }
+            description
+            coverImage { extraLarge large }
+            bannerImage
+            genres
+            averageScore
+            status
+            episodes
+            chapters
+            format
+            trailer { id site }
+            externalLinks { url site }
+            characters(perPage: 24) {
+              edges {
+                role
+                node {
+                  name { full }
+                  image { large }
+                  id
+                  favourites
+                }
+                voiceActors(language: JAPANESE) {
+                  name { full }
+                  image { large }
+                }
+              }
+            }
+            relations {
+              edges {
+                relationType
+                node {
+                  idMal
+                  type
+                  title { english romaji }
+                  coverImage { large }
+                }
+              }
+            }
+            recommendations(perPage: 6) {
+              nodes {
+                mediaRecommendation {
+                  idMal
+                  title { english romaji }
+                  coverImage { large }
+                }
+              }
+            }
+          }
+        }
+        `;
+
+        const response = await apiClient.post('https://graphql.anilist.co', {
+            query,
+            variables: { idMal: parseInt(idMal), type: aniType }
+        });
+
+        const data = response.data.data.Media;
+        if (!data) return null;
+
+        const anime = {
+            id: data.idMal,
+            externalId: data.idMal,
+            anilistId: data.id,
+            title: data.title.english || data.title.romaji,
+            summary: data.description,
+            cover: data.coverImage.extraLarge || data.coverImage.large,
+            banner: data.bannerImage,
+            genres: data.genres,
+            genre: data.genres?.[0] || 'Media',
+            score: data.averageScore ? data.averageScore / 10 : null,
+            status: data.status,
+            episodes: data.episodes,
+            chapters: data.chapters,
+            type: type,
+            format: data.format,
+            trailer: data.trailer?.site === 'youtube' ? data.trailer.id : null,
+            externalLinks: data.externalLinks.map(l => ({ url: l.url, site: l.site })),
+            streamingLinks: data.externalLinks.map(l => ({ url: l.url, name: l.site })),
+            cast: data.characters.edges.map(e => ({
+                name: e.node.name.full,
+                role: e.role,
+                image: e.node.image.large,
+                favorites: e.node.favourites,
+                va: e.voiceActors?.[0] ? { 
+                    name: e.voiceActors[0].name.full, 
+                    image: e.voiceActors[0].image.large 
+                } : null
+            })),
+            relations: data.relations.edges.map(e => ({
+                relation: e.relationType,
+                items: [{
+                    id: e.node.idMal,
+                    name: e.node.title.english || e.node.title.romaji,
+                    type: e.node.type?.toLowerCase(),
+                    cover: e.node.coverImage?.large
+                }]
+            })),
+            similar: data.recommendations.nodes.map(n => ({
+                id: n.mediaRecommendation?.idMal,
+                title: n.mediaRecommendation?.title.english || n.mediaRecommendation?.title.romaji,
+                cover: n.mediaRecommendation?.coverImage?.large
+            })).filter(i => i.id),
+            screenshots: [] // AniList doesn't provide screenshots directly in this query
+        };
+
+        return anime;
+    } catch (e) {
+        console.error('AniList Full Detail Error:', e.message);
+        return null;
+    }
+};
 
 // ── ASYNC COVER FETCH (For speed optimization) ──
 router.get('/cover/:type/:id', async (req, res) => {
@@ -141,7 +299,31 @@ router.get('/home', async (req, res) => {
 
         // Aggregate stats
         const allIds = [...trending, ...topRated, ...upcoming].map(i => i.externalId);
-        const stats = await fetchMediaStats(allIds, type);
+        const [stats, englishTitles] = await Promise.all([
+            fetchMediaStats(allIds, type),
+            fetchAnilistEnglishTitles(allIds, type)
+        ]);
+
+        // Standardize English Titles and Deduplicate
+        const finalizeList = (list) => {
+            const seen = new Set();
+            return list.map(item => {
+                const meta = englishTitles[item.externalId];
+                if (meta) {
+                    item.title = meta.title;
+                    item.cover = meta.cover;
+                }
+                return item;
+            }).filter(item => {
+                if (seen.has(item.externalId)) return false;
+                seen.add(item.externalId);
+                return true;
+            });
+        };
+
+        trending = finalizeList(trending);
+        topRated = finalizeList(topRated);
+        upcoming = finalizeList(upcoming);
 
         const sections = [
             { title: `Trending ${type === 'manga' ? 'Manga' : 'Anime'}`, items: trending },
@@ -176,7 +358,24 @@ router.get('/search', protectOptional, async (req, res) => {
             retryDelay: 1000
         });
 
-        const results = (response.data?.data || []).map(item => formatJikanItem(item, type));
+        let results = (response.data?.data || []).map(item => formatJikanItem(item, type));
+        
+        // Resolve English Titles and Deduplicate
+        const englishTitles = await fetchAnilistEnglishTitles(results.map(i => i.externalId), type);
+        const seen = new Set();
+        results = results.map(item => {
+            const meta = englishTitles[item.externalId];
+            if (meta) {
+                item.title = meta.title;
+                item.cover = meta.cover;
+            }
+            return item;
+        }).filter(item => {
+            if (seen.has(item.externalId)) return false;
+            seen.add(item.externalId);
+            return true;
+        });
+
         const stats = await fetchMediaStats(results.map(r => r.externalId), type);
         // ── FETCH USER RATINGS IF AUTHENTICATED ──
         let userRatings = {}
@@ -232,7 +431,24 @@ router.get('/discover', async (req, res) => {
             retryDelay: 2000 
         });
         
-        const results = (response.data?.data || []).map(item => formatJikanItem(item, type));
+        let results = (response.data?.data || []).map(item => formatJikanItem(item, type));
+        
+        // Resolve English Titles and Deduplicate
+        const englishTitles = await fetchAnilistEnglishTitles(results.map(i => i.externalId), type);
+        const seen = new Set();
+        results = results.map(item => {
+            const meta = englishTitles[item.externalId];
+            if (meta) {
+                item.title = meta.title;
+                item.cover = meta.cover;
+            }
+            return item;
+        }).filter(item => {
+            if (seen.has(item.externalId)) return false;
+            seen.add(item.externalId);
+            return true;
+        });
+
         const stats = await fetchMediaStats(results.map(r => r.externalId), type);
         const result = { 
             items: results, 
@@ -293,31 +509,71 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
         const { type = 'anime' } = req.query;
         const userId = req.user?._id;
 
-        const cacheKey = `detail-v10-${type}-${id}`;
+        const cacheKey = `detail-v12-${type}-${id}`; // Bumped version
         let anime = jikanCache.get(cacheKey);
 
         if (!anime) {
-            const requestConfig = { retry: 3, retryDelay: 1000 };
-            const [mainRes, picsRes, recsRes, videoRes, charRes, staffRes, streamingRes, externalRes] = await Promise.all([
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/full`, requestConfig),
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/pictures`, requestConfig).catch(() => ({ data: { data: [] } })),
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/recommendations`, requestConfig).catch(() => ({ data: { data: [] } })),
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/videos`, requestConfig).catch(() => ({ data: { data: {} } })),
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/characters`, requestConfig).catch(() => ({ data: { data: [] } })),
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/staff`, requestConfig).catch(() => ({ data: { data: [] } })),
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/streaming`, requestConfig).catch(() => ({ data: { data: [] } })),
-                apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/external`, requestConfig).catch(() => ({ data: { data: [] } }))
-            ]);
+            // ── TRY ANILIST FIRST ──
+            anime = await fetchAnilistFullDetail(id, type);
 
-            const rawData = mainRes.data.data;
-            anime = formatJikanItem(rawData, type);
-            anime.streamingLinks = streamingRes.data.data || [];
-            anime.externalLinks = externalRes.data.data || [];
+            if (!anime) {
+                console.log(`AniList missed for ${type} ${id}, falling back to Jikan...`);
+                const requestConfig = { retry: 3, retryDelay: 1000 };
+                const [mainRes, picsRes, recsRes, videoRes, charRes, staffRes, streamingRes, externalRes] = await Promise.all([
+                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/full`, requestConfig),
+                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/pictures`, requestConfig).catch(() => ({ data: { data: [] } })),
+                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/recommendations`, requestConfig).catch(() => ({ data: { data: [] } })),
+                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/videos`, requestConfig).catch(() => ({ data: { data: {} } })),
+                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/characters`, requestConfig).catch(() => ({ data: { data: [] } })),
+                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/staff`, requestConfig).catch(() => ({ data: { data: [] } })),
+                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/streaming`, requestConfig).catch(() => ({ data: { data: [] } })),
+                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/external`, requestConfig).catch(() => ({ data: { data: [] } }))
+                ]);
 
-            // ── TMDB WATCH PROVIDER INTEGRATION ──
+                const rawData = mainRes.data.data;
+                anime = formatJikanItem(rawData, type);
+                anime.streamingLinks = streamingRes.data.data || [];
+                anime.externalLinks = externalRes.data.data || [];
+                
+                // Extract Relations
+                anime.relations = rawData.relations?.map(rel => ({
+                    relation: rel.relation,
+                    items: rel.entry.map(e => ({
+                        id: e.mal_id,
+                        name: e.name,
+                        type: e.type
+                    }))
+                })) || [];
+
+                // Extract Staff
+                anime.staff = staffRes.data.data?.slice(0, 8).map(s => ({
+                    name: s.person.name,
+                    positions: s.positions,
+                    image: s.person.images?.jpg?.image_url
+                })) || [];
+
+                anime.screenshots = picsRes.data.data?.map(p => p.webp?.large_image_url || p.jpg?.large_image_url).slice(0, 8) || [];
+                
+                anime.cast = charRes.data.data?.slice(0, 24).map(c => {
+                    const va = c.voice_actors?.find(v => v.language === 'Japanese');
+                    return {
+                        name: c.character.name,
+                        role: c.role,
+                        image: c.character.images?.webp?.image_url || c.character.images?.jpg?.image_url,
+                        favorites: c.character.favorites,
+                        va: va ? { name: va.person.name, image: va.person.images?.jpg?.image_url } : null
+                    };
+                }) || [];
+
+                anime.similar = recsRes.data.data?.slice(0, 6).map(r => ({
+                    id: r.entry.mal_id,
+                    title: r.entry.title,
+                    cover: r.entry.images?.webp?.large_image_url || r.entry.images?.jpg?.large_image_url
+                })) || [];
+            }
+
+            // ── TMDB WATCH PROVIDER INTEGRATION (Always run for regional data) ──
             try {
-                // Search TMDB for this anime to get regional watch providers
-                // Search both tv and movie since some anime are films
                 const animeTitle = anime.title;
                 const tmdbSearch = await apiClient.get(`${TMDB_BASE_URL}/search/multi`, {
                     params: { 
@@ -340,56 +596,29 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
                     anime.watchProviders = providersRes.data.results || {};
                 }
             } catch (tmdbErr) {
-                console.error('TMDB Provider Fetch Failed for Anime:', tmdbErr.message);
+                console.error('TMDB Provider Fetch Failed:', tmdbErr.message);
                 anime.watchProviders = {};
             }
+
+            // Resolve English titles for relations/similar if they were fetched from Jikan or just to be safe
+            const relatedIds = [];
+            anime.relations.forEach(r => r.items.forEach(i => relatedIds.push(i.id)));
+            anime.similar.forEach(i => relatedIds.push(i.id));
             
-            // Extract Relations - FAST (No cover fetching here)
-            anime.relations = rawData.relations?.map(rel => ({
-                relation: rel.relation,
-                items: rel.entry.map(e => ({
-                    id: e.mal_id,
-                    name: e.name,
-                    type: e.type
-                }))
-            })) || [];
+            const relatedEnglish = await fetchAnilistEnglishTitles(relatedIds, type);
+            anime.relations.forEach(r => r.items.forEach(i => {
+                if (relatedEnglish[i.id]) {
+                    i.name = relatedEnglish[i.id].title;
+                    i.cover = relatedEnglish[i.id].cover;
+                }
+            }));
+            anime.similar.forEach(i => {
+                if (relatedEnglish[i.id]) {
+                    i.title = relatedEnglish[i.id].title;
+                    i.cover = relatedEnglish[i.id].cover;
+                }
+            });
 
-            // Extract Staff
-            anime.staff = staffRes.data.data?.slice(0, 8).map(s => ({
-                name: s.person.name,
-                positions: s.positions,
-                image: s.person.images?.jpg?.image_url
-            })) || [];
-
-            // Explicitly find relations (IDs only for frontend to fetch covers lazily)
-            const adaptation = rawData.relations?.find(r => r.relation === 'Adaptation')?.entry?.[0];
-            if (adaptation && adaptation.type === 'manga') {
-                anime.sourceManga = { id: adaptation.mal_id, name: adaptation.name };
-            }
-
-            const prequel = rawData.relations?.find(r => r.relation === 'Prequel')?.entry?.[0];
-            const sequel = rawData.relations?.find(r => r.relation === 'Sequel')?.entry?.[0];
-            if (prequel) anime.prequel = { id: prequel.mal_id, name: prequel.name, type: prequel.type };
-            if (sequel) anime.sequel = { id: sequel.mal_id, name: sequel.name, type: sequel.type };
-            anime.screenshots = picsRes.data.data?.map(p => p.webp?.large_image_url || p.jpg?.large_image_url).slice(0, 8) || [];
-            
-            anime.cast = charRes.data.data?.slice(0, 24).map(c => {
-                const va = c.voice_actors?.find(v => v.language === 'Japanese');
-                return {
-                    name: c.character.name,
-                    role: c.role,
-                    image: c.character.images?.webp?.image_url || c.character.images?.jpg?.image_url,
-                    favorites: c.character.favorites,
-                    va: va ? { name: va.person.name, image: va.person.images?.jpg?.image_url } : null
-                };
-            }) || [];
-
-            anime.similar = recsRes.data.data?.slice(0, 6).map(r => ({
-                id: r.entry.mal_id,
-                title: r.entry.title,
-                cover: r.entry.images?.webp?.large_image_url || r.entry.images?.jpg?.large_image_url
-            })) || [];
-            
             jikanCache.set(cacheKey, anime);
         }
 

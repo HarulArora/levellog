@@ -167,7 +167,7 @@ const GifPicker = ({ onSelect, onClose }) => {
                         <Search 
                             size={16} 
                             strokeWidth={2.5}
-                            className={`absolute left-3.5 top-1/2 -translate-y-1/2 z-10 pointer-events-none transition-colors ${loading ? 'text-[#c8ff57]' : 'text-white'}`} 
+                            className={`absolute left-3.5 top-1/2 -translate-y-1/2 z-10 pointer-events-none transition-colors ${loading ? 'text-[#c8ff57]' : 'text-[#7a7a90]'}`} 
                         />
                     </div>
                     <button 

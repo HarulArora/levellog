@@ -63,8 +63,9 @@ const MovieCard = memo(({ item, section }) => {
                 
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                     {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
                         </div>
                     )}
                 </div>
@@ -180,7 +181,7 @@ function MoviesDiscover() {
                         </div>
 
                         <form onSubmit={handleSearch} className="w-full md:w-96 relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90]" size={18} />
                             <input 
                                 type="text"
                                 placeholder="Search movies..."

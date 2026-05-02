@@ -34,8 +34,8 @@ createRoot(document.getElementById('root')).render(
         <HelmetProvider>
             {GoogleClientId ? (
                 <GoogleOAuthProvider clientId={GoogleClientId}>
-                    <SectionProvider>
                     <AuthProvider>
+                    <SectionProvider>
                         <GamesProvider>
                             <DealsProvider>
                                 <FollowProvider>
@@ -45,12 +45,12 @@ createRoot(document.getElementById('root')).render(
                                 </FollowProvider>
                             </DealsProvider>
                         </GamesProvider>
-                    </AuthProvider>
                     </SectionProvider>
+                    </AuthProvider>
                 </GoogleOAuthProvider>
             ) : (
-                <SectionProvider>
                 <AuthProvider>
+                <SectionProvider>
                     <GamesProvider>
                         <DealsProvider>
                             <FollowProvider>
@@ -60,8 +60,8 @@ createRoot(document.getElementById('root')).render(
                             </FollowProvider>
                         </DealsProvider>
                     </GamesProvider>
-                </AuthProvider>
                 </SectionProvider>
+                </AuthProvider>
             )}
         </HelmetProvider>
     </StrictMode>

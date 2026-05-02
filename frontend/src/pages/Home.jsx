@@ -221,7 +221,7 @@ function GameSearchBar({ id = 'game-search' }) {
         <div ref={wrapperRef} className="relative w-full">
             {/* Input */}
             <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none z-10">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none z-10">
                     <Search size={18} strokeWidth={2.5} />
                 </span>
                 <input

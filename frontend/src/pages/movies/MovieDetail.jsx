@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback, memo, useRef } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
-import { invalidateCache } from '../../utils/cache'
 import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play, Film, Tv, Flame, ChevronRight, CreditCard, ShoppingBag, Layers } from 'lucide-react'
 import AddMovieModal from '../../components/library/AddMovieModal'
 import Skeleton from '../../components/ui/Skeleton'
@@ -93,9 +92,8 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
     const [submittingReply, setSubmittingReply] = useState(false)
     const [editingText, setEditingText] = useState('')
     const [isEditing, setIsEditing] = useState(false)
-    const [submittingEdit, setSubmittingEdit] = useState(false)
     const [isEdited, setIsEdited] = useState(comment.edited || false)
-    const [repliesVisible, setRepliesVisible] = useState(true)
+    const [repliesVisible] = useState(true)
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [showBurst, setShowBurst] = useState(false)
     const [likes, setLikes] = useState(comment.likeCount || 0)
@@ -152,13 +150,11 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
 
     const handleEdit = async () => {
         if (!editingText.trim()) return
-        setSubmittingEdit(true)
         try {
             await api.put(`/movies/comments/${comment._id}`, { text: editingText })
             setIsEditing(false); setIsEdited(true)
             onRefresh(true)
         } catch (err) { console.error(err) }
-        finally { setSubmittingEdit(false) }
     }
 
     const handleReply = async () => {
@@ -326,7 +322,6 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
 
 function MovieDetail() {
     const { id } = useParams()
-    const location = useLocation()
     const navigate = useNavigate()
     const { user, updateUser } = useAuth()
     const type = 'movie'
@@ -425,6 +420,7 @@ function MovieDetail() {
             else showXpToast('💔 Unliked', 'loss')
             refetchContext(true)
         } catch (err) {
+            console.error('Like error:', err)
             setLiked(wasLiked)
             if (oldData) setContextData(oldData)
         } finally { setLiking(false) }
@@ -454,6 +450,7 @@ function MovieDetail() {
             if (res.data.wishlisted) showXpToast('🎯 Wishlisted!', 'gain')
             refetchContext(true)
         } catch (err) {
+            console.error('Wishlist error:', err)
             setWishlisted(wasWishlisted)
             if (oldData) setContextData(oldData)
         } finally { setWishing(false) }
@@ -481,6 +478,7 @@ function MovieDetail() {
             setTimeout(() => setListToast(null), 3000)
             setShowListModal(false)
         } catch (err) { 
+            console.error('Add to list error:', err)
             setListToast({ msg: 'Failed to add to list', type: 'error' }) 
             setTimeout(() => setListToast(null), 3000)
         }
@@ -496,6 +494,7 @@ function MovieDetail() {
             showXpToast('💬 Comment posted', 'gain')
             refetchComments(true)
         } catch (err) {
+            console.error('Comment error:', err)
             setCommentText(text)
             showXpToast('Failed to post comment', 'loss')
         } finally { setSubmittingComment(false) }
@@ -564,30 +563,47 @@ function MovieDetail() {
                                 ))}
                             </div>
 
-                            <div className="flex flex-wrap gap-8 mb-8">
-                                <div>
+                            <div className="flex flex-wrap gap-x-12 gap-y-6 mb-10 py-6 border-y border-white/5 backdrop-blur-sm">
+                                {/* Avg Rating */}
+                                <div className="group transition-all">
                                     <div className="flex items-center gap-2">
-                                        <div className="font-black text-4xl text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.avgRating || '—'}{stats?.avgRating && <small className="text-[10px] font-normal opacity-60">/10</small>}</div>
+                                        <div className="font-black text-5xl text-[#5c9fff] leading-none drop-shadow-[0_0_15px_rgba(92,159,255,0.3)]"
+                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                            {stats?.avgRating > 0 ? stats.avgRating : '—'}
+                                            {stats?.avgRating > 0 && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal align-top ml-1">/10</small>}
+                                        </div>
                                     </div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Avg Rating ({stats?.ratingCount || 0})</div>
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 flex items-center gap-1.5 group-hover:text-[#5c9fff] transition-colors">
+                                        Avg Rating {stats?.ratingCount > 0 && <span className="opacity-60">({stats.ratingCount})</span>}
+                                    </div>
                                 </div>
+
                                 {myEntry?.rating > 0 && (
-                                    <div>
-                                        <div className="font-black text-4xl text-[#c8ff57] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{myEntry.rating}<small className="text-[10px] font-normal opacity-60">/10</small></div>
-                                        <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">My Rating</div>
+                                    <div className="group transition-all">
+                                        <div className="font-black text-5xl text-[#c8ff57] leading-none drop-shadow-[0_0_15px_rgba(200,255,87,0.3)]"
+                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                            {myEntry.rating}<small className="font-mono text-[10px] text-[#a0a0b8] font-normal align-top ml-1">/10</small>
+                                        </div>
+                                        <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#c8ff57] transition-colors">My Rating</div>
                                     </div>
                                 )}
-                                <div>
-                                    <div className="font-black text-4xl text-[#ff9f5c] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.loggedCount || 0}</div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">In Pond</div>
+
+                                <div className="group transition-all">
+                                    <div className="font-black text-5xl text-[#ff9f5c] leading-none drop-shadow-[0_0_15px_rgba(255,159,92,0.3)]"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.loggedCount ?? '—'}</div>
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#ff9f5c] transition-colors">In Pond</div>
                                 </div>
-                                <div>
-                                    <div className="font-black text-4xl text-[#ff5c5c] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.likeCount || 0}</div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Likes</div>
+
+                                <div className="group transition-all">
+                                    <div className="font-black text-5xl text-[#ff5c5c] leading-none drop-shadow-[0_0_15px_rgba(255,92,92,0.3)]"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.likeCount ?? '—'}</div>
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#ff5c5c] transition-colors">Likes</div>
                                 </div>
-                                <div>
-                                    <div className="font-black text-4xl text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.wishlistCount || 0}</div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Wishlists</div>
+
+                                <div className="group transition-all">
+                                    <div className="font-black text-5xl text-[#5c9fff] leading-none drop-shadow-[0_0_15px_rgba(92,159,255,0.3)]"
+                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.wishlistCount ?? '—'}</div>
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#5c9fff] transition-colors">Wishlists</div>
                                 </div>
                             </div>
 
@@ -1144,7 +1160,10 @@ function MovieDetail() {
                             const libRes = await api.get('/movies/library')
                             setUserLibrary(libRes.data.library || [])
                             return { success: true }
-                        } catch (err) { return { success: false } }
+                        } catch (err) {
+                            console.error('Log error:', err)
+                            return { success: false }
+                        }
                     }}
                     preselectedMovie={movie}
                     existingEntry={myEntry}

@@ -43,7 +43,7 @@ function SearchBar({ value, onChange, placeholder = 'Search...' }) {
                 onChange={e => onChange(e.target.value)}
                 placeholder={placeholder}
                 className="w-full bg-[#111118] border border-[#2a2a35] rounded-xl
-                           px-3 py-2.5 pl-10 text-sm text-white font-mono
+                           px-3 py-2.5 pl-10 pr-10 text-sm text-white font-mono
                            focus:outline-none focus:border-[#c8ff57]/50
                            placeholder:text-[#7a7a90] transition-all shadow-sm"
             />
@@ -125,9 +125,9 @@ function MediaGrid({ items, onRemove, mediaType, navigate }) {
                             )}
                             
                             {/* Community Average Rating Badge */}
-                            {mediaType === 'game' && item.avgRating > 0 && (
+                            {item.avgRating > 0 && (
                                 <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1.5 py-0.5 shadow-xl z-10">
-                                    <Star size={9} className="text-[#5c9fff] fill-current" />
+                                    <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
                                     <span className="font-black text-[11px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
                                 </div>
                             )}
@@ -136,7 +136,14 @@ function MediaGrid({ items, onRemove, mediaType, navigate }) {
                             </div>
                         </div>
                         <div className="p-3">
-                            <div className="text-white font-bold text-xs leading-tight line-clamp-2 h-[32px] group-hover/card:text-[#c8ff57] transition-colors">{item.gameTitle}</div>
+                            {(() => {
+                                const displayTitle = item.title_english || item.gameTitle
+                                return (
+                                    <div className="text-white font-bold text-xs leading-tight line-clamp-2 h-[32px] group-hover/card:text-[#c8ff57] transition-colors">
+                                        {displayTitle}
+                                    </div>
+                                )
+                            })()}
                             <div className="font-mono text-[9px] text-[#4a4a5e] mt-1 uppercase tracking-wider">{item.genre || mediaType}</div>
                         </div>
                     </div>
@@ -260,6 +267,7 @@ function ListDetail({ list, onBack, onUpdate, showToast, mediaType }) {
                 const results = (res.data.games || res.data.results || []).map(g => ({
                     igdbId: g.igdbId || g.externalId || g.id,
                     gameTitle: g.title,
+                    title_english: g.title_english,
                     gameCover: g.cover
                 }))
                 setSearchResults(results.filter(g => !alreadyInList.has(String(g.igdbId))))
@@ -420,7 +428,7 @@ function Lists() {
     }, [])
 
     const userId = user?.id || user?._id
-    const { data: listBundle, loading, refetch: refetchLists, setData: setListBundle } = useCachedFetch(
+    const { data: listBundle, refetch: refetchLists, setData: setListBundle } = useCachedFetch(
         userId ? `lists_${userId}_${mediaType}` : null,
         userId ? `/lists/me?mediaType=${mediaType}` : null,
         { enabled: !!userId, ttl: 30 * 1000 } 
@@ -436,9 +444,9 @@ function Lists() {
         fetchData(false)
         setActiveTab('lists')
         setSelectedListId(null)
-    }, [mediaType])
+    }, [mediaType, fetchData])
 
-    const { customLists = [], likesCount = 0, wishlistCount = 0, likesPreview = [], wishlistPreview = [] } = listBundle || {}
+    const { customLists = [], likesCount = 0, wishlistCount = 0 } = listBundle || {}
 
     const selectedList = useMemo(() => selectedListId ? customLists.find(l => l._id === selectedListId) : null, [selectedListId, customLists])
     const filteredLikes = useMemo(() => filterByQuery(fullLikes || [], likedSearch), [fullLikes, likedSearch])
@@ -499,7 +507,7 @@ function Lists() {
                 user: { ...prev.user, [field]: value }
             }))
             showToast('Privacy updated!')
-        } catch (err) {
+        } catch {
             showToast('Failed to update privacy', 'error')
         }
     }

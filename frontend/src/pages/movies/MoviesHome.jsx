@@ -171,7 +171,7 @@ function MovieSearchBar({ id = 'movie-search', section }) {
     return (
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none z-10">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none z-10">
                     <Search size={18} strokeWidth={2.5} />
                 </span>
                 <input
@@ -540,8 +540,9 @@ function MoviesHome() {
                                                 
                                                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                                                     {stats[item.externalId]?.avgRating && (
-                                                        <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                                                            <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats[item.externalId].avgRating}</span>
+                                                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                                                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                                                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats[item.externalId].avgRating}</span>
                                                         </div>
                                                     )}
                                                 </div>

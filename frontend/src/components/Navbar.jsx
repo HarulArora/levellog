@@ -122,7 +122,7 @@ function Navbar() {
                         }}
                         className="w-full relative group"
                     >
-                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white group-focus-within:text-[#c8ff57] transition-colors" />
+                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors" />
                         <input 
                             name="search"
                             type="text"

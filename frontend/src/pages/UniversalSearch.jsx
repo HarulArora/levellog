@@ -6,6 +6,7 @@ import useCachedFetch from '../hooks/useCachedFetch'
 import { useFollow } from '../context/FollowContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import { useLeaderboard } from '../context/LeaderboardContext'
+import { useSection } from '../context/SectionContext'
 import Skeleton, { GameCardSkeleton } from '../components/ui/Skeleton'
 
 const RANK_CARD_STYLES = {
@@ -61,11 +62,9 @@ function UniversalSearch() {
         navigate(`/universal-search?${params.toString()}`, { replace: true })
     }, [debouncedQuery, activeTab, navigate])
 
-    // ── DATA FETCHING ──
     const trimmed = debouncedQuery.trim()
     const isSearchable = trimmed.length >= 2
 
-    // 1. User Search
     const userSearchKey = activeTab === 'users' && isSearchable ? `user_search_${trimmed.toLowerCase()}` : null
     const { data: userData, loading: loadingUsers } = useCachedFetch(
         userSearchKey,
@@ -73,7 +72,6 @@ function UniversalSearch() {
         { enabled: !!userSearchKey, ttl: 5 * 60 * 1000 }
     )
 
-    // 2. Media Search
     const mediaSearchKey = activeTab !== 'users' && isSearchable ? `${activeTab}_search_${trimmed.toLowerCase()}` : null
     const endpointMap = {
         games: `/igdb/search?q=${encodeURIComponent(trimmed)}`,
@@ -106,12 +104,9 @@ function UniversalSearch() {
 
     return (
         <div className="w-full max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10 min-h-[70vh]">
-            
-            {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-[#2a2a35] pb-6">
                 <div>
-                    <h2 className="font-black text-3xl md:text-4xl tracking-widest uppercase text-white mb-2"
-                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                    <h2 className="font-black text-3xl md:text-4xl tracking-widest uppercase text-white mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                         Universal <span className="text-[#c8ff57]">Search</span>
                     </h2>
                     <p className="text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest">
@@ -120,19 +115,16 @@ function UniversalSearch() {
                 </div>
 
                 <div className="relative w-full md:w-96">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white pointer-events-none">
-                        <SearchIcon size={18} strokeWidth={2.5} />
-                    </span>
                     <input
                         type="text"
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                         placeholder="Search anything..."
-                        className="w-full bg-[#111118] border border-[#2a2a35] rounded-xl
-                                   pl-12 pr-24 py-4 text-white text-sm font-mono
-                                   focus:outline-none focus:border-[#c8ff57]
-                                   transition-all placeholder:text-[#7a7a90] shadow-inner"
+                        className="w-full bg-[#111118] border border-[#2a2a35] rounded-xl pl-12 pr-40 py-4 text-white text-sm font-mono focus:outline-none focus:border-[#c8ff57] transition-all placeholder:text-[#7a7a90] shadow-inner"
                     />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none z-10">
+                        <SearchIcon size={18} strokeWidth={2.5} />
+                    </span>
                     {loading && (
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#c8ff57] font-mono text-[10px] uppercase tracking-widest animate-pulse">
                             Searching...
@@ -141,16 +133,12 @@ function UniversalSearch() {
                 </div>
             </div>
 
-            {/* Categories */}
             <div className="flex flex-wrap gap-2 mb-10">
                 {CATEGORIES.map(cat => (
                     <button
                         key={cat.id}
                         onClick={() => setActiveTab(cat.id)}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-[10px] uppercase tracking-widest border transition-all
-                                   ${activeTab === cat.id 
-                                       ? 'bg-[#c8ff57] text-black border-[#c8ff57] shadow-[0_0_15px_rgba(200,255,87,0.2)]' 
-                                       : 'bg-[#111118] border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-white'}`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-mono text-[10px] uppercase tracking-widest border transition-all ${activeTab === cat.id ? 'bg-[#c8ff57] text-black border-[#c8ff57] shadow-[0_0_15px_rgba(200,255,87,0.2)]' : 'bg-[#111118] border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-white'}`}
                     >
                         <cat.icon size={14} />
                         {cat.label}
@@ -158,13 +146,10 @@ function UniversalSearch() {
                 ))}
             </div>
 
-            {/* Results */}
             {!isSearchable ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-40">
                     <div className="text-6xl">🔍</div>
-                    <div className="text-[#7a7a90] font-mono text-sm">
-                        Enter at least 2 characters to begin
-                    </div>
+                    <div className="text-[#7a7a90] font-mono text-sm">Enter at least 2 characters to begin</div>
                 </div>
             ) : loading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
@@ -174,9 +159,6 @@ function UniversalSearch() {
                 <div className="text-center py-20 bg-[#111118] border border-[#2a2a35] border-dashed rounded-2xl">
                     <div className="text-5xl mb-4">🛸</div>
                     <div className="text-white font-bold text-lg mb-2">Nothing found in this sector</div>
-                    <div className="text-[#7a7a90] font-mono text-xs">
-                        Try searching for something else or switch categories
-                    </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
@@ -208,9 +190,7 @@ function UserResultCard({ u, getFollowStatus, handleFollowToggle, loadingMap, to
                     {u.username}
                 </Link>
                 {u.followsMe && (
-                    <span className="font-mono text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-[#7a7a90]/20 text-[#7a7a90] border border-[#7a7a90]/30 mt-1">
-                        Follows you
-                    </span>
+                    <span className="font-mono text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-[#7a7a90]/20 text-[#7a7a90] border border-[#7a7a90]/30 mt-1">Follows you</span>
                 )}
             </div>
 
@@ -220,9 +200,7 @@ function UserResultCard({ u, getFollowStatus, handleFollowToggle, loadingMap, to
                         ✨ {RANK_TITLES[rank].label}
                     </div>
                 ) : (
-                    <div className="font-mono text-[10px] text-[#7a7a90] truncate inline-block">
-                        {u.followerCount || 0} followers
-                    </div>
+                    <div className="font-mono text-[10px] text-[#7a7a90] truncate inline-block">{u.followerCount || 0} followers</div>
                 )}
             </div>
 
@@ -230,31 +208,13 @@ function UserResultCard({ u, getFollowStatus, handleFollowToggle, loadingMap, to
                 <button
                     onClick={() => handleFollowToggle(u)}
                     disabled={isBtnLoading}
-                    className={`w-full py-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2
-                               ${state === 'following'
-                            ? 'border border-[#2a2a35] bg-transparent text-[#7a7a90] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'
-                            : state === 'requested'
-                            ? 'border border-[#c8ff57]/20 bg-[#c8ff57]/5 text-[#c8ff57]'
-                            : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e] shadow-lg'}
-                               disabled:opacity-50`}
+                    className={`w-full py-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${state === 'following' ? 'border border-[#2a2a35] bg-transparent text-[#7a7a90] hover:border-[#ff5c5c] hover:text-[#ff5c5c]' : state === 'requested' ? 'border border-[#c8ff57]/20 bg-[#c8ff57]/5 text-[#c8ff57]' : 'bg-[#c8ff57] text-black hover:bg-[#d4ff6e] shadow-lg'} disabled:opacity-50`}
                 >
-                    {isBtnLoading ? (
-                        '...'
-                    ) : state === 'following' ? (
-                        'Unfollow'
-                    ) : state === 'requested' ? (
-                        'Cancel Request'
-                    ) : u.isPrivate ? (
-                        'Request'
-                    ) : (
-                        'Follow'
-                    )}
+                    {isBtnLoading ? '...' : state === 'following' ? 'Unfollow' : state === 'requested' ? 'Cancel Request' : u.isPrivate ? 'Request' : 'Follow'}
                 </button>
             ) : (
                 <Link to="/login" className="w-full">
-                    <button className="w-full py-3 text-xs font-bold rounded-lg bg-[#c8ff57] text-black">
-                        Follow
-                    </button>
+                    <button className="w-full py-3 text-xs font-bold rounded-lg bg-[#c8ff57] text-black">Follow</button>
                 </Link>
             )}
         </div>
@@ -263,12 +223,11 @@ function UserResultCard({ u, getFollowStatus, handleFollowToggle, loadingMap, to
 
 function MediaResultCard({ item, type }) {
     const navigate = useNavigate()
-    const id = item.igdbId || item.externalId || item.id
     
-    // Normalize properties across different APIs
-    const title = item.title || item.name
+    const id = item.igdbId || item.externalId || item.id
+    const displayTitle = item.title_english || item.title || item.name
+    
     const cover = item.cover
-    const score = item.rating || item.score
     const year = item.releaseYear || item.year
     const genre = item.genre || (item.genres?.[0])
 
@@ -287,29 +246,35 @@ function MediaResultCard({ item, type }) {
         >
             <div className="aspect-[3/4] relative overflow-hidden">
                 {cover ? (
-                    <img src={cover} alt={title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                    <img src={cover} alt={displayTitle} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                 ) : (
                     <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">{type === 'tv' ? '📺' : '🎬'}</div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
                 
-                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    {item.userRating && (
-                        <div className="bg-[#c8ff57]/90 backdrop-blur-md border border-[#c8ff57]/50 rounded px-2 py-1 flex items-center gap-1 shadow-xl">
-                            <span className="font-mono text-[8px] text-black/50 uppercase tracking-tighter">YOU</span>
-                            <span className="font-black text-xs text-black" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.userRating}</span>
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                    <div className="bg-[#c8ff57] text-black px-4 py-2 rounded font-black uppercase text-xs tracking-widest shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        View Details
+                    </div>
+                </div>
+
+                <div className="absolute top-2 right-2 flex flex-col gap-1.5 items-end z-10">
+                    {Number(item.avgRating) > 0 && (
+                        <div className="bg-black/85 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center justify-center gap-1.5 shadow-xl min-w-[52px]">
+                            <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
+                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.5px' }}>{item.avgRating}</span>
                         </div>
                     )}
-                    {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
+                    {Number(item.userRating) > 0 && (
+                        <div className="bg-black/85 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center justify-center gap-1.5 shadow-xl min-w-[52px]">
+                            <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-bold">ME</span>
+                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.5px' }}>{item.userRating}</span>
                         </div>
                     )}
                 </div>
             </div>
 
             <div className="p-4">
-                <h3 className="font-bold text-sm text-white truncate mb-1 group-hover:text-[#c8ff57] transition-colors">{title}</h3>
+                <h3 className="font-bold text-sm text-white truncate mb-1 group-hover:text-[#c8ff57] transition-colors">{displayTitle}</h3>
                 <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider">{year || 'TBA'}</span>
                     <span className="w-1 h-1 rounded-full bg-[#3a3a4a]" />

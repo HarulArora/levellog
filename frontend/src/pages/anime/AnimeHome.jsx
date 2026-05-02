@@ -2,13 +2,11 @@ import { useState, useRef, useMemo, useEffect, lazy, Suspense, memo, useCallback
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
-import { useSection } from '../../context/SectionContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Tv, Flame, Plus, BookOpen } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import AvatarFrame from '../../components/ui/AvatarFrame'
-import { getXPProgress } from '../../utils/levels'
 import { useLeaderboard } from '../../context/LeaderboardContext'
 import { Helmet } from 'react-helmet-async'
 import { ChevronRight } from 'lucide-react'
@@ -20,7 +18,7 @@ const AnimeCard = memo(({ item, section }) => {
     
     return (
         <div 
-            onClick={() => navigate(`/anime/${item.externalId}?type=${section}`)}
+            onClick={() => navigate(`/anime/${item.externalId}?type=${section || 'anime'}`)}
             className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
         >
             <div className="aspect-[3/4] relative overflow-hidden">
@@ -41,8 +39,9 @@ const AnimeCard = memo(({ item, section }) => {
                 
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                     {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-white/10 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <span className="font-black text-xs text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
                         </div>
                     )}
                 </div>
@@ -76,44 +75,9 @@ const AnimeLogModal = lazy(() => import('../../components/anime/AnimeLogModal'))
 
 
 
-const timeAgo = (date) => {
-    const seconds = Math.floor((new Date() - new Date(date)) / 1000)
-    if (seconds < 60) return 'just now'
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m ago`
-    const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours}h ago`
-    const days = Math.floor(hours / 24)
-    if (days < 7) return `${days}d ago`
-    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
 
-const makeActivityConfig = (navigate, section) => ({
-    completed: {
-        icon: <Trophy size={16} />, bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
-        getText: (a) => (<>Completed{' '}<span onClick={() => a.anime.externalId && navigate(`/anime/${a.anime.externalId}?type=${a.anime.type || a.anime.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span>{a.rating ? ` — rated it ${a.rating}/10` : ''}</>)
-    },
-    playing: {
-        icon: <Play size={16} fill="currentColor" />, bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
-        getText: (a) => (<>{(a.anime.type || a.anime.mediaType) === 'manga' ? 'Started reading' : 'Started watching'}{' '}<span onClick={() => a.anime.externalId && navigate(`/anime/${a.anime.externalId}?type=${a.anime.type || a.anime.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span></>)
-    },
-    rated: {
-        icon: <Star size={16} fill="currentColor" />, bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
-        getText: (a) => (<>Rated{' '}<span onClick={() => a.anime.externalId && navigate(`/anime/${a.anime.externalId}?type=${a.anime.type || a.anime.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span>{` ${a.rating}/10`}</>)
-    },
-    planned: {
-        icon: <ListChecks size={16} />, bg: 'bg-[#2a2a35] text-[#e8e8f0]',
-        getText: (a) => (<>Added{' '}<span onClick={() => a.anime.externalId && navigate(`/anime/${a.anime.externalId}?type=${a.anime.type || a.anime.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span>{' to planned list'}</>)
-    },
-    dropped: {
-        icon: <X size={16} strokeWidth={3} />, bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
-        getText: (a) => (<>Dropped{' '}<span onClick={() => a.anime.externalId && navigate(`/anime/${a.anime.externalId}?type=${a.anime.type || a.anime.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span>{a.anime.episodesWatched ? ` after ${a.anime.episodesWatched} ep` : ''}</>)
-    },
-    paused: {
-        icon: <Pause size={16} fill="currentColor" />, bg: 'bg-[#c45cff]/15 text-[#c45cff]',
-        getText: (a) => (<>Paused{' '}<span onClick={() => a.anime.externalId && navigate(`/anime/${a.anime.externalId}?type=${a.anime.type || a.anime.mediaType || section}`)} className={`text-[#c8ff57] font-bold ${a.anime.externalId ? 'cursor-pointer hover:underline' : ''}`}>{a.anime.title}</span></>)
-    },
-})
+
+
 
 // ── Mosaic banner ──
 const HeroBanner = memo(({ animes }) => {
@@ -208,6 +172,7 @@ function AnimeSearchBar({ id = 'anime-search', section }) {
     const wrapperRef = useRef(null)
     const debounceRef = useRef(null)
     const type = window.location.pathname.startsWith('/manga') ? 'manga' : 'anime'
+    const displaySection = section || type
 
     useEffect(() => {
         const handler = (e) => {
@@ -241,19 +206,19 @@ function AnimeSearchBar({ id = 'anime-search', section }) {
         setQuery('')
         setResults([])
         setOpen(false)
-        navigate(`/anime/${item.externalId}`)
+        navigate(`/anime/${item.externalId}?type=${displaySection}`)
     }
 
     return (
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/70 pointer-events-none z-10">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none z-10">
                     <Search size={18} strokeWidth={2.5} />
                 </span>
                 <input
                     id={id}
                     type="text"
-                    placeholder={`Search any ${section}...`}
+                    placeholder={`Search any ${displaySection}...`}
                     value={query}
                     onChange={handleChange}
                     className="w-full bg-[#111118] border border-[#2a2a35] rounded-lg
@@ -281,7 +246,7 @@ function AnimeSearchBar({ id = 'anime-search', section }) {
                                                 {item.cover ? (
                                                     <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">{section === 'manga' ? '📖' : '📺'}</div>
+                                                    <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">{displaySection === 'manga' ? '📖' : '📺'}</div>
                                                 )}
                                             </div>
                                         <div className="flex-1 min-w-0">
@@ -324,9 +289,7 @@ function AnimeHome() {
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
     const [userAnime, setUserAnime] = useState([])
-    const [loadingLibrary, setLoadingLibrary] = useState(true)
 
-    const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
     const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type })
         setTimeout(() => setToast(null), 3000)
@@ -335,12 +298,11 @@ function AnimeHome() {
     // ── Fetch user library ──
     useEffect(() => {
         const fetchLibrary = async () => {
-            if (!user) { setLoadingLibrary(false); return }
+            if (!user) return
             try {
                 const res = await api.get('/anime/library')
                 setUserAnime(res.data.library || [])
             } catch (err) { console.error(err) }
-            finally { setLoadingLibrary(false) }
         }
         fetchLibrary()
     }, [user, location.key])
@@ -365,15 +327,7 @@ function AnimeHome() {
         '/anime/home?type=anime',
         { ttl: 10 * 60 * 1000 }
     )
-    const userId = user?.id || user?._id
-    const { data: activityData } = useCachedFetch(
-        userId ? `anime_activity_${userId}` : null,
-        userId ? `/anime/activity/${userId}` : null,
-        { enabled: !!userId, ttl: 2 * 60 * 1000 }
-    )
-
-    const sections = homeData?.sections || []
-    const activity = activityData?.activity || []
+    const sections = useMemo(() => homeData?.sections || [], [homeData])
 
     const userStats = useMemo(() => {
         const filtered = userAnime.filter(a => (a.type || a.mediaType) === 'anime')
@@ -418,7 +372,7 @@ function AnimeHome() {
             {/* Mobile Search */}
             <div className="md:hidden sticky top-[57px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center gap-2">
                 <div className="flex-1">
-                    <AnimeSearchBar id="anime-search-mobile" />
+                    <AnimeSearchBar id="anime-search-mobile" section="anime" />
                 </div>
             </div>
 
@@ -508,7 +462,7 @@ function AnimeHome() {
 
                         <div className="hidden md:flex flex-col gap-3">
                             <div className="mb-1">
-                                <AnimeSearchBar id="anime-search-desktop" />
+                                <AnimeSearchBar id="anime-search-desktop" section="anime" />
                             </div>
                             <div className="border-t border-[#2a2a35] my-1" />
 
@@ -623,6 +577,7 @@ function AnimeHome() {
                                             <AnimeCard 
                                                 key={`${section.title}-${item.externalId}-${idx}`} 
                                                 item={{ ...item, avgRating: homeData?.stats?.[item.externalId]?.avgRating }} 
+                                                section="anime"
                                             />
                                         ))}
                                     </div>

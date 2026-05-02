@@ -5,7 +5,6 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
-import { invalidateCache } from '../utils/cache'
 import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play } from 'lucide-react'
 import AddGameModal from '../components/library/AddGameModal'
 import Skeleton from '../components/ui/Skeleton'
@@ -966,42 +965,47 @@ function GameDetail() {
                             </div>
 
                             {/* Scores */}
-                            <div className="flex flex-wrap gap-8 mb-8">
-                                <div>
+                            <div className="flex flex-wrap gap-x-12 gap-y-6 mb-10 py-6 border-y border-white/5 backdrop-blur-sm">
+                                {/* Avg Rating */}
+                                <div className="group transition-all">
                                     <div className="flex items-center gap-2">
-                                        <div className="font-black text-4xl text-[#5c9fff] leading-none"
+                                        <div className="font-black text-5xl text-[#5c9fff] leading-none drop-shadow-[0_0_15px_rgba(92,159,255,0.3)]"
                                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                             {stats?.avgRating > 0 ? stats.avgRating : '—'}
-                                            {stats?.avgRating > 0 && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>}
+                                            {stats?.avgRating > 0 && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal align-top ml-1">/10</small>}
                                         </div>
                                     </div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">
-                                        Avg Rating {stats?.ratingCount > 0 && <span className="ml-1 text-[#7a7a90]">({stats.ratingCount})</span>}
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 flex items-center gap-1.5 group-hover:text-[#5c9fff] transition-colors">
+                                        Avg Rating {stats?.ratingCount > 0 && <span className="opacity-60">({stats.ratingCount})</span>}
                                     </div>
                                 </div>
+
                                 {user && myGame?.rating > 0 && (
-                                    <div>
-                                        <div className="font-black text-4xl text-[#c8ff57] leading-none"
+                                    <div className="group transition-all">
+                                        <div className="font-black text-5xl text-[#c8ff57] leading-none drop-shadow-[0_0_15px_rgba(200,255,87,0.3)]"
                                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                            {myGame.rating}<small className="font-mono text-[10px] text-[#a0a0b8] font-normal">/10</small>
+                                            {myGame.rating}<small className="font-mono text-[10px] text-[#a0a0b8] font-normal align-top ml-1">/10</small>
                                         </div>
-                                        <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">My Rating</div>
+                                        <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#c8ff57] transition-colors">My Rating</div>
                                     </div>
                                 )}
-                                <div>
-                                    <div className="font-black text-4xl text-[#ff9f5c] leading-none"
+
+                                <div className="group transition-all">
+                                    <div className="font-black text-5xl text-[#ff9f5c] leading-none drop-shadow-[0_0_15px_rgba(255,159,92,0.3)]"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.loggedCount ?? '—'}</div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">In Pond</div>
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#ff9f5c] transition-colors">In Pond</div>
                                 </div>
-                                <div>
-                                    <div className="font-black text-4xl text-[#ff5c5c] leading-none"
+
+                                <div className="group transition-all">
+                                    <div className="font-black text-5xl text-[#ff5c5c] leading-none drop-shadow-[0_0_15px_rgba(255,92,92,0.3)]"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.likeCount ?? '—'}</div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Likes</div>
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#ff5c5c] transition-colors">Likes</div>
                                 </div>
-                                <div>
-                                    <div className="font-black text-4xl text-[#5c9fff] leading-none"
+
+                                <div className="group transition-all">
+                                    <div className="font-black text-5xl text-[#5c9fff] leading-none drop-shadow-[0_0_15px_rgba(92,159,255,0.3)]"
                                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.wishlistCount ?? '—'}</div>
-                                    <div className="font-mono text-[10px] text-[#a0a0b8] uppercase tracking-wider mt-1">Wishlists</div>
+                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#5c9fff] transition-colors">Wishlists</div>
                                 </div>
                             </div>
 

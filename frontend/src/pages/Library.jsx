@@ -203,7 +203,7 @@ function Library() {
                     
                     <div className="flex flex-col sm:flex-row items-center gap-4 border-l border-[#2a2a35] pl-6 ml-2 hidden lg:flex">
                         <div className="relative w-full sm:w-72 group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white group-focus-within:text-[#c8ff57] transition-colors" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors" size={18} />
                             <input 
                                 type="text" 
                                 placeholder="Search your vault..."

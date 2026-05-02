@@ -1,4 +1,4 @@
-import { useState, useMemo, memo, useEffect, useRef } from 'react'
+import { useState, memo, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { ChevronLeft, Flame, Trophy, Calendar, Star } from 'lucide-react'
@@ -6,16 +6,16 @@ import useCachedFetch from '../hooks/useCachedFetch'
 import { GameCardSkeleton } from '../components/ui/Skeleton'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
-const RankingCard = memo(({ item, contentType, index, rankType }) => {
+const RankingCard = memo(({ item, contentType, index }) => {
     const navigate = useNavigate()
     
     const handleClick = () => {
         const pathMap = {
             game: `/game/${item.contentId}`,
-            anime: `/anime/${item.contentId}`,
-            manga: `/manga/${item.contentId}`,
-            movie: `/movies/${item.contentId}`,
-            tv: `/tv/${item.contentId}`
+            anime: `/anime/${item.contentId}?type=anime`,
+            manga: `/manga/${item.contentId}?type=manga`,
+            movie: `/movies/${item.contentId}?type=movie`,
+            tv: `/tv/${item.contentId}?type=tv`
         }
         navigate(pathMap[contentType])
     }
@@ -52,8 +52,9 @@ const RankingCard = memo(({ item, contentType, index, rankType }) => {
 
                 {/* Rating Badge */}
                 {item.avgRating > 0 && (
-                    <div className="absolute top-2 right-2 bg-[#5c9fff] rounded px-2 py-1 flex items-center gap-1 shadow-xl z-10">
-                        <span className="font-black text-xs text-black" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                    <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl z-10">
+                        <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                        <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                             {(() => {
                                 const raw = item.avgRating;
                                 const val = raw > 10 ? raw / 10 : raw;
