@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useSection } from '../context/SectionContext';
+import { useSection } from '../context/SectionState';
 
 const SectionSwitcher = () => {
     const { activeSection, setActiveSection } = useSection();
@@ -70,3 +70,4 @@ const SectionSwitcher = () => {
 };
 
 export default SectionSwitcher;
+

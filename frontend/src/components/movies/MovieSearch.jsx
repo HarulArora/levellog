@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import api from '../../api/axios'
-import { useSection } from '../../context/SectionContext'
+import { useSection } from '../../context/SectionState'
 
 function MovieSearch({ onSelect }) {
   const [query, setQuery] = useState('')
@@ -116,3 +116,4 @@ function MovieSearch({ onSelect }) {
 }
 
 export default MovieSearch
+

@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-// import { useSection } from '../../context/SectionContext'
+// import { useSection } from '../../context/SectionState'
 
 const MangaCard = memo(({ anime: manga, onDelete, onEdit }) => {
     const navigate = useNavigate()
@@ -147,4 +147,5 @@ const MangaCard = memo(({ anime: manga, onDelete, onEdit }) => {
 })
 
 export default MangaCard
+
 

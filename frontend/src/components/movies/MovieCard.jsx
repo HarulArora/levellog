@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSection } from '../../context/SectionContext'
+import { useSection } from '../../context/SectionState'
 
 const MovieCard = memo(({ movie, onDelete, onEdit }) => {
     const navigate = useNavigate()
@@ -144,4 +144,5 @@ const MovieCard = memo(({ movie, onDelete, onEdit }) => {
 })
 
 export default MovieCard
+
 

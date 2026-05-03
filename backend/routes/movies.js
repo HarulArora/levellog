@@ -694,13 +694,13 @@ router.get('/library', protect, async (req, res) => {
 
 router.post('/log', protect, async (req, res) => {
     try {
-        const { externalId, type, status, rating, seasonsWatched, episodesWatched, totalEpisodes, totalSeasons, notes, title, cover, genre } = req.body;
+        const { externalId, type, status, rating, seasonsWatched, episodesWatched, totalEpisodes, totalSeasons, notes, title, cover, genre, year } = req.body;
         
         const result = await withRetryTransaction(async (session) => {
             const oldEntry = await MovieEntry.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
             const isNew = !oldEntry;
 
-            const updateData = { status, rating, seasonsWatched, episodesWatched, totalEpisodes, totalSeasons, notes, title, cover, genre, type };
+            const updateData = { status, rating, seasonsWatched, episodesWatched, totalEpisodes, totalSeasons, notes, title, cover, genre, type, year };
             const entry = await MovieEntry.findOneAndUpdate(
                 { userId: req.user._id, externalId: parseInt(externalId), type },
                 updateData,

@@ -10,7 +10,7 @@ function VerifyEmail() {
     const queryParams = new URLSearchParams(location.search)
     const emailFromQuery = queryParams.get('email') || ''
 
-    const [email, setEmail] = useState(emailFromQuery)
+    const [email] = useState(emailFromQuery)
     const [code, setCode] = useState('')
     const [error, setError] = useState('')
     const [message, setMessage] = useState('')

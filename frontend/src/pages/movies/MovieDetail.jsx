@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, memo } from 'react'
-import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'

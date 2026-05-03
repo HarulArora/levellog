@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-// import { useSection } from '../../context/SectionContext'
+// import { useSection } from '../../context/SectionState'
 
 const TVCard = memo(({ movie: tvShow, onDelete, onEdit }) => {
     const navigate = useNavigate()
@@ -141,4 +141,5 @@ const TVCard = memo(({ movie: tvShow, onDelete, onEdit }) => {
 })
 
 export default TVCard
+
 

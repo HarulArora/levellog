@@ -13,6 +13,7 @@ import GifPicker from '../../components/ui/GifPicker'
 
 const getYoutubeId = (url) => {
     if (!url) return null;
+    if (url.length === 11 && !url.includes('/') && !url.includes('.')) return url;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
@@ -692,14 +693,6 @@ function MangaDetail() {
                         )}
                         {activeTab === 'overview' && (
                             <>
-                                {anime.trailer && (
-                                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
-                                        <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">🎬 Trailer</div>
-                                        <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                                            <iframe src={`https://www.youtube.com/embed/${getYoutubeId(anime.trailer)}?rel=0&modestbranding=1`} className="absolute inset-0 w-full h-full rounded-lg" allowFullScreen />
-                                        </div>
-                                    </div>
-                                )}
                                 {summaryText && (
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6 shadow-sm">
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">About</div>
@@ -709,22 +702,31 @@ function MangaDetail() {
                                 )}
 
                                 {/* Relations & Timeline (Visual List) */}
-                                {(anime.prequel || anime.sequel || anime.sourceManga) && (
-                                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6 shadow-sm">
-                                        <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">Timeline & Relations</div>
-                                        <div className="flex flex-col gap-3">
-                                            {anime.sourceManga && (
-                                                <RelationItem item={{...anime.sourceManga, type: 'manga'}} label="Original Source" colorClass="[#c8ff57]" icon="📖" />
-                                            )}
-                                            {anime.prequel && (
-                                                <RelationItem item={anime.prequel} label="Story Prequel" colorClass="[#5c9fff]" icon="⏪" />
-                                            )}
-                                            {anime.sequel && (
-                                                <RelationItem item={anime.sequel} label="Story Sequel" colorClass="[#c8ff57]" icon="⏩" />
-                                            )}
+                                {(() => {
+                                    const relations = anime.relations || [];
+                                    const prequel = relations.find(r => r.relation?.toUpperCase() === 'PREQUEL')?.items?.[0];
+                                    const sequel = relations.find(r => r.relation?.toUpperCase() === 'SEQUEL')?.items?.[0];
+                                    const source = relations.find(r => r.relation?.toUpperCase() === 'SOURCE')?.items?.[0];
+
+                                    if (!prequel && !sequel && !source) return null;
+
+                                    return (
+                                        <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6 shadow-sm">
+                                            <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">Timeline & Relations</div>
+                                            <div className="flex flex-col gap-3">
+                                                {source && (
+                                                    <RelationItem item={source} label="Original Source" colorClass="[#c8ff57]" icon="📖" />
+                                                )}
+                                                {prequel && (
+                                                    <RelationItem item={prequel} label="Story Prequel" colorClass="[#5c9fff]" icon="⏪" />
+                                                )}
+                                                {sequel && (
+                                                    <RelationItem item={sequel} label="Story Sequel" colorClass="[#c8ff57]" icon="⏩" />
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    );
+                                })()}
                                 {anime.screenshots?.length > 0 && (
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6">
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">
@@ -758,21 +760,10 @@ function MangaDetail() {
                                             <div className="flex items-center gap-4">
                                                 <div className="relative">
                                                     <img src={char.image} alt={char.name} className="w-16 h-16 rounded-xl object-cover ring-1 ring-white/10 group-hover:ring-[#c8ff57]/50 transition-all shadow-lg" />
-                                                    {char.favorites > 5000 && (
-                                                        <div className="absolute -top-1.5 -left-1.5 bg-[#ff5c5c] text-white p-1 rounded-full shadow-lg">
-                                                            <Heart size={8} fill="currentColor" />
-                                                        </div>
-                                                    )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-white font-bold text-sm truncate">{char.name}</div>
                                                     <div className="font-mono text-[9px] text-[#7a7a90] uppercase tracking-widest mb-1.5">{char.role}</div>
-                                                    {char.favorites > 0 && (
-                                                        <div className="flex items-center gap-1 text-[9px] font-mono text-[#7a7a90]">
-                                                            <Heart size={8} className="text-[#ff5c5c]" />
-                                                            {char.favorites.toLocaleString()}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                             {char.va && (
@@ -941,7 +932,7 @@ function MangaDetail() {
                                 <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">{type === 'manga' ? 'MANGA' : 'ANIME'} INFO</div>
                                 <div className="flex flex-col divide-y divide-[#2a2a35]">
                                     <div className="flex justify-between py-2.5 gap-4"><span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider flex-shrink-0">Type</span><span className="font-mono text-[11px] text-white uppercase font-bold text-right">{type}</span></div>
-                                <div className="flex justify-between py-2.5 gap-4"><span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider flex-shrink-0">Studio</span><span className="font-mono text-[11px] text-white font-bold text-right">{anime.studios || 'TBA'}</span></div>
+                                <div className="flex justify-between py-2.5 gap-4"><span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider flex-shrink-0">Mangaka</span><span className="font-mono text-[11px] text-white font-bold text-right">{anime.studios || 'TBA'}</span></div>
                                 <div className="flex justify-between py-2.5 gap-4"><span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider flex-shrink-0">Year</span><span className="font-mono text-[11px] text-white font-bold text-right">{anime.year || 'TBA'}</span></div>
                                 <div className="flex justify-between py-2.5 gap-4"><span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider flex-shrink-0">Source</span><span className="font-mono text-[11px] text-white font-bold text-right uppercase">{anime.source || '—'}</span></div>
                                 <div className="flex justify-between py-2.5 gap-4"><span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider flex-shrink-0">Rating</span><span className="font-mono text-[11px] text-white font-bold text-right">{anime.rating || '—'}</span></div>

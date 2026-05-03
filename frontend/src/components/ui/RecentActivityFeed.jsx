@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useGamesContext } from '../../context/GamesContext'
-import { useSection } from '../../context/SectionContext'
+import { useSection } from '../../context/SectionState'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Gamepad2, Users, Film, Tv, BookOpen } from 'lucide-react'
 import { getIGDBImage, SIZES } from '../../utils/igdb'
@@ -406,3 +406,4 @@ function RecentActivityFeed({ defaultMedia = 'all' }) {
 }
 
 export default RecentActivityFeed
+

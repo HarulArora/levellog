@@ -65,25 +65,6 @@ function MoviesLibrary() {
         setTimeout(() => setToast(null), 3000)
     }
 
-    const handleLogMovie = async (data) => {
-        try {
-            const res = await api.post('/movies/log', data)
-            if (res.data.success) {
-                showToast(res.data.updated ? `"${data.title}" updated!` : `"${data.title}" added to Pond!`)
-                
-                // Update local user XP/Stats
-                if (res.data.xp !== undefined) {
-                    updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
-                }
-                
-                fetchLibrary()
-                return { success: true }
-            }
-        } catch (err) {
-            showToast(err.response?.data?.message || 'Action failed', 'error')
-            return { success: false }
-        }
-    }
 
     const handleDelete = async (id) => {
         if (!window.confirm('Remove from library?')) return

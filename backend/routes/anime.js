@@ -108,6 +108,24 @@ const fetchAnilistFullDetail = async (idMal, type = 'anime') => {
             genres
             averageScore
             status
+            seasonYear
+            startDate {
+              year
+            }
+            source
+            studios(isMain: true) {
+              nodes {
+                name
+              }
+            }
+            staff(perPage: 8) {
+              edges {
+                role
+                node {
+                  name { full }
+                }
+              }
+            }
             episodes
             chapters
             format
@@ -172,6 +190,14 @@ const fetchAnilistFullDetail = async (idMal, type = 'anime') => {
             genre: data.genres?.[0] || 'Media',
             score: data.averageScore ? data.averageScore / 10 : null,
             status: data.status,
+            year: data.seasonYear || data.startDate?.year,
+            source: data.source?.replace(/_/g, ' '),
+            studios: data.studios?.nodes?.length > 0 
+                ? data.studios.nodes.map(s => s.name).join(', ') 
+                : data.staff?.edges?.filter(e => {
+                    const role = e.role.toLowerCase();
+                    return role.includes('story') || role.includes('art') || role.includes('original creator');
+                }).map(e => e.node.name.full).filter((v, i, a) => a.indexOf(v) === i).join(', '),
             episodes: data.episodes,
             chapters: data.chapters,
             type: type,
@@ -272,11 +298,11 @@ router.get('/home', async (req, res) => {
         }));
 
         // 4. Backfill/Fallback for Trending/Top/Upcoming if Ranking has less than 15 items
-        if (trending.length < 15 || topRated.length < 15 || (type === 'anime' && upcoming.length < 15)) {
+        if (trending.length < 15 || topRated.length < 15 || upcoming.length < 15) {
             const [trendFallback, topFallback, soonFallback] = await Promise.all([
                 trending.length < 15 ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: type === 'manga' ? 'publishing' : 'airing', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } },
                 topRated.length < 15 ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: 'bypopularity', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } },
-                (type === 'anime' && upcoming.length < 15) ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: 'upcoming', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } }
+                upcoming.length < 15 ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: 'upcoming', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } }
             ]);
 
             const mergeUnique = (existing, fetchedRaw) => {
@@ -327,12 +353,9 @@ router.get('/home', async (req, res) => {
 
         const sections = [
             { title: `Trending ${type === 'manga' ? 'Manga' : 'Anime'}`, items: trending },
-            { title: `Top Rated ${type === 'manga' ? 'Manga' : 'Anime'}`, items: topRated }
+            { title: `Top Rated ${type === 'manga' ? 'Manga' : 'Anime'}`, items: topRated },
+            { title: `${type === 'manga' ? 'Upcoming Manga' : 'Upcoming Anime'}`, items: upcoming }
         ];
-
-        if (type === 'anime') {
-            sections.push({ title: 'Upcoming Anime', items: upcoming });
-        }
 
         const result = { sections, stats };
         jikanCache.set(cacheKey, result);
@@ -509,7 +532,7 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
         const { type = 'anime' } = req.query;
         const userId = req.user?._id;
 
-        const cacheKey = `detail-v12-${type}-${id}`; // Bumped version
+        const cacheKey = `detail-v14-${type}-${id}`; // Bumped version to v14
         let anime = jikanCache.get(cacheKey);
 
         if (!anime) {
@@ -949,13 +972,13 @@ router.get('/library', protect, async (req, res) => {
 
 router.post('/log', protect, async (req, res) => {
     try {
-        let { externalId, type, status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre } = req.body;
+        let { externalId, type, status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre, year } = req.body;
         
         const result = await withRetryTransaction(async (session) => {
             const oldEntry = await AnimeEntry.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
             const isNew = !oldEntry;
 
-            const updateData = { status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre };
+            const updateData = { status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre, year };
             const entry = await AnimeEntry.findOneAndUpdate(
                 { userId: req.user._id, externalId: parseInt(externalId), type },
                 updateData,

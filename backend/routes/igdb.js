@@ -53,7 +53,7 @@ router.get('/search', protectOptional, async (req, res) => {
                     cover: normCover(g.cover),
                     genre: genreNames[0] || null,
                     genres: genreNames,
-                    releaseYear: g.releaseYear || (g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null),
+                    year: g.releaseYear || (g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null),
                     rating: g.rating != null ? g.rating : (g.igdbRating != null ? g.igdbRating : null),
                     platforms: g.platforms || [],
                     summary: g.summary || g.description || '',
@@ -142,7 +142,7 @@ router.get('/discover', async (req, res) => {
         // Uses imported shortPlatform
 
         // ── CACHE WRAPPER FOR IGDB DATA ONLY ──
-        const igdbDataCacheKey = `igdb-discover-v2-${genre}-${pageNum}-${limitNum}`
+        const igdbDataCacheKey = `igdb-discover-v3-${genre}-${pageNum}-${limitNum}`
         let igdbResult = igdbCache.get(igdbDataCacheKey)
 
         if (!igdbResult) {
@@ -156,6 +156,7 @@ router.get('/discover', async (req, res) => {
                         .map(p => shortPlatform(p.name))
                         .filter(Boolean)
                 )].slice(0, 4),
+                year: game.first_release_date ? new Date(game.first_release_date * 1000).getFullYear() : null,
                 ratingCount: game.rating_count || 0,
             }))
 
@@ -380,35 +381,122 @@ router.get('/coming-soon', async (req, res) => {
 // for all returned game IDs in one batch. Result cached for 12 h.
 router.get('/home', async (req, res) => {
     try {
-        // 1. Fetch Trending from Rankings
-        const trendingRankings = await Ranking.find({ contentType: 'game', rankType: 'trending' }).sort({ rankPosition: 1 }).limit(15);
+        // 1. Fetch Trending from Rankings (Local) with GlobalList fallback
+        let trendingRankings = await Ranking.find({ contentType: 'game', rankType: 'trending' }).sort({ rankPosition: 1 }).limit(15);
+        if (trendingRankings.length === 0) {
+            const globalTrending = await GlobalList.findOne({ key: 'trending' });
+            if (globalTrending) {
+                trendingRankings = globalTrending.games.map((g, idx) => ({
+                    contentId: String(g.id),
+                    title: g.title,
+                    cover: g.cover,
+                    genres: [g.genre],
+                    year: g.year,
+                    rankPosition: idx + 1
+                }));
+            }
+        }
+
         let trending = (trendingRankings || []).map(r => ({
             id: parseInt(r.contentId),
             title: r.title,
             cover: r.cover,
-            genre: r.genres?.[0] || 'Game',
+            genre: r.genres?.[0] || (r.genre) || 'Game',
+            year: r.year,
             releaseDate: r.year ? `Jan 1, ${r.year}` : null
         }));
 
         // 2. Fetch Top Rated from Rankings
-        const topRatedRankings = await Ranking.find({ contentType: 'game', rankType: 'top_rated' }).sort({ rankPosition: 1 }).limit(15);
+        let topRatedRankings = await Ranking.find({ contentType: 'game', rankType: 'top_rated' }).sort({ rankPosition: 1 }).limit(15);
+        if (topRatedRankings.length === 0) {
+            const globalTop = await GlobalList.findOne({ key: 'top-rated' });
+            if (globalTop) {
+                topRatedRankings = globalTop.games.map((g, idx) => ({
+                    contentId: String(g.id),
+                    title: g.title,
+                    cover: g.cover,
+                    genres: [g.genre],
+                    year: g.year,
+                    rankPosition: idx + 1
+                }));
+            }
+        }
+
         let topRated = (topRatedRankings || []).map(r => ({
             id: parseInt(r.contentId),
             title: r.title,
             cover: r.cover,
-            genre: r.genres?.[0] || 'Game',
+            genre: r.genres?.[0] || (r.genre) || 'Game',
+            year: r.year,
             releaseDate: r.year ? `Jan 1, ${r.year}` : null
         }));
 
         // 4. Fetch Coming Soon from Rankings
-        const comingSoonRankings = await Ranking.find({ contentType: 'game', rankType: 'coming_soon' }).sort({ rankPosition: 1 }).limit(15);
+        let comingSoonRankings = await Ranking.find({ contentType: 'game', rankType: 'coming_soon' }).sort({ rankPosition: 1 }).limit(15);
+        if (comingSoonRankings.length === 0) {
+            const globalSoon = await GlobalList.findOne({ key: 'coming-soon' });
+            if (globalSoon) {
+                comingSoonRankings = globalSoon.games.map((g, idx) => ({
+                    contentId: String(g.id),
+                    title: g.title,
+                    cover: g.cover,
+                    genres: [g.genre],
+                    year: g.year,
+                    rankPosition: idx + 1
+                }));
+            }
+        }
+
         let comingSoon = (comingSoonRankings || []).map(r => ({
             id: parseInt(r.contentId),
             title: r.title,
             cover: r.cover,
-            genre: r.genres?.[0] || 'Game',
+            genre: r.genres?.[0] || (r.genre) || 'Game',
+            year: r.year,
             releaseDate: r.year ? `Jan 1, ${r.year}` : null
         }));
+
+        // ── ON-THE-FLY RECOVERY FOR MISSING YEARS ──
+        const missingYearIds = [...trending, ...topRated, ...comingSoon]
+            .filter(g => !g.year)
+            .map(g => g.id);
+
+        if (missingYearIds.length > 0) {
+            try {
+                const token = await getAccessToken();
+                const headers = { 'Client-ID': process.env.IGDB_CLIENT_ID, 'Authorization': `Bearer ${token}`, 'Content-Type': 'text/plain' };
+                const igdbRes = await apiClient.post('https://api.igdb.com/v4/games', 
+                    `fields first_release_date; where id = (${missingYearIds.join(',')});`, 
+                    { headers }
+                );
+                const yearMap = {};
+                (igdbRes.data || []).forEach(g => {
+                    if (g.first_release_date) {
+                        yearMap[g.id] = new Date(g.first_release_date * 1000).getFullYear();
+                    }
+                });
+
+                // Update the arrays in-memory AND heal the database
+                const healingOps = [];
+                [trending, topRated, comingSoon].forEach(list => {
+                    list.forEach(g => {
+                        if (!g.year && yearMap[g.id]) {
+                            g.year = yearMap[g.id];
+                            g.releaseDate = `Jan 1, ${g.year}`;
+                            
+                            // Queue DB update
+                            healingOps.push(
+                                Ranking.updateMany(
+                                    { contentId: String(g.id), contentType: 'game' },
+                                    { $set: { year: g.year } }
+                                )
+                            );
+                        }
+                    });
+                });
+                if (healingOps.length > 0) Promise.all(healingOps).catch(e => logger.error('[Home Healing] DB update failed:', e.message));
+            } catch (err) { logger.error('[Home Year Recovery] Failed:', err.message); }
+        }
 
         // 5. Backfill/Fallback to IGDB API if Rankings have less than 15 items
         if (trending.length < 15 || topRated.length < 15 || comingSoon.length < 15) {
@@ -424,6 +512,7 @@ router.get('/home', async (req, res) => {
                         title: g.name,
                         cover: normalizeCover(g.cover?.url),
                         genre: g.genres?.[0]?.name || 'Game',
+                        year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
                         releaseDate: g.first_release_date
                             ? new Date(g.first_release_date * 1000).toLocaleDateString('en-US', {
                                 month: 'short', day: 'numeric', year: 'numeric'

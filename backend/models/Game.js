@@ -53,6 +53,10 @@ const gameSchema = new mongoose.Schema(
             type: String,
             default: ''
         },
+        year: {
+            type: Number,
+            default: null
+        },
         igdbId: {
             type: Number,
             default: null

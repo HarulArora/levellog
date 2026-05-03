@@ -541,7 +541,7 @@ function MoviesHome() {
                                                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                                                     {stats[item.externalId]?.avgRating && (
                                                         <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                                                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                                                            <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
                                                             <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats[item.externalId].avgRating}</span>
                                                         </div>
                                                     )}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import MovieSearch from './MovieSearch'
-import { useSection } from '../../context/SectionContext'
+import { useSection } from '../../context/SectionState'
 import { invalidatePrefix } from '../../utils/cache'
 
 function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry = null, items = [] }) {
@@ -220,3 +220,4 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
 }
 
 export default MovieLogModal
+

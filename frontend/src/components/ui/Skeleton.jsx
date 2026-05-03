@@ -37,12 +37,8 @@ const Skeleton = ({ variant = 'block', width, height, className = '', style = {}
 // ── Compounded Components for Common Layouts ──
 
 export const GameCardSkeleton = () => (
-    <div style={{ background: '#111118', border: '1px solid #2a2a35', borderRadius: 12, overflow: 'hidden' }}>
-        <Skeleton variant="block" height="180px" style={{ borderRadius: 0 }} />
-        <div style={{ padding: '12px' }}>
-            <Skeleton variant="line" width="70%" height="16px" style={{ marginBottom: 8 }} />
-            <Skeleton variant="line" width="40%" height="10px" />
-        </div>
+    <div className="bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden shadow-lg aspect-[3/4]">
+        <Skeleton variant="block" height="100%" style={{ borderRadius: 0 }} />
     </div>
 )
 

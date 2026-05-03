@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../api/axios'
 import AnimeSearch from './AnimeSearch'
-import { useSection } from '../../context/SectionContext'
+import { useSection } from '../../context/SectionState'
 import { invalidatePrefix } from '../../utils/cache'
 
 function AnimeLogModal({ onClose, onAdd, preselectedItem = null, existingEntry = null, items = [] }) {
@@ -43,7 +43,7 @@ function AnimeLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
             };
             fetchTotals();
         }
-    }, [itemSelected, formData.externalId, animeSubSection]);
+    }, [itemSelected, formData.externalId, animeSubSection, formData.totalEpisodes, formData.totalChapters]);
 
     const [itemSelected, setItemSelected] = useState(!!(preselectedItem || existingEntry))
     const [submitting, setSubmitting] = useState(false)
@@ -236,3 +236,4 @@ function AnimeLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
 }
 
 export default AnimeLogModal
+

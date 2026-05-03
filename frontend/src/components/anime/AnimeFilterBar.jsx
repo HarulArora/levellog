@@ -1,4 +1,4 @@
-import { useSection } from '../../context/SectionContext'
+import { useSection } from '../../context/SectionState'
 
 function AnimeFilterBar({ activeFilter, onFilter, counts }) {
     const { animeSubSection } = useSection()
@@ -55,3 +55,4 @@ function AnimeFilterBar({ activeFilter, onFilter, counts }) {
 }
 
 export default AnimeFilterBar
+

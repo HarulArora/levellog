@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useSection } from '../context/SectionContext'
+import { useSection } from '../context/SectionState'
 import useNotifications from '../hooks/useNotifications'
 import { Bell, User, Search, LogOut, ChevronDown, UserSearch, Tags, ListChecks, Flame } from 'lucide-react'
 import { useDeals } from '../context/DealsContext'
@@ -344,3 +344,4 @@ function NavbarSectionAdapter() {
 }
 
 export default NavbarSectionAdapter;
+

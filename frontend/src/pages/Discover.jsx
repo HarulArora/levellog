@@ -116,159 +116,79 @@ const GameCard = memo(({ game, entry, onClick }) => {
     const userRating = entry?.rating
     const statusStyle = status ? STATUS_COLORS[status] : null
 
-
     return (
-        <div
+        <div 
             onClick={onClick}
-            className="game-card-hover"
-            style={{
-                background: '#111118',
-                border: statusStyle ? `1px solid ${statusStyle.color}40` : '1px solid #2a2a35',
-                borderRadius: 8,
-                overflow: 'hidden',
-                cursor: 'pointer',
-                transition: 'all 0.25s',
-                position: 'relative',
-            }}
-            onMouseEnter={e => {
-                e.currentTarget.style.borderColor = '#c8ff57'
-                e.currentTarget.style.transform = 'translateY(-3px)'
-                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.4), 0 0 0 1px rgba(200,255,87,0.1)'
-            }}
-            onMouseLeave={e => {
-                e.currentTarget.style.borderColor = statusStyle ? `${statusStyle.color}40` : '#2a2a35'
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = 'none'
-            }}
+            className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
         >
-            {/* Banner image */}
-            <div className="game-card-banner">
+            <div className="aspect-[3/4] relative overflow-hidden">
                 {game.cover ? (
-                    <img
-                        src={getIGDBImage(game.cover, SIZES.COVER_BIG)}
-                        alt={game.title}
+                    <img 
+                        src={getIGDBImage(game.cover, SIZES.COVER_BIG)} 
+                        alt={game.title} 
                         loading="lazy"
-                        className="game-card-img"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
                 ) : (
-                    <div className="game-card-placeholder">🎮</div>
-                )}
-                {/* score color matching the HTML sample */}
-                <div className="game-card-gradient" />
-
-                {/* Community Average Rating Badge */}
-                {game.avgRating && (
-                    <div style={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        background: 'rgba(0,0,0,0.82)',
-                        backdropFilter: 'blur(4px)',
-                        border: '1px solid #5c9fff',
-                        borderRadius: 4,
-                        padding: '3px 6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        zIndex: 10,
-                        boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
-                    }}>
-                        <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
-                        <span style={{
-                            fontFamily: "'Bebas Neue', sans-serif",
-                            fontSize: 11,
-                            fontWeight: 900,
-                            color: '#5c9fff',
-                            letterSpacing: '0.5px',
-                            lineHeight: 1
-                        }}>{game.avgRating}</span>
+                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">
+                        🎮
                     </div>
                 )}
+                
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
+
+                {/* Rating Badge */}
+                {game.avgRating && (
+                    <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                        <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
+                        <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
+                    </div>
+                )}
+
+                {/* Status Badge */}
+                {status && statusStyle && (
+                    <div className="absolute top-2 left-2 px-2 py-1 rounded bg-black/80 border border-[#c8ff57]/30 shadow-xl">
+                        <div className="font-mono text-[8px] font-bold text-[#c8ff57] uppercase tracking-wider">{statusStyle.label}</div>
+                    </div>
+                )}
+
+                {/* Hover Overlay */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                    <div className="bg-[#c8ff57] text-black px-4 py-2 rounded font-black uppercase text-xs tracking-widest shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                        View Details
+                    </div>
+                </div>
             </div>
 
-            {/* Status pill — positioned relative to CARD (not banner) so overflow:hidden doesn't clip it */}
-            {status && statusStyle && (
-                <div style={{
-                    position: 'absolute',
-                    top: 8,
-                    left: 8,
-                    background: 'rgba(0,0,0,0.72)',
-                    border: `1px solid ${statusStyle.color}`,
-                    color: statusStyle.color,
-                    fontFamily: "'DM Mono', monospace",
-                    fontWeight: 700,
-                    fontSize: 9,
-                    letterSpacing: '1.5px',
-                    textTransform: 'uppercase',
-                    padding: '3px 7px',
-                    borderRadius: 3,
-                    zIndex: 10,
-                }}>
-                    {statusStyle.label}
-                </div>
-            )}
-
-            {/* Card body */}
-            <div style={{ padding: '8px 10px 10px' }}>
-                {/* Title */}
-                <div style={{
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontWeight: 600,
-                    fontSize: 13,
-                    color: '#e8e8f0',
-                    marginBottom: status ? 6 : 6,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                }}>
+            {/* Info Section - Outside of Aspect Ratio div to match Anime/Manga cards */}
+            <div className="p-4">
+                <h3 className="font-bold text-sm text-white truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
                     {game.title}
-                </div>
-
-
-
-                {/* Platform badges */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 10, minHeight: 16 }}>
-                    {(game.platforms || []).slice(0, 4).map(p => <PlatBadge key={p} name={p} />)}
-                </div>
-
-                {/* Bottom: ratings row + genre row — no overlap */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-
-                    {/* Ratings row */}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-
-                        {/* Your rating — site green */}
-                        {userRating ? (
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                                <span style={{
-                                    fontFamily: "'Bebas Neue', sans-serif",
-                                    fontSize: 20,
-                                    color: '#c8ff57',
-                                    letterSpacing: 1,
-                                    lineHeight: 1,
-                                }}>{userRating}</span>
-                                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 9, color: 'rgba(200,255,87,0.45)' }}>/10</span>
-                            </div>
-                        ) : (
-                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 16, color: '#3a3a4a', fontWeight: 600 }}>—</span>
-                        )}
-
-                    </div>
-
-                    {/* Genre below ratings — full width, no overlap */}
-                    {game.genre && (
-                        <span style={{
-                            fontFamily: "'DM Mono', monospace",
-                            fontSize: 9,
-                            color: '#7a7a90',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            display: 'block',
-                        }}>
-                            {game.genre}
+                </h3>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider flex-shrink-0">
+                            {game.year || 'TBA'}
                         </span>
+                        <span className="w-1 h-1 rounded-full bg-[#3a3a4a] flex-shrink-0" />
+                        <span className="font-mono text-[9px] text-[#c8ff57] uppercase tracking-widest truncate">
+                            {game.genre || 'Game'}
+                        </span>
+                    </div>
+                    {userRating && (
+                        <div className="flex items-baseline gap-0.5 ml-2">
+                            <span className="font-mono text-[11px] font-bold text-[#c8ff57]">{userRating}</span>
+                            <span className="font-mono text-[7px] text-[#c8ff57]/50">/10</span>
+                        </div>
                     )}
+                </div>
+                {/* Platform Tags - Small and subtle */}
+                <div className="flex gap-1 mt-2 overflow-hidden">
+                    {(game.platforms || []).slice(0, 3).map(p => (
+                        <span key={p} className="font-mono text-[7px] text-[#505060] uppercase border border-white/5 px-1 rounded">
+                            {p === 'Xbox Series' ? 'X|S' : p === 'Xbox One' ? 'XOne' : p}
+                        </span>
+                    ))}
                 </div>
             </div>
         </div>
@@ -442,20 +362,17 @@ export default function Discover() {
         .discover-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 10px;
+          gap: 1.5rem;
           margin-bottom: 40px;
         }
-        @media (min-width: 480px) {
-          .discover-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        @media (min-width: 640px) {
+          .discover-grid { grid-template-columns: repeat(3, 1fr); }
         }
         @media (min-width: 768px) {
-          .discover-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+          .discover-grid { grid-template-columns: repeat(4, 1fr); }
         }
         @media (min-width: 1024px) {
-          .discover-grid { grid-template-columns: repeat(5, 1fr); gap: 16px; }
-        }
-        @media (min-width: 1280px) {
-          .discover-grid { grid-template-columns: repeat(6, 1fr); gap: 16px; }
+          .discover-grid { grid-template-columns: repeat(5, 1fr); }
         }
         .genre-grid-responsive {
           display: grid;
@@ -497,35 +414,6 @@ export default function Discover() {
         }
         @media (min-width: 480px) {
           .game-card-title-text { font-size: 13px; }
-        }
-        .game-card-banner {
-          height: 110px;
-          position: relative;
-          overflow: hidden;
-          background: #18181f;
-        }
-        .game-card-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center top;
-          display: block;
-        }
-        .game-card-placeholder {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-center;
-          font-size: 30px;
-        }
-        .game-card-gradient {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          height: 45px;
-          background: linear-gradient(to top, #111118, transparent);
         }
       `}</style>
             <div className="discover-page-padding">

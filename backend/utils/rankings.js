@@ -45,7 +45,8 @@ export const calculateTopRated = async (type) => {
                 v: { $sum: 1 },
                 title: { $first: '$title' },
                 cover: { $first: '$cover' },
-                genre: { $first: '$genre' }
+                genre: { $first: '$genre' },
+                year: { $first: '$year' }
             }},
             { $match: { v: { $gte: 1 } } } // We filter by m later in the formula
         ]);
@@ -81,7 +82,8 @@ export const calculateTopRated = async (type) => {
             title: t.title,
             cover: t.cover,
             genres: t.genres || [t.genre],
-            avgRating: t.R
+            avgRating: t.R,
+            year: t.year
         };
     })
     .sort((a, b) => b.score - a.score)
@@ -142,32 +144,50 @@ export const calculateTrending = async (type) => {
     for (let i = 0; i < ranked.length; i++) {
         const item = ranked[i];
         let metadata = null;
+        const extId = parseInt(item.contentId);
         
         if (type === 'game') {
-            const g = await Game.findOne({ igdbId: parseInt(item.contentId) });
-            metadata = g ? { 
-                title: g.title, 
-                cover: g.cover, 
-                genres: [g.genre], 
-                avgRating: g.rating,
-                year: item.year // Keep existing if present
-            } : null;
-        } else if (type === 'anime' || type === 'manga' || type === 'movie' || type === 'tv') {
-            const EntryModel = (type === 'anime' || type === 'manga') ? AnimeEntry : MovieEntry;
-            const [entry, stats] = await Promise.all([
-                EntryModel.findOne({ externalId: parseInt(item.contentId) }),
-                MediaStats.findOne({ externalId: parseInt(item.contentId), type })
+            const [g, l, w] = await Promise.all([
+                Game.findOne({ igdbId: extId }),
+                import('../models/GameLike.js').then(m => m.default.findOne({ igdbId: extId })),
+                import('../models/Wishlist.js').then(m => m.default.findOne({ igdbId: extId }))
             ]);
-            metadata = entry ? { 
-                title: entry.title, 
-                cover: entry.cover, 
-                genres: entry.genres,
-                avgRating: stats?.avgRating || 0,
-                year: entry.year || entry.releaseDate ? new Date(entry.releaseDate).getFullYear() : item.year
-            } : null;
+            
+            const source = g || l || w;
+            if (source) {
+                metadata = { 
+                    title: source.title, 
+                    cover: source.cover, 
+                    genres: source.genres || (source.genre ? [source.genre] : []), 
+                    avgRating: g?.rating || 0,
+                    year: source.year || source.releaseYear
+                };
+            }
+        } else if (['anime', 'manga', 'movie', 'tv'].includes(type)) {
+            const EntryModel = (type === 'anime' || type === 'manga') ? AnimeEntry : MovieEntry;
+            const LikeModel = (type === 'anime' || type === 'manga') ? import('../models/AnimeLike.js').then(m => m.default) : import('../models/MovieLike.js').then(m => m.default);
+            const WishModel = (type === 'anime' || type === 'manga') ? import('../models/AnimeWishlist.js').then(m => m.default) : import('../models/MovieWishlist.js').then(m => m.default);
+
+            const [entry, like, wish, stats] = await Promise.all([
+                EntryModel.findOne({ externalId: extId, type }),
+                LikeModel.then(M => M.findOne({ externalId: extId, type })),
+                WishModel.then(M => M.findOne({ externalId: extId, type })),
+                MediaStats.findOne({ externalId: extId, type })
+            ]);
+
+            const source = entry || like || wish;
+            if (source) {
+                metadata = { 
+                    title: source.title, 
+                    cover: source.cover, 
+                    genres: source.genres || (source.genre ? [source.genre] : []),
+                    avgRating: stats?.avgRating || 0,
+                    year: source.year || (source.releaseDate ? new Date(source.releaseDate).getFullYear() : null)
+                };
+            }
         }
         
-        if (metadata) {
+        if (metadata && metadata.title) {
             finalRanked.push({
                 ...item,
                 ...metadata,
@@ -175,7 +195,7 @@ export const calculateTrending = async (type) => {
             });
         }
         
-        if (finalRanked.length >= 100) break; // Limit to 100 for explore pages
+        if (finalRanked.length >= 100) break; 
     }
 
     // 4. Atomic Update
@@ -191,17 +211,12 @@ export const calculateTrending = async (type) => {
  * COMING SOON / UPCOMING (Unified)
  */
 export const calculateComingSoon = async (type) => {
-    if (type === 'manga') {
-        await Ranking.deleteMany({ contentType: 'manga', rankType: 'coming_soon' });
-        return; 
-    }
     logger.info(`[Rankings] Syncing Coming Soon for ${type}...`);
     
     let items = [];
     
     if (type === 'game') {
         try {
-            // Fetch directly from IGDB for Coming Soon
             const { getAccessToken, normalizeCover } = await import('./igdb.js');
             const token = await getAccessToken();
             const now = Math.floor(Date.now() / 1000);
@@ -222,7 +237,15 @@ export const calculateComingSoon = async (type) => {
         } catch (err) { logger.error(`[Rankings] IGDB Coming Soon error:`, err.message); }
     } else if (type === 'anime' || type === 'manga') {
         try {
-            const res = await apiClient.get(`https://api.jikan.moe/v4/top/${type}`, { params: { limit: 25, filter: 'upcoming', sfw: true } });
+            // For manga, Jikan supports 'upcoming' filter as well
+            const res = await apiClient.get(`https://api.jikan.moe/v4/top/${type}`, { 
+                params: { 
+                    limit: 25, 
+                    filter: 'upcoming', 
+                    sfw: true 
+                },
+                retry: 2
+            });
             items = (res.data?.data || []).map(item => ({
                 contentId: String(item.mal_id),
                 title: item.title,
@@ -230,7 +253,7 @@ export const calculateComingSoon = async (type) => {
                 year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year || item.year,
                 genres: item.genres?.map(g => g.name) || []
             }));
-        } catch (err) { logger.error(`[Rankings] Jikan Coming Soon error:`, err.message); }
+        } catch (err) { logger.error(`[Rankings] Jikan Coming Soon error for ${type}:`, err.message); }
     } else {
         try {
             const endpoint = type === 'movie' ? 'movie/upcoming' : 'tv/on_the_air';
@@ -250,7 +273,7 @@ export const calculateComingSoon = async (type) => {
             ...item,
             contentType: type,
             rankType: 'coming_soon',
-            score: 0, // Not applicable for coming soon
+            score: 0, 
             rankPosition: index + 1
         }));
 

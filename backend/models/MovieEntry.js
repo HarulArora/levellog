@@ -76,6 +76,10 @@ const movieEntrySchema = new mongoose.Schema(
         genre: {
             type: String,
             default: ''
+        },
+        year: {
+            type: Number,
+            default: null
         }
     },
     {

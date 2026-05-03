@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useSection } from '../../context/SectionContext';
+import { useSection } from '../../context/SectionState';
 
 const SubSectionToggle = ({ current, options, type }) => {
     const navigate = useNavigate();
@@ -32,3 +32,4 @@ const SubSectionToggle = ({ current, options, type }) => {
 };
 
 export default SubSectionToggle;
+

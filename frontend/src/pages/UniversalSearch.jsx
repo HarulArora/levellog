@@ -6,7 +6,6 @@ import useCachedFetch from '../hooks/useCachedFetch'
 import { useFollow } from '../context/FollowContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import { useLeaderboard } from '../context/LeaderboardContext'
-import { useSection } from '../context/SectionContext'
 import Skeleton, { GameCardSkeleton } from '../components/ui/Skeleton'
 
 const RANK_CARD_STYLES = {

@@ -1,9 +1,9 @@
 import cron from 'node-cron'
-import fetch from 'node-fetch' // Check if global fetch is available (Node 18+) or use axios
 import GlobalList from '../models/GlobalList.js'
 import { getAccessToken } from '../utils/igdb.js'
 import { normalizeCover } from '../utils/helpers.js'
 import logger from '../utils/logger.js'
+import apiClient from '../utils/apiClient.js'
 
 /**
  * IGDB Synchronization Task
@@ -15,7 +15,6 @@ export const syncIGDBLists = async () => {
     try {
         const token = await getAccessToken()
         const now = Math.floor(Date.now() / 1000)
-        const sixMonths = now + (60 * 60 * 24 * 180)
         
         const headers = {
             'Client-ID': process.env.IGDB_CLIENT_ID,
@@ -39,18 +38,9 @@ export const syncIGDBLists = async () => {
         ]
 
         for (const config of endpoints) {
-            const response = await fetch('https://api.igdb.com/v4/games', {
-                method: 'POST',
-                headers,
-                body: config.body
-            })
+            const response = await apiClient.post('https://api.igdb.com/v4/games', config.body, { headers });
 
-            if (!response.ok) {
-                logger.error(`[Sync] Failed to fetch ${config.key}: ${response.statusText}`)
-                continue
-            }
-
-            const data = await response.json()
+            const data = response.data || []
             
             const normalizedGames = data.map(g => ({
                 id: g.id,

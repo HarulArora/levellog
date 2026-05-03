@@ -38,6 +38,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
         summary: existingEntry?.summary || preselectedGame?.summary || '',
 
         igdbId: existingEntry?.igdbId || preselectedGame?.igdbId || '',
+        year: existingEntry?.year || preselectedGame?.year || '',
 
     })
 
@@ -107,6 +108,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
             cover: game.cover || '',
             summary: game.summary || '',
             igdbId: game.igdbId || '',
+            year: game.year || '',
             platforms: alreadyLogged ? alreadyLogged.platforms : mappedPlatforms,
             status: alreadyLogged ? alreadyLogged.status : 'playing',
             rating: alreadyLogged ? alreadyLogged.rating : 0,

@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useEffect, lazy, Suspense, memo, useCallback
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
-import { useSection } from '../../context/SectionContext'
+import { useSection } from '../../context/SectionState'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Flame, Plus, Tv, ChevronRight } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
@@ -364,6 +364,9 @@ function TVHome() {
                                 ]}
                             />
 
+                            <h1 className="font-black uppercase leading-none tracking-wide text-[#c8ff57] mb-2" style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', letterSpacing: '0.2em' }}>
+                                Track Your Watchlist
+                            </h1>
                             <h2 className="font-black uppercase leading-none tracking-wide text-white mb-6" style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}>
                                 The TV<br />
                                 <span className="text-[#c8ff57]">Pond.</span>
@@ -556,15 +559,15 @@ function TVHome() {
 
                                                 <div className="absolute top-2 right-2 flex flex-col gap-1.5 items-end z-10">
                                                     {Number(stats[item.externalId]?.avgRating) > 0 && (
-                                                        <div className="bg-black/85 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center justify-center gap-1.5 shadow-xl min-w-[52px]">
+                                                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
                                                             <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
-                                                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.5px' }}>{stats[item.externalId].avgRating}</span>
+                                                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats[item.externalId].avgRating}</span>
                                                         </div>
                                                     )}
                                                     {getMyRating(item.externalId) && (
-                                                        <div className="bg-black/85 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center justify-center gap-1.5 shadow-xl min-w-[52px]">
+                                                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
                                                             <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-bold">ME</span>
-                                                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif', letterSpacing: '0.5px' }}>{getMyRating(item.externalId)}</span>
+                                                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{getMyRating(item.externalId)}</span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -610,3 +613,4 @@ function TVHome() {
 }
 
 export default TVHome
+

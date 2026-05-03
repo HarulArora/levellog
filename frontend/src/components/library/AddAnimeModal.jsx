@@ -15,7 +15,8 @@ function AddAnimeModal({ onClose, onAdd, preselectedAnime = null, existingEntry 
         type: existingEntry?.type || existingEntry?.mediaType || preselectedAnime?.type || 'anime',
         totalEpisodes: existingEntry?.totalEpisodes || preselectedAnime?.episodes || 0,
         totalChapters: existingEntry?.totalChapters || preselectedAnime?.chapters || 0,
-        airingStatus: existingEntry?.airingStatus || preselectedAnime?.airingStatus || preselectedAnime?.status || ''
+        airingStatus: existingEntry?.airingStatus || preselectedAnime?.airingStatus || preselectedAnime?.status || '',
+        year: existingEntry?.year || preselectedAnime?.year || null
     })
     
     // Auto-fetch total episodes if missing from existing entry
@@ -31,6 +32,7 @@ function AddAnimeModal({ onClose, onAdd, preselectedAnime = null, existingEntry 
                             ...prev,
                             totalEpisodes: totalEp,
                             totalChapters: totalCh,
+                            year: prev.year || res.data.anime.year,
                             episodesWatched: totalEp > 0 && prev.episodesWatched > totalEp ? totalEp : prev.episodesWatched,
                             chaptersRead: totalCh > 0 && prev.chaptersRead > totalCh ? totalCh : prev.chaptersRead
                         }));

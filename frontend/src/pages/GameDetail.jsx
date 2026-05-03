@@ -13,6 +13,7 @@ import { getIGDBImage, SIZES } from '../utils/igdb'
 import { useLeaderboard } from '../context/LeaderboardContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import GifPicker from '../components/ui/GifPicker'
+import { invalidateCache } from '../utils/cache'
 
 const GifIcon = ({ size = 16, className = "" }) => (
     <svg 

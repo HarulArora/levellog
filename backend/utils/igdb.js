@@ -68,7 +68,7 @@ export const searchGames = async (query) => {
                 genres: game.genres?.map(g => g.name) || [],
                 platforms,
                 summary: game.summary || '',
-                releaseYear: game.first_release_date
+                year: game.first_release_date
                     ? new Date(game.first_release_date * 1000).getFullYear()
                     : null,
                 rating: game.rating ? (game.rating / 10).toFixed(1) : null

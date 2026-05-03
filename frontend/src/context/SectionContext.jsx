@@ -1,18 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useAuth } from './AuthContext';
-
-const SectionContext = createContext();
-
-export const useSection = () => {
-    const context = useContext(SectionContext);
-    if (!context) {
-        throw new Error('useSection must be used within a SectionProvider');
-    }
-    return context;
-};
+import React, { useState, useEffect } from 'react';
+import { SectionContext, useSection } from './SectionState';
+export { useSection };
 
 export const SectionProvider = ({ children }) => {
-    const { user, updateSettings } = useAuth();
 
     const [activeSection, setActiveSectionState] = useState(() => {
         const path = window.location.pathname;
@@ -93,4 +83,5 @@ export const SectionProvider = ({ children }) => {
         </SectionContext.Provider>
     );
 };
+
 

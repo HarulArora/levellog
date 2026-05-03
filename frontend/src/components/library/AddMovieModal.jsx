@@ -11,7 +11,8 @@ function AddMovieModal({ onClose, onAdd, preselectedMovie = null, existingEntry 
         notes: existingEntry?.notes || '',
         cover: existingEntry?.cover || existingEntry?.coverImage || preselectedMovie?.cover || '',
         externalId: existingEntry?.externalId || preselectedMovie?.externalId || '',
-        type: existingEntry?.type || existingEntry?.mediaType || preselectedMovie?.type || 'movie'
+        type: existingEntry?.type || existingEntry?.mediaType || preselectedMovie?.type || 'movie',
+        year: existingEntry?.year || preselectedMovie?.year || null
     })
 
     const [submitting, setSubmitting] = useState(false)
