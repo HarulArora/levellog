@@ -4,13 +4,12 @@ import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import { useSection } from '../../context/SectionState'
 import useCachedFetch from '../../hooks/useCachedFetch'
-import { Trophy, Play, Star, ListChecks, X, Pause, Search, BookOpen, Flame, Plus, Tv } from 'lucide-react'
+import { Trophy, Play, Star, ListChecks, X, Pause, Search, BookOpen, Flame, Plus, Tv, ChevronRight } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import AvatarFrame from '../../components/ui/AvatarFrame'
 import { useLeaderboard } from '../../context/LeaderboardContext'
 import { Helmet } from 'react-helmet-async'
-import { ChevronRight } from 'lucide-react'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
 import StatsBar from '../../components/ui/StatsBar'
 import RecentActivityFeed from '../../components/ui/RecentActivityFeed'
@@ -233,7 +232,7 @@ function MangaSearchBar({ id = 'manga-search' }) {
                     value={query}
                     onChange={handleChange}
                     className="w-full bg-[#111118] border border-[#2a2a35] rounded-xl
-                                pl-11 pr-32 py-4 text-white text-sm
+                                pl-12 pr-32 py-4 text-white text-sm
                                 focus:outline-none focus:border-[#c8ff57]
                                 placeholder:text-[#94999c] transition-all shadow-inner"
                 />
@@ -406,20 +405,21 @@ function MangaHome() {
             </div>
 
             {/* Hero */}
-            <section className="relative py-20 md:py-32 overflow-hidden min-h-[650px] flex items-center">
+            <section className="relative pt-20 pb-16 md:pt-24 md:pb-24 overflow-hidden min-h-[600px] flex items-center">
                 {(allManga.length > 0 || !loading) && <HeroBanner animes={allManga} />}
 
-                <div className="relative z-10 max-w-[1300px] mx-auto px-5 md:px-10">
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_450px] gap-16 lg:gap-24 items-center">
+                <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10 w-full">
+                    <SubSectionToggle 
+                         current="manga"
+                         type="anime"
+                         options={[
+                             { label: 'Anime', value: 'anime', path: '/anime', icon: Tv },
+                             { label: 'Manga', value: 'manga', path: '/manga', icon: BookOpen }
+                         ]}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
                         <div>
-                            <SubSectionToggle 
-                                 current="manga"
-                                 type="anime"
-                                 options={[
-                                     { label: 'Anime', value: 'anime', path: '/anime', icon: Tv },
-                                     { label: 'Manga', value: 'manga', path: '/manga', icon: BookOpen }
-                                 ]}
-                            />
 
                             <h1 className="font-black uppercase leading-none tracking-wide text-[#c8ff57] mb-2" style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', letterSpacing: '0.2em' }}>
                                 Hatch Your Collection

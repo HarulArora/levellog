@@ -26,80 +26,84 @@ const inFlightRequests = new Map()
 router.get('/search', protectOptional, async (req, res) => {
     try {
         const query = req.query.q
+        const page = parseInt(req.query.page) || 1
+        const limit = parseInt(req.query.limit) || 20
+
         if (!query) return res.status(400).json({ success: false, message: 'Query is required' })
 
-        const cacheKey = `search-${query}`
-        if (igdbCache.has(cacheKey)) return res.json({ success: true, ...igdbCache.get(cacheKey) })
+        const cacheKey = `search-${query}-${page}-${limit}`
+        if (igdbCache.has(cacheKey)) {
+            const cached = igdbCache.get(cacheKey)
+            return res.json({ success: true, ...cached })
+        }
 
         // 🚀 Pooling check
         if (inFlightRequests.has(cacheKey)) {
             const data = await inFlightRequests.get(cacheKey)
-            return res.json({ success: true, games: data })
+            return res.json({ success: true, ...data })
         }
 
         const performSearch = async () => {
-            const raw = await searchGames(query)
-            const normCover = (c) => normalizeCover(c)
-            const results = (raw || []).map(g => {
-                const genreNames = g.genres
-                    ? (Array.isArray(g.genres)
-                        ? g.genres.map(x => typeof x === 'string' ? x : x.name).filter(Boolean)
-                        : [g.genres])
-                    : (g.genre ? [g.genre] : [])
-                return {
-                    id: g.igdbId || g.id,
-                    igdbId: g.igdbId || g.id,
-                    title: g.title || g.name || 'Unknown',
-                    cover: normCover(g.cover),
-                    genre: genreNames[0] || null,
-                    genres: genreNames,
-                    year: g.releaseYear || (g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null),
-                    rating: g.rating != null ? g.rating : (g.igdbRating != null ? g.igdbRating : null),
-                    platforms: g.platforms || [],
-                    summary: g.summary || g.description || '',
+            const results = await searchGames(query, page, limit)
+            
+            // ── FETCH COMMUNITY STATS FOR SEARCH RESULTS (Optional) ──
+            const allIds = results.map(g => g.igdbId || g.id).filter(id => typeof id === 'number')
+            let stats = {}
+            let userRatings = {}
+
+            try {
+                if (allIds.length > 0) {
+                    const reviewData = await Game.aggregate([
+                        { $match: { igdbId: { $in: allIds }, rating: { $gt: 0 } } },
+                        { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
+                    ])
+                    allIds.forEach(id => {
+                        const review = reviewData.find(r => r._id === id)
+                        stats[id] = {
+                            avgRating: review ? parseFloat(review.avg.toFixed(1)) : null,
+                            ratingCount: review?.count || 0
+                        }
+                    })
                 }
-            })
-            igdbCache.set(cacheKey, { games: results })
-            return results
+
+                // ── FETCH USER RATINGS IF AUTHENTICATED ──
+                if (req.user && allIds.length > 0) {
+                    const userGames = await Game.find({
+                        userId: req.user._id,
+                        igdbId: { $in: allIds }
+                    }).select('igdbId rating')
+                    userGames.forEach(g => {
+                        if (g.rating > 0) userRatings[g.igdbId] = g.rating
+                    })
+                }
+            } catch (dbErr) {
+                logger.error('[IGDB Search] Stats enrichment failed:', dbErr.message)
+                // Continue without stats/ratings
+            }
+
+            const finalResponse = { games: results, stats, userRatings }
+            igdbCache.set(cacheKey, finalResponse)
+            return finalResponse
         }
 
         const fetchPromise = performSearch()
         inFlightRequests.set(cacheKey, fetchPromise)
-        const finalGames = await fetchPromise
-        inFlightRequests.delete(cacheKey)
-
-        // ── FETCH COMMUNITY STATS FOR SEARCH RESULTS ──
-        const allIds = finalGames.map(g => g.id).filter(Boolean)
-        let stats = {}
-        if (allIds.length > 0) {
-            const reviewData = await Game.aggregate([
-                { $match: { igdbId: { $in: allIds }, rating: { $gt: 0 } } },
-                { $group: { _id: '$igdbId', avg: { $avg: '$rating' }, count: { $sum: 1 } } }
-            ])
-            allIds.forEach(id => {
-                const review = reviewData.find(r => r._id === id)
-                stats[id] = {
-                    avgRating: review ? parseFloat(review.avg.toFixed(1)) : null,
-                    ratingCount: review?.count || 0
-                }
-            })
+        
+        let responseData;
+        try {
+            responseData = await fetchPromise
+        } finally {
+            inFlightRequests.delete(cacheKey)
         }
 
-        // ── FETCH USER RATINGS IF AUTHENTICATED ──
-        let userRatings = {}
-        if (req.user && allIds.length > 0) {
-            const userGames = await Game.find({
-                userId: req.user._id,
-                igdbId: { $in: allIds }
-            }).select('igdbId rating')
-            userGames.forEach(g => {
-                if (g.rating > 0) userRatings[g.igdbId] = g.rating
-            })
-        }
-
-        res.json({ success: true, games: finalGames, stats, userRatings })
+        res.json({ success: true, ...responseData })
     } catch (error) {
-        res.status(500).json({ success: false, message: 'IGDB search failed', error: error.message })
+        logger.error(`[IGDB Search Route Error] Query: "${req.query.q}":`, error)
+        res.status(500).json({ 
+            success: false, 
+            message: 'IGDB search failed', 
+            error: error.message 
+        })
     }
 })
 

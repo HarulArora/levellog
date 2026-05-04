@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
-import { Search, Star } from 'lucide-react'
+import { Search, Star, Plus } from 'lucide-react'
 import { GameCardSkeleton } from '../components/ui/Skeleton'
 import { getIGDBImage, SIZES } from '../utils/igdb'
+import { Helmet } from 'react-helmet-async'
 
 const GENRE_CARDS = [
     { label: 'Action RPG', igdb: 'Role-playing (RPG)', emoji: '⚔️' },
@@ -137,13 +138,21 @@ const GameCard = memo(({ game, entry, onClick }) => {
                 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
 
-                {/* Rating Badge */}
-                {game.avgRating && (
-                    <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                        <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
-                        <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
-                    </div>
-                )}
+                {/* Rating Badges */}
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
+                    {game.avgRating && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl min-w-[45px] justify-center">
+                            <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
+                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
+                        </div>
+                    )}
+                    {userRating && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl min-w-[45px] justify-center">
+                            <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
+                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{userRating}</span>
+                        </div>
+                    )}
+                </div>
 
                 {/* Status Badge */}
                 {status && statusStyle && (
@@ -210,12 +219,11 @@ export default function Discover() {
     const [showMore, setShowMore] = useState(false)
 
 
-    // Search Mode State
     const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
     const [searchResults, setSearchResults] = useState([])
     const [isSearching, setIsSearching] = useState(false)
-    const abortControllerRef = useRef(null)
-
+    const [searchPerformed, setSearchPerformed] = useState(!!searchParams.get('q'))
+    
     const LIMIT = 24
 
     // Map library for quick lookups
@@ -277,68 +285,62 @@ export default function Discover() {
         setSearchParams(newParams, { replace: true })
     }, [searchQuery, activeGenre, page, searchParams, setSearchParams])
 
-    useEffect(() => {
+    const handleSearch = async (e) => {
+        e?.preventDefault()
         const q = searchQuery.trim()
-        if (q.length < 2) {
-            setSearchResults([])
-            setIsSearching(false)
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort()
-                abortControllerRef.current = null
-            }
-            return
-        }
+        if (!q) return
 
         setIsSearching(true)
+        setSearchPerformed(true)
+        setActiveGenre(null)
 
-        const timer = setTimeout(async () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort()
-            }
-            abortControllerRef.current = new AbortController()
-            try {
-                const res = await api.get(`/igdb/search?q=${encodeURIComponent(q)}`, {
-                    signal: abortControllerRef.current.signal
-                })
-                const fetchedSearchedGames = res.data.games || []
-                
-                const ids = fetchedSearchedGames.map(g => g.id).filter(Boolean)
-                if (ids.length > 0) {
-                    try {
-                        const statsRes = await api.post('/games/stats/batch', { igdbIds: ids }, {
-                            signal: abortControllerRef.current.signal
-                        })
-                        const stats = statsRes.data.stats || {}
-                        const enriched = fetchedSearchedGames.map(g => {
-                            const igdbId = g.igdbId || g.id
-                            return {
-                                ...g,
-                                id: igdbId,
-                                igdbId: igdbId,
-                                avgRating: stats[igdbId]?.avgRating || null
-                            }
-                        })
-                        setSearchResults(enriched)
-                    } catch (err) {
-                        if (err.name !== 'CanceledError' && err.message !== 'canceled') {
-                            setSearchResults(fetchedSearchedGames)
+        try {
+            const res = await api.get(`/igdb/search?q=${encodeURIComponent(q)}&page=${page}&limit=${LIMIT}`)
+            const fetchedSearchedGames = res.data.games || []
+            
+            const ids = fetchedSearchedGames.map(g => g.id).filter(Boolean)
+            if (ids.length > 0) {
+                try {
+                    const statsRes = await api.post('/games/stats/batch', { igdbIds: ids })
+                    const stats = statsRes.data.stats || {}
+                    const enriched = fetchedSearchedGames.map(g => {
+                        const igdbId = g.igdbId || g.id
+                        return {
+                            ...g,
+                            id: igdbId,
+                            igdbId: igdbId,
+                            avgRating: stats[igdbId]?.avgRating || null
                         }
-                    }
-                } else {
+                    })
+                    setSearchResults(enriched)
+                } catch (err) {
                     setSearchResults(fetchedSearchedGames)
                 }
-            } catch (err) {
-                if (err.name !== 'CanceledError' && err.message !== 'canceled') {
-                    console.error('Search error:', err)
-                    setSearchResults([])
-                }
-            } finally {
-                setIsSearching(false)
+            } else {
+                setSearchResults(fetchedSearchedGames)
             }
-        }, 400)
+        } catch (err) {
+            console.error('Search error:', err)
+            setSearchResults([])
+        } finally {
+            setIsSearching(false)
+        }
+    }
 
-        return () => clearTimeout(timer)
-    }, [searchQuery])
+    // Trigger search on page change
+    useEffect(() => {
+        if (searchPerformed && searchQuery.trim()) {
+            handleSearch()
+        }
+    }, [page])
+
+    // Handle clearing search manually
+    const clearSearch = () => {
+        setSearchQuery('')
+        setSearchPerformed(false)
+        setSearchResults([])
+        setPage(1)
+    }
 
     const selectGenre = (card) => {
         setActiveGenre(prev => prev?.label === card.label ? null : card)
@@ -357,335 +359,210 @@ export default function Discover() {
     const pageNumbers = getPageNumbers()
 
     return (
-        <div style={{ minHeight: '100vh', color: '#e8e8f0', paddingBottom: 60 }}>
-            <style>{`
-        .discover-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 1.5rem;
-          margin-bottom: 40px;
-        }
-        @media (min-width: 640px) {
-          .discover-grid { grid-template-columns: repeat(3, 1fr); }
-        }
-        @media (min-width: 768px) {
-          .discover-grid { grid-template-columns: repeat(4, 1fr); }
-        }
-        @media (min-width: 1024px) {
-          .discover-grid { grid-template-columns: repeat(5, 1fr); }
-        }
-        .genre-grid-responsive {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 8px;
-          margin-bottom: 40px;
-        }
-        @media (min-width: 480px) {
-          .genre-grid-responsive { grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        }
-        @media (min-width: 768px) {
-          .genre-grid-responsive { grid-template-columns: repeat(7, 1fr); gap: 12px; }
-        }
-        @media (min-width: 1024px) {
-          .genre-grid-responsive { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
-        }
-        .discover-page-padding {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 24px 16px 0;
-        }
-        @media (min-width: 768px) {
-          .discover-page-padding { padding: 40px 40px 0; }
-        }
-        .game-card-body-inner {
-          padding: 8px 10px 10px;
-        }
-        @media (min-width: 480px) {
-          .game-card-body-inner { padding: 12px 14px 14px; }
-        }
-        .game-card-title-text {
-          font-weight: 600;
-          font-size: 11px;
-          color: #e8e8f0;
-          margin-bottom: 5px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        @media (min-width: 480px) {
-          .game-card-title-text { font-size: 13px; }
-        }
-      `}</style>
-            <div className="discover-page-padding">
+        <div className="min-h-screen pb-20">
+            <Helmet>
+                <title>Discover Games | QuestDuck</title>
+            </Helmet>
 
-                {/* ── Browse by Genre ── */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 28, paddingBottom: 16, borderBottom: '1px solid #2a2a35', flexWrap: 'wrap' }}>
-                    <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 3 }}>BROWSE BY GENRE</span>
-                    
-                    {/* Native Search Input */}
-                    <div style={{ position: 'relative', width: '100%', maxWidth: 360 }}>
-                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a7a90', display: 'flex', alignItems: 'center' }}>
-                            <Search size={16} strokeWidth={2.5} />
-                        </span>
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search games..."
-                            style={{
-                                width: '100%',
-                                background: '#111118',
-                                border: '1px solid #2a2a35',
-                                borderRadius: 8,
-                                padding: '10px 14px 10px 42px',
-                                color: '#fff',
-                                fontFamily: "'DM Mono', monospace",
-                                fontSize: 13,
-                                transition: 'all 0.2s',
-                                outline: 'none',
-                            }}
-                            onFocus={e => e.currentTarget.style.borderColor = '#c8ff57'}
-                            onBlur={e => e.currentTarget.style.borderColor = '#2a2a35'}
-                        />
-                        {isSearching && (
-                            <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a7a90', fontSize: 11, fontFamily: "'DM Mono', monospace" }}>
-                                loading...
-                            </span>
-                        )}
-                        {searchQuery.length > 0 && !isSearching && (
-                            <button
-                                onClick={() => setSearchQuery('')}
-                                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#7a7a90', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12 }}
-                            >
-                                ✕
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {searchQuery.trim().length < 2 && (
-                    <>
-                        {/* Genre cards */}
-                <div className="genre-grid-responsive">
-                    {GENRE_CARDS.map(card => {
-                        const isActive = activeGenre?.label === card.label
-                        return (
-                            <div
-                                key={card.label}
-                                onClick={() => selectGenre(card)}
-                                style={{
-                                    background: isActive ? 'rgba(200,255,87,0.06)' : '#111118',
-                                    border: `1px solid ${isActive ? '#c8ff57' : '#2a2a35'}`,
-                                    borderRadius: 8,
-                                    padding: '20px 16px',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    textAlign: 'center',
-                                }}
-                                onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = '#c8ff57'; e.currentTarget.style.transform = 'translateY(-2px)' } }}
-                                onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = '#2a2a35'; e.currentTarget.style.transform = 'translateY(0)' } }}
-                            >
-                                <div style={{ fontSize: 28, marginBottom: 8 }}>{card.emoji}</div>
-                                <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: 2, color: isActive ? '#c8ff57' : '#e8e8f0', marginBottom: 2 }}>
-                                    {card.label.toUpperCase()}
-                                </div>
-                            </div>
-                        )
-                    })}
-
-                    {/* + More */}
-                    <div
-                        onClick={() => setShowMore(true)}
-                        style={{
-                            background: '#111118',
-                            border: '1px solid #2a2a35',
-                            borderRadius: 8,
-                            padding: '20px 16px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            textAlign: 'center',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 8,
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#c8ff57'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a35'; e.currentTarget.style.transform = 'translateY(0)' }}
-                    >
-                        <div style={{ fontSize: 28 }}>＋</div>
-                        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: 2, color: '#7a7a90' }}>MORE</div>
-                    </div>
-                </div>
-
-                {/* More Genres Modal */}
-                {showMore && (
-                    <div
-                        onClick={() => setShowMore(false)}
-                        style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                        <div
-                            onClick={e => e.stopPropagation()}
-                            style={{ background: '#111118', border: '1px solid #2a2a35', borderRadius: 12, padding: 32, width: 520, maxWidth: '92vw' }}
-                        >
-                            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 24, letterSpacing: 3, marginBottom: 20 }}>MORE GENRES</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
-                                {MORE_GENRES.map(card => {
-                                    const isActive = activeGenre?.label === card.label
-                                    return (
-                                        <button
-                                            key={card.label}
-                                            onClick={() => { selectGenre(card); setShowMore(false) }}
-                                            style={{
-                                                background: isActive ? 'rgba(200,255,87,0.06)' : 'transparent',
-                                                border: `1px solid ${isActive ? '#c8ff57' : '#2a2a35'}`,
-                                                borderRadius: 8,
-                                                padding: '14px 10px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.15s',
-                                                textAlign: 'center',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                gap: 6,
-                                            }}
-                                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#c8ff57'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-                                            onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = '#2a2a35'; e.currentTarget.style.transform = 'translateY(0)' } }}
-                                        >
-                                            <span style={{ fontSize: 22 }}>{card.emoji}</span>
-                                            <span style={{
-                                                fontFamily: "'Bebas Neue', sans-serif",
-                                                fontSize: 12,
-                                                letterSpacing: 2,
-                                                color: isActive ? '#c8ff57' : '#e8e8f0',
-                                            }}>{card.label.toUpperCase()}</span>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                            <button
-                                onClick={() => setShowMore(false)}
-                                style={{ marginTop: 20, background: 'transparent', border: 'none', color: '#7a7a90', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Mono', monospace" }}
-                            >
-                                Close
-                            </button>
+            {/* ── Header ── */}
+            <section className="bg-[#111118] border-b border-[#2a2a35] pt-24 pb-12">
+                <div className="max-w-[1200px] mx-auto px-5 md:px-10">
+                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+                        <div className="max-w-xl">
+                            <h1 className="font-black text-5xl md:text-6xl text-white uppercase leading-none mb-3" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                Discover <span className="text-[#c8ff57]">{activeGenre ? activeGenre.label : 'Games'}</span>
+                            </h1>
+                            <p className="text-[#7a7a90] text-sm font-mono uppercase tracking-wider">
+                                Browse thousands of titles across all platforms.
+                            </p>
                         </div>
-                    </div>
-                )}
 
-                        {/* All Games header */}
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #2a2a35' }}>
-                            <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 3 }}>
-                                {activeGenre ? activeGenre.label.toUpperCase() : 'ALL GAMES'}
-                            </span>
-                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#7a7a90' }}>
-                                {total > 0 ? `${total.toLocaleString()} games` : ''}
-                            </span>
-                            {activeGenre && (
-                                <button
-                                    onClick={() => { setActiveGenre(null); setPage(1) }}
-                                    style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: '#7a7a90', cursor: 'pointer', fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}
+                        <form onSubmit={handleSearch} className="w-full md:w-96 relative">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] z-10" size={18} />
+                            <input 
+                                type="text"
+                                placeholder="Search games..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl pl-12 pr-32 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all shadow-inner placeholder:text-[#7a7a90]"
+                            />
+                            {searchQuery && (
+                                <button 
+                                    type="submit" 
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#c8ff57] text-black font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded hover:bg-[#d4ff6e] transition-colors"
+                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                 >
-                                    ✕ Clear filter
+                                    {isSearching ? '...' : 'Find'}
                                 </button>
                             )}
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <div className="max-w-[1200px] mx-auto px-5 md:px-10 mt-12">
+                
+                {/* ── Browse by Genre ── */}
+                {!searchQuery && (
+                    <>
+                        <div className="flex items-center justify-between mb-8 border-b border-[#2a2a35] pb-4">
+                            <span className="font-black text-2xl tracking-[2px] uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                BROWSE BY GENRE
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 lg:grid-cols-8 gap-3 mb-16">
+                            {GENRE_CARDS.map(genre => {
+                                const isActive = activeGenre?.label === genre.label
+                                return (
+                                    <div
+                                        key={genre.label}
+                                        onClick={() => selectGenre(genre)}
+                                        className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all cursor-pointer text-center group
+                                            ${isActive ? 'bg-[#c8ff57]/10 border-[#c8ff57] scale-105' : 'bg-[#111118] border-[#2a2a35] hover:border-[#c8ff57] hover:-translate-y-1'}
+                                        `}
+                                    >
+                                        <div className="text-2xl mb-2">{genre.emoji}</div>
+                                        <div className={`font-black text-[11px] uppercase tracking-wider leading-tight ${isActive ? 'text-[#c8ff57]' : 'text-[#7a7a90] group-hover:text-white'}`} style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                            {genre.label}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                            <div
+                                onClick={() => setShowMore(true)}
+                                className="flex flex-col items-center justify-center p-4 rounded-xl border border-[#2a2a35] bg-[#111118] hover:border-[#c8ff57] transition-all cursor-pointer text-center group hover:-translate-y-1"
+                            >
+                                <div className="text-2xl mb-2">➕</div>
+                                <div className="font-black text-[11px] uppercase tracking-wider text-[#7a7a90] group-hover:text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                    More
+                                </div>
+                            </div>
                         </div>
                     </>
                 )}
 
-                {searchQuery.trim().length >= 2 && (
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #2a2a35' }}>
-                        <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, letterSpacing: 3 }}>
-                            SEARCH RESULTS
+                {/* ── Main Feed Header ── */}
+                <div className="flex items-center justify-between mb-8 border-b border-[#2a2a35] pb-4">
+                    <div className="flex items-center gap-4">
+                        <span className="font-black text-2xl tracking-[2px] uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            {searchPerformed ? 'SEARCH RESULTS' : (activeGenre ? activeGenre.label.toUpperCase() : 'TRENDING NOW')}
                         </span>
-                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#7a7a90' }}>
-                            "{searchQuery}"
-                        </span>
+                        {total > 0 && !searchQuery && (
+                            <span className="font-mono text-[10px] text-[#7a7a90] mt-1">{total.toLocaleString()}</span>
+                        )}
                     </div>
-                )}
-
-                {/* Games Grid — 6 cols */}
-                <div className="discover-grid">
-                    {(searchQuery.trim().length >= 2 ? (isSearching && searchResults.length === 0) : (loading && games.length === 0))
-                        ? Array.from({ length: LIMIT }).map((_, i) => <GameCardSkeleton key={i} />)
-                        : (searchQuery.trim().length >= 2 ? searchResults : games).map(game => (
-                            <GameCard
-                                key={game.id}
-                                game={game}
-                                entry={libraryMap[game.id]}
-                                onClick={() => navigate(`/game/${game.id}`)}
-                            />
-                        ))
-                    }
+                    {(searchQuery || activeGenre) && (
+                        <button 
+                            onClick={clearSearch}
+                            className="text-[#7a7a90] hover:text-white font-mono text-[10px] uppercase tracking-widest transition-colors"
+                        >
+                            ✕ Clear Filter
+                        </button>
+                    )}
                 </div>
 
-                {/* No Results Empty State */}
-                {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '60px 20px', color: '#7a7a90', fontFamily: "'DM Mono', monospace", fontSize: 14 }}>
-                        <div style={{ fontSize: 40, marginBottom: 12 }}>😕</div>
-                        No games found for "{searchQuery}"
+                {/* ── Grid ── */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                    {loading || isSearching ? (
+                        Array.from({ length: 20 }).map((_, i) => <GameCardSkeleton key={i} />)
+                    ) : (searchPerformed ? searchResults : games).map(game => (
+                        <GameCard 
+                            key={game.id} 
+                            game={game} 
+                            entry={libraryMap[game.id]}
+                            onClick={() => navigate(`/game/${game.id}`)}
+                        />
+                    ))}
+                </div>
+
+                {/* ── No Results ── */}
+                {!loading && !isSearching && (searchPerformed ? searchResults.length === 0 : games.length === 0) && (
+                    <div className="py-24 text-center bg-[#111118] border border-[#2a2a35] border-dashed rounded-3xl">
+                        <div className="text-5xl mb-6">🛰️</div>
+                        <h3 className="text-white font-black text-2xl uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>No games found</h3>
+                        <p className="text-[#7a7a90] font-mono text-sm">Try a different search or genre</p>
                     </div>
                 )}
 
-                {/* Pagination */}
-                {!loading && totalPages > 1 && searchQuery.trim().length < 2 && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'wrap', paddingBottom: 16 }}>
+                {/* ── Pagination ── */}
+                {!loading && (searchPerformed ? searchResults.length > 0 : totalPages > 1) && (
+                    <div className="flex items-center justify-center gap-2 mt-16 flex-wrap">
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            style={{
-                                padding: '6px 14px', borderRadius: 4,
-                                border: '1px solid #2a2a35',
-                                background: 'transparent',
-                                color: page === 1 ? '#3a3a4a' : '#7a7a90',
-                                fontFamily: "'DM Sans', sans-serif", fontSize: 13,
-                                cursor: page === 1 ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => { if (page !== 1) { e.currentTarget.style.borderColor = '#c8ff57'; e.currentTarget.style.color = '#c8ff57' } }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a35'; e.currentTarget.style.color = page === 1 ? '#3a3a4a' : '#7a7a90' }}
-                        >← Prev</button>
-
-                        {pageNumbers.map((n, i) => {
+                            className="px-4 py-2 rounded bg-[#111118] border border-[#2a2a35] text-[#7a7a90] font-mono text-xs uppercase tracking-widest hover:border-[#c8ff57] hover:text-[#c8ff57] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        >
+                            ← Prev
+                        </button>
+                        
+                        {/* Only show page numbers for non-search (where we have totalPages) */}
+                        {!searchPerformed && pageNumbers.map((n, i) => {
                             const prev = pageNumbers[i - 1]
                             const ellipsis = prev && n - prev > 1
                             return (
-                                <div key={n} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    {ellipsis && <span style={{ color: '#3a3a4a', fontSize: 13 }}>…</span>}
+                                <div key={n} className="flex items-center gap-2">
+                                    {ellipsis && <span className="text-[#3a3a4a] font-mono">...</span>}
                                     <button
                                         onClick={() => setPage(n)}
-                                        style={{
-                                            width: 34, height: 34, borderRadius: 4,
-                                            border: `1px solid ${n === page ? '#c8ff57' : '#2a2a35'}`,
-                                            background: n === page ? 'rgba(200,255,87,0.08)' : 'transparent',
-                                            color: n === page ? '#c8ff57' : '#7a7a90',
-                                            fontFamily: "'DM Mono', monospace", fontSize: 13,
-                                            fontWeight: n === page ? 600 : 400,
-                                            cursor: 'pointer', transition: 'all 0.15s',
-                                        }}
-                                        onMouseEnter={e => { if (n !== page) { e.currentTarget.style.borderColor = '#c8ff57'; e.currentTarget.style.color = '#c8ff57' } }}
-                                        onMouseLeave={e => { if (n !== page) { e.currentTarget.style.borderColor = '#2a2a35'; e.currentTarget.style.color = '#7a7a90' } }}
-                                    >{n}</button>
+                                        className={`w-10 h-10 rounded border font-mono text-xs transition-all ${n === page ? 'bg-[#c8ff57]/10 border-[#c8ff57] text-[#c8ff57]' : 'bg-[#111118] border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-white'}`}
+                                    >
+                                        {n}
+                                    </button>
                                 </div>
                             )
                         })}
 
+                        {/* If searching, we don't always know totalPages, so we just show Next if we got a full page of results */}
                         <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages}
-                            style={{
-                                padding: '6px 14px', borderRadius: 4,
-                                border: '1px solid #2a2a35',
-                                background: 'transparent',
-                                color: page === totalPages ? '#3a3a4a' : '#7a7a90',
-                                fontFamily: "'DM Sans', sans-serif", fontSize: 13,
-                                cursor: page === totalPages ? 'not-allowed' : 'pointer', transition: 'all 0.15s',
-                            }}
-                            onMouseEnter={e => { if (page !== totalPages) { e.currentTarget.style.borderColor = '#c8ff57'; e.currentTarget.style.color = '#c8ff57' } }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a35'; e.currentTarget.style.color = page === totalPages ? '#3a3a4a' : '#7a7a90' }}
-                        >Next →</button>
+                            onClick={() => setPage(p => p + 1)}
+                            disabled={searchPerformed ? searchResults.length < LIMIT : page === totalPages}
+                            className="px-4 py-2 rounded bg-[#111118] border border-[#2a2a35] text-[#7a7a90] font-mono text-xs uppercase tracking-widest hover:border-[#c8ff57] hover:text-[#c8ff57] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        >
+                            Next →
+                        </button>
                     </div>
                 )}
 
+                {/* ── More Genres Modal ── */}
+                {showMore && (
+                    <div
+                        onClick={() => setShowMore(false)}
+                        className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+                    >
+                        <div
+                            onClick={e => e.stopPropagation()}
+                            className="bg-[#111118] border border-[#2a2a35] rounded-2xl p-8 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+                        >
+                            <div className="flex items-center justify-between mb-8 border-b border-[#2a2a35] pb-4">
+                                <span className="font-black text-2xl tracking-[3px] uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                    ALL GENRES
+                                </span>
+                                <button onClick={() => setShowMore(false)} className="text-[#7a7a90] hover:text-white transition-colors">✕</button>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {[...GENRE_CARDS, ...MORE_GENRES].map(genre => {
+                                    const isActive = activeGenre?.label === genre.label
+                                    return (
+                                        <div
+                                            key={genre.label}
+                                            onClick={() => { selectGenre(genre); setShowMore(false) }}
+                                            className={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all cursor-pointer text-center group
+                                                ${isActive ? 'bg-[#c8ff57]/10 border-[#c8ff57]' : 'bg-[#0d0d14] border-[#2a2a35] hover:border-[#c8ff57]'}
+                                            `}
+                                        >
+                                            <div className="text-2xl mb-2">{genre.emoji}</div>
+                                            <div className={`font-black text-[11px] uppercase tracking-wider leading-tight ${isActive ? 'text-[#c8ff57]' : 'text-[#7a7a90] group-hover:text-white'}`} style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                                {genre.label}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )

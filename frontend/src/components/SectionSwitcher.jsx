@@ -5,9 +5,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Gamepad2, Tv, Popcorn } from 'lucide-react';
 
 const SectionSwitcher = () => {
-    const { activeSection, setActiveSection } = useSection();
     const navigate = useNavigate();
     const location = useLocation();
+    const { activeSection, setActiveSection } = useSection();
+
+    // Auto-sync section with URL path changes
+    React.useEffect(() => {
+        const path = location.pathname;
+        if (path.startsWith('/manga') || path.startsWith('/anime')) {
+            if (activeSection !== 'anime') setActiveSection('anime');
+        } else if (path.startsWith('/tv') || path.startsWith('/movies')) {
+            if (activeSection !== 'movies') setActiveSection('movies');
+        } else if (path === '/' || path.startsWith('/library') || path.startsWith('/discover') || path.startsWith('/game')) {
+            if (activeSection !== 'games') setActiveSection('games');
+        }
+    }, [location.pathname, activeSection, setActiveSection]);
 
     const hideOnRoutes = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'];
     if (hideOnRoutes.includes(location.pathname)) return null;

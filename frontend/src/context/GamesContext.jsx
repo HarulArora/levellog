@@ -39,8 +39,21 @@ export function GamesProvider({ children }) {
                 headers: { Authorization: `Bearer ${token}` }
             })
             const fetched = res.data.games || []
-            setGames(fetched)
-            setCache(CACHE_KEY, fetched, CACHE_TTL)
+            
+            // 🛡️ Final Deduplication Safety Layer
+            const uniqueMap = new Map()
+            fetched.forEach(g => {
+                const type = g.type || g.mediaType || 'game'
+                const key = g.igdbId ? `${type}_ext_${g.igdbId}` : `${type}_title_${g.title?.toLowerCase()}`
+                const existing = uniqueMap.get(key)
+                if (!existing || (!existing.rating && g.rating) || (new Date(g.updatedAt) > new Date(existing.updatedAt))) {
+                    uniqueMap.set(key, g)
+                }
+            })
+            const finalGames = Array.from(uniqueMap.values())
+
+            setGames(finalGames)
+            setCache(CACHE_KEY, finalGames, CACHE_TTL)
             setError(null)
         } catch (err) {
             console.error('[GamesContext] fetch error:', err)

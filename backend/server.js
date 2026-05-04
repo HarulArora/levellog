@@ -82,7 +82,7 @@ app.use(helmet({
         directives: {
             "default-src": ["'self'"],
             "script-src": ["'self'", "'unsafe-inline'", "https://accounts.google.com"],
-            "connect-src": ["'self'", "https://questduck.com", "https://*.onrender.com", "https://*.googleapis.com"],
+            "connect-src": ["'self'", "http://localhost:5000", "https://questduck.com", "https://*.onrender.com", "https://*.googleapis.com"],
             "img-src": ["'self'", "data:", "https://images.igdb.com", "https://www.cheapshark.com", "https://*.googleusercontent.com", "https://cdn.myanimelist.net", "https://image.tmdb.org", "https://*.tmdb.org"],
             "frame-src": ["'self'", "https://accounts.google.com", "https://www.youtube.com", "https://youtube.com"],
             "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],

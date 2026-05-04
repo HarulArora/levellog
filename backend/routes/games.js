@@ -16,10 +16,31 @@ const router = express.Router()
 // ── GET /api/games ──
 router.get('/', protect, async (req, res) => {
     try {
-        const games = await Game.find({ userId: req.user._id })
+        let games = await Game.find({ userId: req.user._id })
             .select('title cover status genre rating hours platforms igdbId steamId createdAt updatedAt')
             .sort({ createdAt: -1 })
             .lean()
+
+        // 🛡️ Auto-Healing: Deduplicate by igdbId if multiple entries exist
+        const uniqueMap = new Map()
+        games.forEach(game => {
+            if (!game.igdbId) {
+                // If no igdbId (rare), just keep it using _id
+                uniqueMap.set(game._id.toString(), game)
+                return
+            }
+            
+            const existing = uniqueMap.get(game.igdbId)
+            if (!existing) {
+                uniqueMap.set(game.igdbId, game)
+            } else {
+                // Keep the one with a rating or the more recent one
+                if (!existing.rating && game.rating) {
+                    uniqueMap.set(game.igdbId, game)
+                }
+            }
+        })
+        games = Array.from(uniqueMap.values())
 
         // ── FETCH COMMUNITY STATS FOR LIBRARY ──
         const allIds = games.map(g => g.igdbId).filter(Boolean)
@@ -48,10 +69,28 @@ router.get('/', protect, async (req, res) => {
 // ── GET /api/games/user/:userId ──
 router.get('/user/:userId', async (req, res) => {
     try {
-        const games = await Game.find({ userId: req.params.userId })
+        let games = await Game.find({ userId: req.params.userId })
             .select('title cover status genre rating hours platforms igdbId createdAt updatedAt')
             .sort({ createdAt: -1 })
             .lean()
+
+        // 🛡️ Auto-Healing: Deduplicate by igdbId if multiple entries exist
+        const uniqueMap = new Map()
+        games.forEach(game => {
+            if (!game.igdbId) {
+                uniqueMap.set(game._id.toString(), game)
+                return
+            }
+            const existing = uniqueMap.get(game.igdbId)
+            if (!existing) {
+                uniqueMap.set(game.igdbId, game)
+            } else {
+                if (!existing.rating && game.rating) {
+                    uniqueMap.set(game.igdbId, game)
+                }
+            }
+        })
+        games = Array.from(uniqueMap.values())
 
         // ── FETCH COMMUNITY STATS FOR USER LIBRARY ──
         const allIds = games.map(g => g.igdbId).filter(Boolean)
@@ -238,6 +277,17 @@ router.post('/', protect, async (req, res) => {
         const session = await mongoose.startSession()
         session.startTransaction()
         try {
+            // 🛡️ Prevent Duplicates: Check if user already has this game
+            if (igdbId) {
+                const existing = await Game.findOne({ userId: req.user._id, igdbId })
+                if (existing) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'This game is already in your Pond!' 
+                    })
+                }
+            }
+
             const newGame = new Game({
                 userId: req.user._id,
                 title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId

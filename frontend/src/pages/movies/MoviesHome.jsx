@@ -181,7 +181,7 @@ function MovieSearchBar({ id = 'movie-search', section }) {
                     value={query}
                     onChange={handleChange}
                     className="w-full bg-[#111118] border border-[#2a2a35] rounded-lg
-                               pl-11 pr-24 py-3.5 text-white text-sm
+                               pl-12 pr-32 py-3.5 text-white text-sm
                                focus:outline-none focus:border-[#c8ff57]
                                placeholder:text-[#94999c] transition-all"
                 />
@@ -332,20 +332,22 @@ function MoviesHome() {
                 </div>
             </div>
 
-            <section className="relative py-16 md:py-24 overflow-hidden min-h-[500px] flex items-center">
+            {/* Hero */}
+            <section className="relative pt-20 pb-16 md:pt-24 md:pb-24 overflow-hidden min-h-[600px] flex items-center">
                 {(allMovies.length > 0 || !loading) && <HeroBanner movies={allMovies} />}
 
-                <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+                <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10 w-full">
+                    <SubSectionToggle 
+                        current="movie"
+                        type="cinema"
+                        options={[
+                            { label: 'Movies', value: 'movie', path: '/movies', icon: Film },
+                            { label: 'TV Shows', value: 'tv', path: '/tv', icon: Tv }
+                        ]}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
                         <div>
-                            <SubSectionToggle 
-                                current="movie"
-                                type="cinema"
-                                options={[
-                                    { label: 'Movies', value: 'movie', path: '/movies', icon: Film },
-                                    { label: 'TV Shows', value: 'tv', path: '/tv', icon: Tv }
-                                ]}
-                            />
 
                             <h1 className="font-black uppercase leading-none tracking-wide text-[#c8ff57] mb-2" style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', letterSpacing: '0.2em' }}>
                                 Hatch Your Collection

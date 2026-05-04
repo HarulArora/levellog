@@ -1,5 +1,6 @@
 import apiClient from './apiClient.js'
-export { shortPlatform, normalizeCover } from './helpers.js'
+import { shortPlatform, normalizeCover } from './helpers.js'
+export { shortPlatform, normalizeCover }
 
 let cachedToken = null
 let tokenExpiry = null
@@ -31,41 +32,65 @@ export const getAccessToken = async () => {
     }
 }
 
-export const searchGames = async (query) => {
+export const searchGames = async (query, page = 1, limit = 20) => {
     const token = await getAccessToken()
     const sanitizedQuery = String(query).replace(/"/g, '\\"')
+    const offset = (page - 1) * limit
     
-    try {
-        const response = await apiClient.post('https://api.igdb.com/v4/games', `
-            search "${sanitizedQuery}";
-            fields name, cover.url, genres.name, platforms.name,
-                   summary, first_release_date, rating;
-            limit 20;
-        `, {
+    const performQuery = async (body) => {
+        return await apiClient.post('https://api.igdb.com/v4/games', body, {
             headers: {
                 'Client-ID': process.env.IGDB_CLIENT_ID,
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'text/plain'
             },
-            retry: 2,
+            retry: 1,
             retryDelay: 1000
         })
+    }
+
+    try {
+        // 1. Primary: High-relevance search command
+        let response = await performQuery(
+            `search "${sanitizedQuery}"; fields name, cover.url, genres.name, platforms.name, summary, first_release_date, rating; limit ${limit}; offset ${offset};`
+        )
+
+        // 2. Fallback: If no results, try pattern matching (better for partial matches)
+        if (!response.data || response.data.length === 0) {
+            response = await performQuery(
+                `fields name, cover.url, genres.name, platforms.name, summary, first_release_date, rating; where name ~ *"${sanitizedQuery}"*; limit ${limit}; offset ${offset};`
+            )
+        }
 
         const data = response.data
+        if (!Array.isArray(data)) return []
+
         return data.map(game => {
             const cover = normalizeCover(game.cover?.url)
+            
+            // 🚀 Defensive platform mapping
             const platforms = [...new Set(
-                (game.platforms || [])
+                (Array.isArray(game.platforms) ? game.platforms : [])
+                    .filter(p => p && typeof p === 'object' && p.name)
                     .map(p => shortPlatform(p.name))
                     .filter(Boolean)
             )]
 
+            // 🚀 Defensive genre mapping
+            const genreList = (Array.isArray(game.genres) ? game.genres : [])
+                .filter(g => g && typeof g === 'object' && g.name)
+                .map(g => g.name)
+
+            // 🛡️ Ensure ID is always a number
+            const numericId = parseInt(game.id)
+
             return {
-                igdbId: game.id,
-                title: game.name,
+                id: numericId,
+                igdbId: numericId,
+                title: game.name || 'Unknown Title',
                 cover,
-                genre: game.genres?.[0]?.name || 'Unknown',
-                genres: game.genres?.map(g => g.name) || [],
+                genre: genreList[0] || 'Unknown',
+                genres: genreList,
                 platforms,
                 summary: game.summary || '',
                 year: game.first_release_date
@@ -73,9 +98,9 @@ export const searchGames = async (query) => {
                     : null,
                 rating: game.rating ? (game.rating / 10).toFixed(1) : null
             }
-        })
+        }).filter(g => !isNaN(g.id)) // Last safety check
     } catch (error) {
-        console.error('IGDB Search Error:', error.message)
+        console.error(`[IGDB Search Error] Query: "${query}" | Error:`, error.message)
         throw error
     }
-}
+}

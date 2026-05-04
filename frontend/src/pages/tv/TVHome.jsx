@@ -351,20 +351,22 @@ function TVHome() {
                 </div>
             </div>
 
-            <section className="relative py-20 md:py-32 overflow-hidden min-h-[650px] flex items-center">
+            {/* Hero */}
+            <section className="relative pt-20 pb-16 md:pt-24 md:pb-24 overflow-hidden min-h-[600px] flex items-center">
                 {(allMovies.length > 0 || !loading) && <HeroBanner movies={allMovies} />}
 
-                <div className="relative z-10 max-w-[1300px] mx-auto px-5 md:px-10">
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_450px] gap-16 lg:gap-24 items-center">
+                <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10 w-full">
+                    <SubSectionToggle 
+                        current="tv"
+                        type="cinema"
+                        options={[
+                            { label: 'Movies', value: 'movie', path: '/movies', icon: Film },
+                            { label: 'TV Shows', value: 'tv', path: '/tv', icon: Tv }
+                        ]}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
                         <div>
-                            <SubSectionToggle 
-                                current="tv"
-                                type="cinema"
-                                options={[
-                                    { label: 'Movies', value: 'movie', path: '/movies', icon: Film },
-                                    { label: 'TV Shows', value: 'tv', path: '/tv', icon: Tv }
-                                ]}
-                            />
 
                             <h1 className="font-black uppercase leading-none tracking-wide text-[#c8ff57] mb-2" style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', letterSpacing: '0.2em' }}>
                                 Track Your Watchlist

@@ -25,6 +25,7 @@ const movieCache = new LRUCache({
 
 const fetchMediaStats = getBulkStats;
 
+
 const fetchTMDBPaginated = async (endpoint, params, page, limit, filterFn = null) => {
     const requestedLimit = parseInt(limit) || 24;
     const requestedPage = parseInt(page) || 1;
@@ -213,7 +214,7 @@ router.get('/search', protectOptional, async (req, res) => {
         const { q, type = 'movie' } = req.query;
         if (!q) return res.status(400).json({ success: false, message: 'Query is required' });
 
-        const cacheKey = `search-${type}-${q}`;
+        const cacheKey = `search-${type}-${q}-${req.query.page || 1}`;
         if (movieCache.has(cacheKey)) return res.json({ success: true, ...movieCache.get(cacheKey) });
 
         const endpoint = type === 'movie' ? 'search/movie' : 'search/tv';

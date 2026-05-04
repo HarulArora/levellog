@@ -31,7 +31,15 @@ function MangaLibrary() {
         try {
             setLoading(true)
             const res = await api.get('/anime/library')
-            setLibrary(res.data.library || [])
+            const rawList = res.data.library || []
+            const uniqueMap = new Map()
+            rawList.forEach(item => {
+                const type = item.type || item.mediaType || 'manga'
+                if (type !== 'manga') return // Only show manga in MangaLibrary
+                const key = item.externalId ? `${type}_ext_${item.externalId}` : `${type}_title_${item.title?.toLowerCase()}`
+                if (!uniqueMap.has(key)) uniqueMap.set(key, item)
+            })
+            setLibrary(Array.from(uniqueMap.values()))
         } catch (err) {
             console.error('Failed to fetch library:', err)
         } finally {
@@ -199,10 +207,10 @@ function MangaLibrary() {
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors" size={18} />
                             <input 
                                 type="text" 
-                                placeholder="Search your manga..."
+                                placeholder="Search your vault..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-12 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
                             />
                         </div>
                         

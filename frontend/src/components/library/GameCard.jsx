@@ -28,7 +28,7 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
         Mobile: 'text-[#c45cff] border-[#c45cff]/35',
     }
 
-    const sc = statusConfig[game.status] || statusConfig.planned
+    const sc = (game.status && statusConfig[game.status]) ? statusConfig[game.status] : null
 
     // ── IMAGE URL ──
     const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_BIG)
@@ -70,10 +70,12 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#111118] via-transparent to-transparent opacity-60" />
 
                 {/* Status badge */}
-                <div className={`absolute top-2 left-2 font-mono text-[10px] uppercase
-                                 tracking-wider px-2 py-[2px] rounded-sm ${sc.bg} ${sc.color}`}>
-                    {sc.label}
-                </div>
+                {sc && (
+                    <div className={`absolute top-2 left-2 font-mono text-[10px] uppercase
+                                     tracking-wider px-2 py-[2px] rounded-sm ${sc.bg} ${sc.color}`}>
+                        {sc.label}
+                    </div>
+                )}
 
                 {/* Community Average Rating Badge */}
                 {game.avgRating > 0 && (

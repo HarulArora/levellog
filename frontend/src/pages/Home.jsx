@@ -234,7 +234,7 @@ function GameSearchBar({ id = 'game-search' }) {
                     onKeyDown={handleKeyDown}
                     onFocus={() => results.length > 0 && setOpen(true)}
                     className="w-full bg-[#111118] border border-[#2a2a35] rounded-lg
-                               pl-11 pr-24 py-3.5 text-white text-sm
+                               pl-12 pr-32 py-3.5 text-white text-sm
                                focus:outline-none focus:border-[#c8ff57]
                                placeholder:text-[#94999c] transition-all"
                 />
@@ -515,28 +515,23 @@ function Home() {
             {/* ══════════════════════════
                 HERO
             ══════════════════════════ */}
-            <section className="relative py-16 md:py-24 overflow-hidden min-h-[500px] flex items-center">
-                {(allGames.length > 0 || !loading) && (
-                    <HeroBanner games={allGames} />
-                )}
+            <section className="relative pt-20 pb-16 md:pt-24 md:pb-24 min-h-[600px] flex items-center">
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    {(allGames.length > 0 || !loading) && (
+                        <HeroBanner games={allGames} />
+                    )}
+                </div>
 
-                <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+                <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10 w-full">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
 
                         {/* Left */}
                         <div>
-                            <div className="inline-flex items-center gap-2 border border-[#2a2a35] rounded px-3 py-1 mb-6">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#c8ff57]" />
-                                <span className="font-mono text-[11px] text-[#7a7a90] uppercase tracking-widest">
-                                    Beta · Free Forever · All Platforms
-                                </span>
-                            </div>
-
-                                                         <h1
+                             <h1
                                 className="font-black uppercase leading-none tracking-wide text-[#c8ff57] mb-2"
                                 style={{ fontSize: '14px', fontFamily: 'DM Mono, monospace', letterSpacing: '0.2em' }}
                             >
-                                QuestDuck: The Ultimate Gaming Log & Tracker
+                                Hatch Your Library
                             </h1>
                             <h2
                                 className="font-black uppercase leading-none tracking-wide text-white mb-6"

@@ -1,101 +1,66 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, Star } from 'lucide-react'
-import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
+import { Search, Star, Filter } from 'lucide-react'
 import { GameCardSkeleton } from '../../components/ui/Skeleton'
+import { Helmet } from 'react-helmet-async'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
+import MangaCard from '../../components/anime/MangaCard'
 
 const MANGA_GENRES = [
-    { label: 'Action', mal: 1, emoji: '🤺' },
+    { label: 'Action', mal: 1, emoji: '⚔️' },
     { label: 'Adventure', mal: 2, emoji: '🗺️' },
     { label: 'Comedy', mal: 4, emoji: '😂' },
     { label: 'Drama', mal: 8, emoji: '🎭' },
     { label: 'Fantasy', mal: 10, emoji: '🪄' },
     { label: 'Horror', mal: 14, emoji: '👻' },
-    { label: 'Mystery', mal: 7, emoji: '🕵️' },
-    { label: 'Romance', mal: 22, emoji: '💖' },
+    { label: 'Mystery', mal: 7, emoji: '🔍' },
+    { label: 'Psychological', mal: 40, emoji: '🧠' },
+    { label: 'Romance', mal: 22, emoji: '❤️' },
     { label: 'Sci-Fi', mal: 24, emoji: '🚀' },
+    { label: 'Slice of Life', mal: 36, emoji: '🍰' },
     { label: 'Sports', mal: 30, emoji: '⚽' },
-    { label: 'Slice of Life', mal: 36, emoji: '🏘️' },
-    { label: 'Supernatural', mal: 37, emoji: '🧿' },
-    { label: 'Suspense', mal: 41, emoji: '😰' },
-    { label: 'Gourmet', mal: 47, emoji: '🍳' },
-    { label: 'Award Winning', mal: 46, emoji: '🏆' },
-];
-
-const MangaCard = memo(({ item }) => {
-    const navigate = useNavigate()
-    
-    return (
-        <div 
-            onClick={() => navigate(`/manga/${item.externalId}`)}
-            className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
-        >
-            <div className="aspect-[3/4] relative overflow-hidden">
-                {item.cover ? (
-                    <img 
-                        src={item.cover} 
-                        alt={item.title} 
-                        loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                    />
-                ) : (
-                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">
-                        📖
-                    </div>
-                )}
-                
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
-                
-                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
-                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
-                        </div>
-                    )}
-                </div>
-                
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                    <div className="bg-[#c8ff57] text-black px-4 py-2 rounded font-black uppercase text-xs tracking-widest shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        View Details
-                    </div>
-                </div>
-            </div>
-
-            <div className="p-4">
-                <h3 className="font-bold text-sm text-white truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
-                    {item.title}
-                </h3>
-                <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider">{item.year || 'TBA'}</span>
-                    <span className="w-1 h-1 rounded-full bg-[#3a3a4a]" />
-                    <span className="font-mono text-[9px] text-[#c8ff57] uppercase tracking-widest truncate max-w-[100px]">
-                        {item.genres?.[0] || 'Manga'}
-                    </span>
-                </div>
-            </div>
-        </div>
-    )
-})
+    { label: 'Supernatural', mal: 37, emoji: '🔮' },
+    { label: 'Suspense', mal: 41, emoji: '⌛' },
+]
 
 function MangaDiscover() {
+    const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     
-    // Genre State from URL
-    const genreParam = searchParams.get('genre')
-    const initialGenre = genreParam ? MANGA_GENRES.find(g => g.label === genreParam) : null
-    const [activeGenre, setActiveGenre] = useState(initialGenre)
-    
-    // Page State from URL
-    const pageParam = parseInt(searchParams.get('page')) || 1
-    const [page, setPage] = useState(pageParam)
     const [query, setQuery] = useState(searchParams.get('q') || '')
+    const [activeGenre, setActiveGenre] = useState(() => {
+        const g = searchParams.get('genre')
+        return MANGA_GENRES.find(mg => mg.label === g) || null
+    })
+    const [page, setPage] = useState(parseInt(searchParams.get('page')) || 1)
+    
     const [searchResults, setSearchResults] = useState([])
-    const [isSearching, setIsSearching] = useState(false)
     const [searchPerformed, setSearchPerformed] = useState(!!searchParams.get('q'))
+    const [isSearching, setIsSearching] = useState(false)
+    const [libraryMap, setLibraryMap] = useState({})
+    const [searchTotalPages, setSearchTotalPages] = useState(1)
+
+    // Fetch library to show personal ratings/status
+    useEffect(() => {
+        const fetchLibrary = async () => {
+            if (!user) return
+            try {
+                const res = await api.get('/anime/library') // Same endpoint for manga
+                const map = {}
+                res.data.library.forEach(entry => {
+                    if (entry.externalId && (entry.type === 'manga' || entry.mediaType === 'manga')) {
+                        map[entry.externalId] = entry
+                    }
+                })
+                setLibraryMap(map)
+            } catch (err) {
+                console.error('Failed to fetch library for discovery mapping:', err)
+            }
+        }
+        fetchLibrary()
+    }, [user])
 
     const genreKey = activeGenre?.mal || 'all'
     const { data: discoverData, loading } = useCachedFetch(
@@ -126,8 +91,9 @@ function MangaDiscover() {
         setPage(1)
         
         try {
-            const res = await api.get(`/anime/search?q=${encodeURIComponent(query)}&type=manga&limit=24`)
+            const res = await api.get(`/anime/search?q=${encodeURIComponent(query)}&type=manga&limit=24&page=${page}`)
             setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats[r.externalId]?.avgRating })) || [])
+            setSearchTotalPages(res.data.totalPages || 1)
         } catch (err) {
             console.error(err)
             setSearchResults([])
@@ -136,22 +102,36 @@ function MangaDiscover() {
         }
     }
 
+    // Trigger search on page change
+    useEffect(() => {
+        if (searchPerformed && query.trim()) {
+            handleSearch()
+        }
+    }, [page])
+
+    // Reset page on query change
+    useEffect(() => {
+        if (query.trim()) setPage(1)
+    }, [query])
+
     const selectGenre = (genre) => {
         if (activeGenre?.mal === genre.mal) {
             setActiveGenre(null)
         } else {
             setActiveGenre(genre)
-            setQuery('') // Clear search when selecting genre
             setSearchPerformed(false)
+            setSearchResults([])
+            setQuery('')
         }
         setPage(1)
     }
 
     const getPageNumbers = () => {
-        if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
-        const s = new Set([1, totalPages, page])
+        const total = searchPerformed ? searchTotalPages : totalPages
+        if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+        const s = new Set([1, total, page])
         if (page > 1) s.add(page - 1)
-        if (page < totalPages) s.add(page + 1)
+        if (page < total) s.add(page + 1)
         return [...s].sort((a, b) => a - b)
     }
 
@@ -184,13 +164,13 @@ function MangaDiscover() {
                         </div>
 
                         <form onSubmit={handleSearch} className="w-full md:w-96 relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90]" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] z-10" size={18} />
                             <input 
                                 type="text"
                                 placeholder="Search manga..."
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl pl-12 pr-4 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all shadow-inner"
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl pl-12 pr-32 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all shadow-inner placeholder:text-[#7a7a90]"
                             />
                             {query && (
                                 <button 
@@ -198,7 +178,7 @@ function MangaDiscover() {
                                     className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#c8ff57] text-black font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded hover:bg-[#d4ff6e] transition-colors"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                 >
-                                    Find
+                                    {isSearching ? '...' : 'Find'}
                                 </button>
                             )}
                         </form>
@@ -262,11 +242,11 @@ function MangaDiscover() {
                 {/* ── Grid ── */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                     {loading || isSearching ? (
-                        Array.from({ length: 24 }).map((_, i) => <GameCardSkeleton key={i} />)
+                        Array.from({ length: 20 }).map((_, i) => <GameCardSkeleton key={i} />)
                     ) : (searchPerformed ? searchResults : items).map(item => (
                         <MangaCard 
                             key={item.externalId} 
-                            item={searchPerformed ? item : { ...item, avgRating: discoverData.stats?.[item.externalId]?.avgRating }} 
+                            manga={searchPerformed ? { ...item, ...libraryMap[item.externalId] } : { ...item, ...libraryMap[item.externalId], avgRating: discoverData?.stats?.[item.externalId]?.avgRating }} 
                         />
                     ))}
                 </div>
@@ -281,7 +261,7 @@ function MangaDiscover() {
                 )}
 
                 {/* ── Pagination ── */}
-                {!loading && !searchPerformed && totalPages > 1 && (
+                {!loading && (searchPerformed ? searchTotalPages > 1 : totalPages > 1) && (
                     <div className="flex items-center justify-center gap-2 mt-16 flex-wrap">
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -308,8 +288,8 @@ function MangaDiscover() {
                         })}
 
                         <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages}
+                            onClick={() => setPage(p => Math.min(searchPerformed ? searchTotalPages : totalPages, p + 1))}
+                            disabled={page === (searchPerformed ? searchTotalPages : totalPages)}
                             className="px-4 py-2 rounded bg-[#111118] border border-[#2a2a35] text-[#7a7a90] font-mono text-xs uppercase tracking-widest hover:border-[#c8ff57] hover:text-[#c8ff57] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >
                             Next →

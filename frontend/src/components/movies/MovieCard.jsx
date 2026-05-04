@@ -22,7 +22,7 @@ const MovieCard = memo(({ movie, onDelete, onEdit }) => {
     if (statusKey === 'playing') {
         statusKey = 'watching'
     }
-    const sc = statusConfig[statusKey] || statusConfig.planned
+    const sc = (statusKey && statusConfig[statusKey]) ? statusConfig[statusKey] : null
 
     const imageUrl = movie.cover || movie.coverImage
 
@@ -59,10 +59,12 @@ const MovieCard = memo(({ movie, onDelete, onEdit }) => {
 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#111118] via-transparent to-transparent opacity-60" />
 
-                <div className={`absolute top-2 left-2 font-mono text-[10px] uppercase
-                                 tracking-wider px-2 py-[2px] rounded-sm ${sc.bg} ${sc.color}`}>
-                    {sc.label}
-                </div>
+                {sc && (
+                    <div className={`absolute top-2 left-2 font-mono text-[10px] uppercase
+                                     tracking-wider px-2 py-[2px] rounded-sm ${sc.bg} ${sc.color}`}>
+                        {sc.label}
+                    </div>
+                )}
 
                 {movie.externalId && (
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50

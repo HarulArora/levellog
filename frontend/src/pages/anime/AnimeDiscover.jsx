@@ -6,6 +6,7 @@ import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { GameCardSkeleton } from '../../components/ui/Skeleton'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
+import AnimeCard from '../../components/anime/AnimeCard'
 
 const ANIME_GENRES = [
     { label: 'Action', mal: 1, emoji: '🤺' },
@@ -26,61 +27,6 @@ const ANIME_GENRES = [
     { label: 'Movies', mal: 'movie', emoji: '🎬' },
 ];
 
-const AnimeCard = memo(({ item }) => {
-    const navigate = useNavigate()
-    
-    return (
-        <div 
-            onClick={() => navigate(`/anime/${item.externalId}`)}
-            className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
-        >
-            <div className="aspect-[3/4] relative overflow-hidden">
-                {item.cover ? (
-                    <img 
-                        src={item.cover} 
-                        alt={item.title} 
-                        loading="lazy"
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                    />
-                ) : (
-                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">
-                        📺
-                    </div>
-                )}
-                
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
-                
-                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                    {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
-                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
-                        </div>
-                    )}
-                </div>
-                
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                    <div className="bg-[#c8ff57] text-black px-4 py-2 rounded font-black uppercase text-xs tracking-widest shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                        View Details
-                    </div>
-                </div>
-            </div>
-
-            <div className="p-4">
-                <h3 className="font-bold text-sm text-white truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
-                    {item.title}
-                </h3>
-                <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-wider">{item.year || 'TBA'}</span>
-                    <span className="w-1 h-1 rounded-full bg-[#3a3a4a]" />
-                    <span className="font-mono text-[9px] text-[#c8ff57] uppercase tracking-widest truncate max-w-[100px]">
-                        {item.genres?.[0] || 'Anime'}
-                    </span>
-                </div>
-            </div>
-        </div>
-    )
-})
 
 function AnimeDiscover() {
     const [searchParams, setSearchParams] = useSearchParams()
@@ -98,8 +44,27 @@ function AnimeDiscover() {
     // Search State
     const [query, setQuery] = useState(searchParams.get('q') || '')
     const [searchResults, setSearchResults] = useState([])
-    const [isSearching, setIsSearching] = useState(false)
     const [searchPerformed, setSearchPerformed] = useState(!!searchParams.get('q'))
+    const [isSearching, setIsSearching] = useState(false)
+    const [libraryMap, setLibraryMap] = useState({})
+
+    // Fetch library to show personal ratings/status
+    useEffect(() => {
+        const fetchLibrary = async () => {
+            if (!user) return
+            try {
+                const res = await api.get('/anime/library')
+                const map = {}
+                res.data.library.forEach(entry => {
+                    if (entry.externalId) map[entry.externalId] = entry
+                })
+                setLibraryMap(map)
+            } catch (err) {
+                console.error('Failed to fetch library for discovery mapping:', err)
+            }
+        }
+        fetchLibrary()
+    }, [user])
 
     // Discovery Data
     const genreKey = activeGenre?.mal || 'all'
@@ -122,6 +87,8 @@ function AnimeDiscover() {
         setSearchParams(newParams, { replace: true })
     }, [query, activeGenre, page, setSearchParams])
 
+    const [searchTotalPages, setSearchTotalPages] = useState(1)
+
     const handleSearch = async (e) => {
         e?.preventDefault()
         if (!query.trim()) return
@@ -129,11 +96,11 @@ function AnimeDiscover() {
         setIsSearching(true)
         setSearchPerformed(true)
         setActiveGenre(null) // Clear genre when searching
-        setPage(1)
         
         try {
-            const res = await api.get(`/anime/search?q=${encodeURIComponent(query)}&type=${type}&limit=24`)
+            const res = await api.get(`/anime/search?q=${encodeURIComponent(query)}&type=${type}&limit=24&page=${page}`)
             setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats[r.externalId]?.avgRating })) || [])
+            setSearchTotalPages(res.data.totalPages || 1)
         } catch (err) {
             console.error(err)
             setSearchResults([])
@@ -141,6 +108,18 @@ function AnimeDiscover() {
             setIsSearching(false)
         }
     }
+
+    // Trigger search on page change
+    useEffect(() => {
+        if (searchPerformed && query.trim()) {
+            handleSearch()
+        }
+    }, [page])
+
+    // Reset page on query change
+    useEffect(() => {
+        if (query.trim()) setPage(1)
+    }, [query])
 
     const selectGenre = (genre) => {
         if (activeGenre?.mal === genre.mal) {
@@ -191,13 +170,13 @@ function AnimeDiscover() {
                         </div>
 
                         <form onSubmit={handleSearch} className="w-full md:w-96 relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90]" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] z-10" size={18} />
                             <input 
                                 type="text"
                                 placeholder="Search anime..."
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl pl-12 pr-4 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all shadow-inner"
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl pl-12 pr-32 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all shadow-inner placeholder:text-[#7a7a90]"
                             />
                             {query && (
                                 <button 
@@ -205,7 +184,7 @@ function AnimeDiscover() {
                                     className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#c8ff57] text-black font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded hover:bg-[#d4ff6e] transition-colors"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                 >
-                                    Find
+                                    {isSearching ? '...' : 'Find'}
                                 </button>
                             )}
                         </form>
@@ -273,7 +252,7 @@ function AnimeDiscover() {
                     ) : (searchPerformed ? searchResults : items).map(item => (
                         <AnimeCard 
                             key={item.externalId} 
-                            item={searchPerformed ? item : { ...item, avgRating: discoverData?.stats?.[item.externalId]?.avgRating }} 
+                            anime={searchPerformed ? { ...item, ...libraryMap[item.externalId] } : { ...item, ...libraryMap[item.externalId], avgRating: discoverData?.stats?.[item.externalId]?.avgRating }} 
                         />
                     ))}
                 </div>
@@ -288,7 +267,7 @@ function AnimeDiscover() {
                 )}
 
                 {/* ── Pagination ── */}
-                {!loading && !searchPerformed && totalPages > 1 && (
+                {!loading && (searchPerformed ? searchTotalPages > 1 : totalPages > 1) && (
                     <div className="flex items-center justify-center gap-2 mt-16 flex-wrap">
                         <button
                             onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -298,25 +277,37 @@ function AnimeDiscover() {
                             ← Prev
                         </button>
                         
-                        {pageNumbers.map((n, i) => {
-                            const prev = pageNumbers[i - 1]
-                            const ellipsis = prev && n - prev > 1
-                            return (
-                                <div key={n} className="flex items-center gap-2">
-                                    {ellipsis && <span className="text-[#3a3a4a] font-mono">...</span>}
-                                    <button
-                                        onClick={() => setPage(n)}
-                                        className={`w-10 h-10 rounded border font-mono text-xs transition-all ${n === page ? 'bg-[#c8ff57]/10 border-[#c8ff57] text-[#c8ff57]' : 'bg-[#111118] border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-white'}`}
-                                    >
-                                        {n}
-                                    </button>
-                                </div>
-                            )
-                        })}
+                        {(() => {
+                            const effectiveTotalPages = searchPerformed ? searchTotalPages : totalPages
+                            const getNumbers = () => {
+                                if (effectiveTotalPages <= 7) return Array.from({ length: effectiveTotalPages }, (_, i) => i + 1)
+                                const s = new Set([1, effectiveTotalPages, page])
+                                if (page > 1) s.add(page - 1)
+                                if (page < effectiveTotalPages) s.add(page + 1)
+                                return [...s].sort((a, b) => a - b)
+                            }
+                            const numbers = getNumbers()
+
+                            return numbers.map((n, i) => {
+                                const prev = numbers[i - 1]
+                                const ellipsis = prev && n - prev > 1
+                                return (
+                                    <div key={n} className="flex items-center gap-2">
+                                        {ellipsis && <span className="text-[#3a3a4a] font-mono">...</span>}
+                                        <button
+                                            onClick={() => setPage(n)}
+                                            className={`w-10 h-10 rounded border font-mono text-xs transition-all ${n === page ? 'bg-[#c8ff57]/10 border-[#c8ff57] text-[#c8ff57]' : 'bg-[#111118] border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-white'}`}
+                                        >
+                                            {n}
+                                        </button>
+                                    </div>
+                                )
+                            })
+                        })()}
 
                         <button
-                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                            disabled={page === totalPages}
+                            onClick={() => setPage(p => Math.min(searchPerformed ? searchTotalPages : totalPages, p + 1))}
+                            disabled={page === (searchPerformed ? searchTotalPages : totalPages)}
                             className="px-4 py-2 rounded bg-[#111118] border border-[#2a2a35] text-[#7a7a90] font-mono text-xs uppercase tracking-widest hover:border-[#c8ff57] hover:text-[#c8ff57] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >
                             Next →

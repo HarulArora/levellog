@@ -31,7 +31,15 @@ function AnimeLibrary() {
         try {
             setLoading(true)
             const res = await api.get('/anime/library')
-            setLibrary(res.data.library || [])
+            const rawList = res.data.library || []
+            const uniqueMap = new Map()
+            rawList.forEach(item => {
+                const type = item.type || item.mediaType || 'anime'
+                if (type !== 'anime') return // Only show anime in AnimeLibrary
+                const key = item.externalId ? `${type}_ext_${item.externalId}` : `${type}_title_${item.title?.toLowerCase()}`
+                if (!uniqueMap.has(key)) uniqueMap.set(key, item)
+            })
+            setLibrary(Array.from(uniqueMap.values()))
         } catch (err) {
             console.error('Failed to fetch library:', err)
         } finally {
@@ -202,7 +210,7 @@ function AnimeLibrary() {
                                 placeholder="Search your anime..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-4 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-12 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
                             />
                         </div>
                         

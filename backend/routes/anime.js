@@ -369,20 +369,20 @@ router.get('/home', async (req, res) => {
 // ── SEARCH ──
 router.get('/search', protectOptional, async (req, res) => {
     try {
-        const { q, type = 'anime', limit = 24 } = req.query;
+        const { q, type = 'anime', limit = 24, page = 1 } = req.query;
         if (!q) return res.status(400).json({ success: false, message: 'Query is required' });
 
-        const cacheKey = `search-${type}-${q}`;
+        const cacheKey = `search-${type}-${q}-${page}-${limit}`;
         if (jikanCache.has(cacheKey)) return res.json({ success: true, ...jikanCache.get(cacheKey) });
 
         const response = await apiClient.get(`${JIKAN_BASE_URL}/${type}`, {
-            params: { q, limit: parseInt(limit), sfw: true },
+            params: { q, limit: parseInt(limit), page: parseInt(page), sfw: true },
             retry: 3,
             retryDelay: 1000
         });
 
         let results = (response.data?.data || []).map(item => formatJikanItem(item, type));
-        
+        const pagination = response.data?.pagination || {};
         // Resolve English Titles and Deduplicate
         const englishTitles = await fetchAnilistEnglishTitles(results.map(i => i.externalId), type);
         const seen = new Set();
@@ -413,7 +413,13 @@ router.get('/search', protectOptional, async (req, res) => {
             })
         }
 
-        const result = { results, stats, userRatings };
+        const result = { 
+            results, 
+            stats, 
+            userRatings, 
+            totalPages: pagination.last_visible_page || 1, 
+            total: pagination.items?.total || 0 
+        };
         jikanCache.set(cacheKey, result);
         res.json({ success: true, ...result });
     } catch (error) {

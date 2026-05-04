@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { Search, Flame, Star, Trophy, Film, Tv, ChevronRight, LayoutGrid, List } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
@@ -61,11 +62,17 @@ const MovieCard = memo(({ item, section }) => {
                 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
                 
-                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
                     {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl min-w-[45px] justify-center">
                             <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
                             <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
+                        </div>
+                    )}
+                    {item.rating > 0 && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl min-w-[45px] justify-center">
+                            <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
+                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.rating}</span>
                         </div>
                     )}
                 </div>
@@ -94,15 +101,58 @@ const MovieCard = memo(({ item, section }) => {
 })
 
 function MoviesDiscover() {
-    
+    const { user } = useAuth()
     const [activeGenre, setActiveGenre] = useState(null)
     const [genres, setGenres] = useState([])
     const [page, setPage] = useState(1)
+    const [libraryMap, setLibraryMap] = useState({})
+
+    // Fetch library to show personal ratings/status
+    useEffect(() => {
+        const fetchLibrary = async () => {
+            if (!user) return
+            try {
+                const res = await api.get('/movies/library')
+                const map = {}
+                res.data.library.forEach(entry => {
+                    if (entry.externalId && (entry.type === 'movie' || entry.mediaType === 'movie')) {
+                        map[entry.externalId] = entry
+                    }
+                })
+                setLibraryMap(map)
+            } catch (err) {
+                console.error('Failed to fetch library for discovery mapping:', err)
+            }
+        }
+        fetchLibrary()
+    }, [user])
     
     const [query, setQuery] = useState('')
     const [searchResults, setSearchResults] = useState([])
-    const [isSearching, setIsSearching] = useState(false)
     const [searchPerformed, setSearchPerformed] = useState(false)
+    const [isSearching, setIsSearching] = useState(false)
+    const [libraryMap, setLibraryMap] = useState({})
+    const [user, setUser] = useState(null)
+
+    // Fetch library to show personal ratings/status
+    useEffect(() => {
+        const fetchLibrary = async () => {
+            if (!user) return
+            try {
+                const res = await api.get('/movies/library')
+                const map = {}
+                res.data.library.forEach(entry => {
+                    if (entry.externalId && (entry.type === 'movie' || entry.mediaType === 'movie')) {
+                        map[entry.externalId] = entry
+                    }
+                })
+                setLibraryMap(map)
+            } catch (err) {
+                console.error('Failed to fetch library for discovery mapping:', err)
+            }
+        }
+        fetchLibrary()
+    }, [user])
 
     useEffect(() => {
         const fetchGenres = async () => {
@@ -125,6 +175,8 @@ function MoviesDiscover() {
     const totalPages = discoverData?.totalPages || 1
     const totalCount = discoverData?.total || 0
 
+    const [searchTotalPages, setSearchTotalPages] = useState(1)
+
     const handleSearch = async (e) => {
         e?.preventDefault()
         if (!query.trim()) return
@@ -132,10 +184,11 @@ function MoviesDiscover() {
         setIsSearching(true)
         setSearchPerformed(true)
         setActiveGenre(null)
-        setPage(1)
+        
         try {
-            const res = await api.get(`/movies/search?q=${encodeURIComponent(query)}&type=movie&limit=24`)
+            const res = await api.get(`/movies/search?q=${encodeURIComponent(query)}&type=movie&limit=24&page=${page}`)
             setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats[r.externalId]?.avgRating })) || [])
+            setSearchTotalPages(res.data.totalPages || 1)
         } catch (err) {
             console.error(err)
             setSearchResults([])
@@ -144,11 +197,24 @@ function MoviesDiscover() {
         }
     }
 
+    // Trigger search on page change
+    useEffect(() => {
+        if (searchPerformed && query.trim()) {
+            handleSearch()
+        }
+    }, [page])
+
+    // Reset page on query change
+    useEffect(() => {
+        if (query.trim()) setPage(1)
+    }, [query])
+
     const getPageNumbers = () => {
-        if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1)
-        const s = new Set([1, totalPages, page])
+        const effectiveTotalPages = searchPerformed ? searchTotalPages : totalPages
+        if (effectiveTotalPages <= 7) return Array.from({ length: effectiveTotalPages }, (_, i) => i + 1)
+        const s = new Set([1, effectiveTotalPages, page])
         if (page > 1) s.add(page - 1)
-        if (page < totalPages) s.add(page + 1)
+        if (page < effectiveTotalPages) s.add(page + 1)
         return [...s].sort((a, b) => a - b)
     }
 
@@ -181,13 +247,13 @@ function MoviesDiscover() {
                         </div>
 
                         <form onSubmit={handleSearch} className="w-full md:w-96 relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90]" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] z-10" size={18} />
                             <input 
                                 type="text"
                                 placeholder="Search movies..."
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl pl-12 pr-4 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all shadow-inner"
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl pl-12 pr-32 py-4 text-white focus:outline-none focus:border-[#c8ff57] transition-all shadow-inner placeholder:text-[#7a7a90]"
                             />
                             {query && (
                                 <button 
@@ -195,7 +261,7 @@ function MoviesDiscover() {
                                     className="absolute right-3 top-1/2 -translate-y-1/2 bg-[#c8ff57] text-black font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded hover:bg-[#d4ff6e] transition-colors"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                 >
-                                    Find
+                                    {isSearching ? '...' : 'Find'}
                                 </button>
                             )}
                         </form>
@@ -205,7 +271,7 @@ function MoviesDiscover() {
 
             <div className="max-w-[1200px] mx-auto px-5 md:px-10 mt-12">
                 
-                {/* Browse by Genre */}
+                {/* ── Browse by Genre ── */}
                 {!searchPerformed && (
                     <>
                         <div className="flex items-center justify-between mb-8 border-b border-[#2a2a35] pb-4">
@@ -262,7 +328,7 @@ function MoviesDiscover() {
                         (searchPerformed ? searchResults : items).map(item => (
                             <MovieCard 
                                 key={item.externalId} 
-                                item={searchPerformed ? item : { ...item, avgRating: discoverData?.stats?.[item.externalId]?.avgRating }} 
+                                item={searchPerformed ? { ...item, ...libraryMap[item.externalId] } : { ...item, ...libraryMap[item.externalId], avgRating: discoverData?.stats?.[item.externalId]?.avgRating }} 
                                 section="movies" 
                             />
                         ))
@@ -275,8 +341,8 @@ function MoviesDiscover() {
                     )}
                 </div>
 
-                {/* Pagination */}
-                {!loading && !searchPerformed && totalPages > 1 && (
+                {/* ── Pagination ── */}
+                {!loading && (searchPerformed ? searchTotalPages > 1 : totalPages > 1) && (
                     <div className="flex items-center justify-center gap-2 mt-16 flex-wrap">
                         <button
                             onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 400); }}
@@ -303,8 +369,8 @@ function MoviesDiscover() {
                         })}
 
                         <button
-                            onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0, 400); }}
-                            disabled={page === totalPages}
+                            onClick={() => { setPage(p => Math.min(searchPerformed ? searchTotalPages : totalPages, p + 1)); window.scrollTo(0, 400); }}
+                            disabled={page === (searchPerformed ? searchTotalPages : totalPages)}
                             className="px-4 py-2 rounded bg-[#111118] border border-[#2a2a35] text-[#7a7a90] font-mono text-xs uppercase tracking-widest hover:border-[#c8ff57] hover:text-[#c8ff57] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >
                             Next →
