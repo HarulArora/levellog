@@ -5,7 +5,7 @@ import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
 // import { invalidateCache } from '../../utils/cache'
-import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play, Film, Tv, Flame, ChevronRight, CreditCard, ShoppingBag, Layers } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play, Film, Tv, Flame, ChevronRight, CreditCard, ShoppingBag, Layers, Star, Users, Target, Gamepad2 } from 'lucide-react'
 import AddMovieModal from '../../components/library/AddMovieModal'
 import Skeleton from '../../components/ui/Skeleton'
 import Avatar from '../../components/ui/Avatar'
@@ -550,47 +550,61 @@ function TVDetail() {
                                 ))}
                             </div>
 
-                            <div className="flex flex-wrap gap-x-12 gap-y-6 mb-10 py-6 border-y border-white/5 backdrop-blur-sm">
+                            {/* Apple-style Stats Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-10">
                                 {/* Avg Rating */}
-                                <div className="group transition-all">
-                                    <div className="flex items-center gap-2">
-                                        <div className="font-black text-5xl text-[#5c9fff] leading-none drop-shadow-[0_0_15px_rgba(92,159,255,0.3)]"
-                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
+                                        <Star size={16} fill="currentColor" />
+                                    </div>
+                                    <div className="flex items-baseline gap-0.5">
+                                        <span className="text-2xl font-bold text-white tracking-tight">
                                             {stats?.avgRating > 0 ? stats.avgRating : '—'}
-                                            {stats?.avgRating > 0 && <small className="font-mono text-[10px] text-[#a0a0b8] font-normal align-top ml-1">/10</small>}
-                                        </div>
+                                        </span>
+                                        {stats?.avgRating > 0 && <span className="text-[10px] text-[#7a7a90] font-medium">/10</span>}
                                     </div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 flex items-center gap-1.5 group-hover:text-[#5c9fff] transition-colors">
-                                        Avg Rating {stats?.ratingCount > 0 && <span className="opacity-60">({stats.ratingCount})</span>}
-                                    </div>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Avg Rating</div>
                                 </div>
 
+                                {/* My Rating */}
                                 {myEntry?.rating > 0 && (
-                                    <div className="group transition-all">
-                                        <div className="font-black text-5xl text-[#c8ff57] leading-none drop-shadow-[0_0_15px_rgba(200,255,87,0.3)]"
-                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                            {myEntry.rating}<small className="font-mono text-[10px] text-[#a0a0b8] font-normal align-top ml-1">/10</small>
+                                    <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#c8ff57]/30 transition-all duration-300 shadow-lg">
+                                        <div className="w-8 h-8 rounded-full bg-[#c8ff57]/10 flex items-center justify-center text-[#c8ff57] mb-2 group-hover:scale-110 transition-transform">
+                                            <Star size={16} fill="currentColor" />
                                         </div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#c8ff57] transition-colors">My Rating</div>
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className="text-2xl font-bold text-[#c8ff57] tracking-tight">{myEntry.rating}</span>
+                                            <span className="text-[10px] text-[#7a7a90] font-medium">/10</span>
+                                        </div>
+                                        <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">My Rating</div>
                                     </div>
                                 )}
 
-                                <div className="group transition-all">
-                                    <div className="font-black text-5xl text-[#ff9f5c] leading-none drop-shadow-[0_0_15px_rgba(255,159,92,0.3)]"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.loggedCount ?? '—'}</div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#ff9f5c] transition-colors">In Pond</div>
+                                {/* In Pond */}
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff9f5c]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-8 h-8 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-2 group-hover:scale-110 transition-transform">
+                                        <Tv size={16} />
+                                    </div>
+                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.loggedCount ?? '—'}</span>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">In Pond</div>
                                 </div>
 
-                                <div className="group transition-all">
-                                    <div className="font-black text-5xl text-[#ff5c5c] leading-none drop-shadow-[0_0_15px_rgba(255,92,92,0.3)]"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.likeCount ?? '—'}</div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#ff5c5c] transition-colors">Likes</div>
+                                {/* Likes */}
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff5c5c]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-8 h-8 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center text-[#ff5c5c] mb-2 group-hover:scale-110 transition-transform">
+                                        <Heart size={16} fill="currentColor" />
+                                    </div>
+                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.likeCount ?? '—'}</span>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Likes</div>
                                 </div>
 
-                                <div className="group transition-all">
-                                    <div className="font-black text-5xl text-[#5c9fff] leading-none drop-shadow-[0_0_15px_rgba(92,159,255,0.3)]"
-                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{stats?.wishlistCount ?? '—'}</div>
-                                    <div className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em] mt-1 group-hover:text-[#5c9fff] transition-colors">Wishlists</div>
+                                {/* Wishlists */}
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
+                                        <Target size={16} />
+                                    </div>
+                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.wishlistCount ?? '—'}</span>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Wishlists</div>
                                 </div>
                             </div>
 

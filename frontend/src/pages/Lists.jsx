@@ -519,26 +519,48 @@ function Lists() {
         } catch { showToast('Failed to update visibility', 'error') }
     }
 
-    const handleTabChange = async (id) => {
+    const handleTabChange = (id) => {
         setActiveTab(id)
         setSelectedListId(null)
-        if (id === 'liked' && !fullLikes) {
-            setLoadingTab(true)
-            try {
-                const res = await api.get(`/lists/likes?mediaType=${mediaType}`)
-                if (res.data.success) setFullLikes(res.data.likes)
-            } catch { showToast('Failed to load likes', 'error') }
-            finally { setLoadingTab(false) }
-        }
-        if (id === 'wishlist' && !fullWish) {
-            setLoadingTab(true)
-            try {
-                const res = await api.get(`/lists/wishlist?mediaType=${mediaType}`)
-                if (res.data.success) setFullWish(res.data.wishlist)
-            } catch { showToast('Failed to load wishlist', 'error') }
-            finally { setLoadingTab(false) }
-        }
     }
+
+    // Effect to fetch tab-specific data (Likes/Wishlist) when tab changes
+    useEffect(() => {
+        if (activeTab === 'liked' && !fullLikes) {
+            const fetchLikes = async () => {
+                setLoadingTab(true)
+                try {
+                    const res = await api.get(`/lists/likes?mediaType=${mediaType}`)
+                    if (res.data.success) {
+                        setFullLikes(res.data.likes || [])
+                    }
+                } catch (err) {
+                    console.error('Fetch likes error:', err)
+                    showToast('Failed to load likes', 'error')
+                } finally {
+                    setLoadingTab(false)
+                }
+            }
+            fetchLikes()
+        }
+        if (activeTab === 'wishlist' && !fullWish) {
+            const fetchWish = async () => {
+                setLoadingTab(true)
+                try {
+                    const res = await api.get(`/lists/wishlist?mediaType=${mediaType}`)
+                    if (res.data.success) {
+                        setFullWish(res.data.wishlist || [])
+                    }
+                } catch (err) {
+                    console.error('Fetch wishlist error:', err)
+                    showToast('Failed to load wishlist', 'error')
+                } finally {
+                    setLoadingTab(false)
+                }
+            }
+            fetchWish()
+        }
+    }, [activeTab, mediaType, fullLikes, fullWish, showToast])
 
     if (!user) return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-6">
