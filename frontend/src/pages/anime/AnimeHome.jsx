@@ -30,8 +30,8 @@ const AnimeCard = memo(({ item, section }) => {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
                 ) : (
-                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">
-                        {section === 'manga' ? '📖' : '📺'}
+                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-[#2a2a35]">
+                        {section === 'manga' ? <BookOpen size={48} strokeWidth={1} /> : <Tv size={48} strokeWidth={1} />}
                     </div>
                 )}
                 
@@ -246,7 +246,9 @@ function AnimeSearchBar({ id = 'anime-search', section }) {
                                                 {item.cover ? (
                                                     <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">{displaySection === 'manga' ? '📖' : '📺'}</div>
+                                                    <div className="w-full h-full flex items-center justify-center text-[#3a3a4a]">
+                                                        {displaySection === 'manga' ? <BookOpen size={14} /> : <Tv size={14} />}
+                                                    </div>
                                                 )}
                                             </div>
                                         <div className="flex-1 min-w-0">
@@ -387,8 +389,8 @@ function AnimeHome() {
                                 current="anime"
                                 type="anime"
                                 options={[
-                                    { label: 'Anime', value: 'anime', path: '/anime' },
-                                    { label: 'Manga', value: 'manga', path: '/manga' }
+                                    { label: 'Anime', value: 'anime', path: '/anime', icon: Tv },
+                                    { label: 'Manga', value: 'manga', path: '/manga', icon: BookOpen }
                                 ]}
                             />
 

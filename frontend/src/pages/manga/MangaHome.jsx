@@ -4,7 +4,7 @@ import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import { useSection } from '../../context/SectionState'
 import useCachedFetch from '../../hooks/useCachedFetch'
-import { Trophy, Play, Star, ListChecks, X, Pause, Search, BookOpen, Flame, Plus } from 'lucide-react'
+import { Trophy, Play, Star, ListChecks, X, Pause, Search, BookOpen, Flame, Plus, Tv } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import AvatarFrame from '../../components/ui/AvatarFrame'
@@ -34,8 +34,8 @@ const MangaCard = memo(({ item }) => {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                     />
                 ) : (
-                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">
-                        📖
+                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-[#2a2a35]">
+                        <BookOpen size={48} strokeWidth={1} />
                     </div>
                 )}
                 
@@ -259,7 +259,9 @@ function MangaSearchBar({ id = 'manga-search' }) {
                                                     {item.cover ? (
                                                         <img src={item.cover} alt={displayTitle} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">📖</div>
+                                                        <div className="w-full h-full flex items-center justify-center text-[#3a3a4a]">
+                                                            <BookOpen size={14} />
+                                                        </div>
                                                     )}
                                                 </div>
                                             <div className="flex-1 min-w-0">
@@ -414,8 +416,8 @@ function MangaHome() {
                                  current="manga"
                                  type="anime"
                                  options={[
-                                     { label: 'Anime', value: 'anime', path: '/anime' },
-                                     { label: 'Manga', value: 'manga', path: '/manga' }
+                                     { label: 'Anime', value: 'anime', path: '/anime', icon: Tv },
+                                     { label: 'Manga', value: 'manga', path: '/manga', icon: BookOpen }
                                  ]}
                             />
 

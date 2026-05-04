@@ -1,31 +1,62 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSection } from '../context/SectionState';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Gamepad2, Tv, Popcorn } from 'lucide-react';
 
 const SectionSwitcher = () => {
     const { activeSection, setActiveSection } = useSection();
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Do not show switcher on login/signup pages if necessary, 
-    // but the request says "it appears on every page".
     const hideOnRoutes = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'];
     if (hideOnRoutes.includes(location.pathname)) return null;
 
-    const sections = [
-        { id: 'games', label: 'Games', icon: '🎮', path: '/' },
-        { id: 'anime', label: 'Anime', icon: '🎌', path: '/anime' },
-        { id: 'movies', label: 'Cinema', icon: '🎬', path: '/movies' }
-    ];
+    const BRAND_GREEN = '#c8ff57';
 
+    const sections = [
+        { 
+            id: 'games', 
+            label: 'GAMES', 
+            icon: Gamepad2, 
+            path: '/',
+            iconAnim: {
+                active: { rotate: [0, -5, 5, -5, 5, 0], x: [0, -1, 1, -1, 1, 0] },
+                transition: { repeat: Infinity, duration: 0.8, ease: "linear", repeatType: "loop" }
+            }
+        },
+        { 
+            id: 'anime', 
+            label: 'ANIME',
+            subLabel: '& MANGA', 
+            icon: Tv, 
+            path: '/anime',
+            iconAnim: {
+                active: { rotate: 360 },
+                transition: { repeat: Infinity, duration: 4, ease: "linear", repeatType: "loop" }
+            }
+        },
+        { 
+            id: 'movies', 
+            label: 'MOVIES',
+            subLabel: '& TV', 
+            icon: Popcorn, 
+            path: '/movies',
+            iconAnim: {
+                active: { 
+                    y: [0, -6, 0],
+                    scaleX: [1, 0.8, 1],
+                    scaleY: [1, 1.2, 1]
+                },
+                transition: { repeat: Infinity, duration: 1.2, ease: "easeInOut", repeatType: "loop" }
+            }
+        }
+    ];
 
     const handleSectionChange = (sectionId, path) => {
         if (activeSection === sectionId) return;
-        
         setActiveSection(sectionId);
         
-        // When switching sections, we usually want to go to the "Home" of that section
-        // But if the user is in Discover, Library, or Lists, we should try to stay on that page type
         const currentPath = location.pathname;
         let targetPath = path;
 
@@ -35,39 +66,92 @@ const SectionSwitcher = () => {
             targetPath = sectionId === 'games' ? '/library' : `/${sectionId}/library`;
         } else if (currentPath.includes('/lists')) {
             targetPath = sectionId === 'games' ? '/lists' : `/${sectionId}/lists`;
-        } else if (currentPath === '/' || currentPath === '/anime' || currentPath === '/movies') {
-            targetPath = path;
-        } else {
-            // For other pages like Profile, Leaderboard, etc., we don't change the path, 
-            // just the section context. But the request says: 
-            // "When switched, the Home, Discover, Library, and Lists pages change content for that section."
-            // So if they are on one of these, we should redirect.
-            // If they are on Profile, they stay on Profile.
         }
-
         navigate(targetPath);
     };
 
     return (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-1 p-1.5 bg-[#12121a]/80 backdrop-blur-xl border border-white/5 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.4)] scale-90 sm:scale-100 transition-transform duration-300">
-            {sections.map((section) => (
-                <button
-                    key={section.id}
-                    onClick={() => handleSectionChange(section.id, section.path)}
-                    className={`
-                        relative flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all duration-300
-                        ${activeSection === section.id 
-                            ? 'bg-[#c8ff57] text-black shadow-[0_0_15px_rgba(200,255,87,0.3)]' 
-                            : 'text-[#7a7a90] hover:text-white hover:bg-white/5'}
-                    `}
-                >
-                    <span className="text-sm">{section.icon}</span>
-                    <span className="hidden sm:inline uppercase tracking-wider">{section.label}</span>
-                </button>
-            ))}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-4 w-full max-w-fit pointer-events-none">
+            <motion.div 
+                layout
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="flex items-center gap-1 p-1.5 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.6)] ring-1 ring-inset ring-white/5 pointer-events-auto"
+            >
+                {sections.map((section) => {
+                    const isActive = activeSection === section.id;
+                    const Icon = section.icon;
+
+                    return (
+                        <button
+                            key={section.id}
+                            onClick={() => handleSectionChange(section.id, section.path)}
+                            className={`
+                                relative flex items-center justify-center gap-2.5 px-5 py-3 rounded-full transition-all duration-500
+                                group outline-none overflow-hidden
+                            `}
+                        >
+                            {/* Sliding Background */}
+                            {isActive && (
+                                <motion.div
+                                    layoutId="activeTab"
+                                    className="absolute inset-0 rounded-full"
+                                    style={{ 
+                                        backgroundColor: BRAND_GREEN,
+                                        boxShadow: `0 0 25px ${BRAND_GREEN}40`
+                                    }}
+                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                />
+                            )}
+
+                            <motion.span 
+                                className={`relative z-10`}
+                                animate={isActive ? section.iconAnim.active : { rotate: 0, scale: 1, x: 0, y: 0 }}
+                                transition={isActive ? section.iconAnim.transition : { duration: 0.3 }}
+                                style={{ color: isActive ? '#000' : 'rgba(255,255,255,0.4)' }}
+                            >
+                                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                            </motion.span>
+                            
+                            <motion.div 
+                                layout
+                                className="relative z-10 flex flex-col items-start overflow-hidden"
+                                initial={false}
+                                animate={{ 
+                                    width: isActive ? 'auto' : 0,
+                                    opacity: isActive ? 1 : 0,
+                                    marginLeft: isActive ? 0 : -10
+                                }}
+                                transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+                            >
+                                <span className={`
+                                    text-[10px] font-black tracking-[0.1em] whitespace-nowrap leading-none
+                                    ${isActive ? 'text-black' : 'text-white/40'}
+                                `}>
+                                    {section.label}
+                                </span>
+                                {section.subLabel && (
+                                    <span className={`
+                                        text-[7px] font-bold tracking-[0.05em] whitespace-nowrap mt-0.5 leading-none
+                                        ${isActive ? 'text-black/60' : 'text-white/20'}
+                                    `}>
+                                        {section.subLabel}
+                                    </span>
+                                )}
+                            </motion.div>
+
+                            {/* Desktop Hover Effect */}
+                            {!isActive && (
+                                <div className="absolute inset-0 rounded-full bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                        </button>
+                    );
+                })}
+            </motion.div>
         </div>
     );
 };
 
 export default SectionSwitcher;
+
 

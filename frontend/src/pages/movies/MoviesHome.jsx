@@ -205,7 +205,9 @@ function MovieSearchBar({ id = 'movie-search', section }) {
                                                 {item.cover ? (
                                                     <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs text-[#3a3a4a]">{section === 'tv' ? '📺' : '🎬'}</div>
+                                                    <div className="w-full h-full flex items-center justify-center text-[#3a3a4a]">
+                                                        <Film size={14} />
+                                                    </div>
                                                 )}
                                             </div>
                                         <div className="flex-1 min-w-0">
@@ -340,8 +342,8 @@ function MoviesHome() {
                                 current="movie"
                                 type="cinema"
                                 options={[
-                                    { label: 'Movies', value: 'movie', path: '/movies' },
-                                    { label: 'TV Shows', value: 'tv', path: '/tv' }
+                                    { label: 'Movies', value: 'movie', path: '/movies', icon: Film },
+                                    { label: 'TV Shows', value: 'tv', path: '/tv', icon: Tv }
                                 ]}
                             />
 
@@ -535,7 +537,9 @@ function MoviesHome() {
                                                 {item.cover ? (
                                                     <img src={item.cover} alt={item.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">🎬</div>
+                                                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-[#2a2a35]">
+                                                        <Film size={48} strokeWidth={1} />
+                                                    </div>
                                                 )}
                                                 
                                                 <div className="absolute top-2 right-2 flex flex-col gap-1.5 items-end z-10">
