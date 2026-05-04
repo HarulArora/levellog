@@ -28,7 +28,8 @@ const MovieCard = memo(({ movie, onDelete, onEdit, showAvgRating = true }) => {
     const imageUrl = movie.cover || movie.coverImage
 
     const handleCardClick = () => {
-        if (movie.externalId) {
+        const extId = Number(movie.externalId)
+        if (movie.externalId && !isNaN(extId)) {
             const path = (movie.type === 'tv' || movie.mediaType === 'tv') ? 'tv' : 'movies'
             navigate(`/${path}/${movie.externalId}`)
         }

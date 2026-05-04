@@ -7,19 +7,29 @@ import { Gamepad2, Tv, Popcorn } from 'lucide-react';
 const SectionSwitcher = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { activeSection, setActiveSection } = useSection();
+    const { activeSection, setActiveSection, animeSubSection, setAnimeSubSection, cinemaSubSection, setCinemaSubSection } = useSection();
+    const isManga = animeSubSection === 'manga';
+    const isTV = cinemaSubSection === 'tv';
 
     // Auto-sync section with URL path changes
     React.useEffect(() => {
         const path = location.pathname;
-        if (path.startsWith('/manga') || path.startsWith('/anime')) {
+        if (path.startsWith('/manga')) {
             if (activeSection !== 'anime') setActiveSection('anime');
-        } else if (path.startsWith('/tv') || path.startsWith('/movies')) {
+            if (animeSubSection !== 'manga') setAnimeSubSection('manga');
+        } else if (path.startsWith('/anime')) {
+            if (activeSection !== 'anime') setActiveSection('anime');
+            if (animeSubSection !== 'anime') setAnimeSubSection('anime');
+        } else if (path.startsWith('/tv')) {
             if (activeSection !== 'movies') setActiveSection('movies');
+            if (cinemaSubSection !== 'tv') setCinemaSubSection('tv');
+        } else if (path.startsWith('/movies')) {
+            if (activeSection !== 'movies') setActiveSection('movies');
+            if (cinemaSubSection !== 'movie') setCinemaSubSection('movie');
         } else if (path === '/' || path.startsWith('/library') || path.startsWith('/discover') || path.startsWith('/game')) {
             if (activeSection !== 'games') setActiveSection('games');
         }
-    }, [location.pathname, activeSection, setActiveSection]);
+    }, [location.pathname, activeSection, setActiveSection, animeSubSection, setAnimeSubSection, cinemaSubSection, setCinemaSubSection]);
 
     const hideOnRoutes = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'];
     if (hideOnRoutes.includes(location.pathname)) return null;
@@ -42,7 +52,7 @@ const SectionSwitcher = () => {
             label: 'ANIME',
             subLabel: '& MANGA', 
             icon: Tv, 
-            path: '/anime',
+            path: isManga ? '/manga' : '/anime',
             iconAnim: {
                 active: { rotate: 360 },
                 transition: { repeat: Infinity, duration: 4, ease: "linear", repeatType: "loop" }
@@ -53,7 +63,7 @@ const SectionSwitcher = () => {
             label: 'MOVIES',
             subLabel: '& TV', 
             icon: Popcorn, 
-            path: '/movies',
+            path: isTV ? '/tv' : '/movies',
             iconAnim: {
                 active: { 
                     y: [0, -6, 0],
@@ -72,12 +82,19 @@ const SectionSwitcher = () => {
         const currentPath = location.pathname;
         let targetPath = path;
 
+        // Ensure sub-section state matches the destination path
+        if (sectionId === 'anime') {
+            setAnimeSubSection(path.includes('/manga') ? 'manga' : 'anime');
+        } else if (sectionId === 'movies') {
+            setCinemaSubSection(path.includes('/tv') ? 'tv' : 'movie');
+        }
+
         if (currentPath.includes('/discover')) {
-            targetPath = sectionId === 'games' ? '/discover' : `/${sectionId}/discover`;
+            targetPath = sectionId === 'games' ? '/discover' : (sectionId === 'anime' ? (isManga ? '/manga/discover' : '/anime/discover') : (isTV ? '/tv/discover' : '/movies/discover'));
         } else if (currentPath.includes('/library')) {
-            targetPath = sectionId === 'games' ? '/library' : `/${sectionId}/library`;
+            targetPath = sectionId === 'games' ? '/library' : (sectionId === 'anime' ? (isManga ? '/manga/library' : '/anime/library') : (isTV ? '/tv/library' : '/movies/library'));
         } else if (currentPath.includes('/lists')) {
-            targetPath = sectionId === 'games' ? '/lists' : `/${sectionId}/lists`;
+            targetPath = sectionId === 'games' ? '/lists' : (sectionId === 'anime' ? (isManga ? '/manga/lists' : '/anime/lists') : (isTV ? '/tv/lists' : '/movies/lists'));
         }
         navigate(targetPath);
     };
@@ -110,15 +127,24 @@ const SectionSwitcher = () => {
                                     className="absolute inset-0 rounded-full"
                                     style={{ 
                                         backgroundColor: BRAND_GREEN,
-                                        boxShadow: `0 0 25px ${BRAND_GREEN}40`
+                                        boxShadow: `0 0 30px ${BRAND_GREEN}50`,
+                                        zIndex: 0
                                     }}
-                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ 
+                                        type: "spring", 
+                                        stiffness: 300, 
+                                        damping: 30, 
+                                        mass: 1,
+                                        layout: { duration: 0.4, ease: "easeOut" }
+                                    }}
                                 />
                             )}
 
                             <motion.span 
                                 className={`relative z-10`}
-                                animate={isActive ? section.iconAnim.active : { rotate: 0, scale: 1, x: 0, y: 0 }}
+                                animate={isActive ? { ...section.iconAnim.active, scale: 1.1 } : { rotate: 0, scale: 1, x: 0, y: 0 }}
                                 transition={isActive ? section.iconAnim.transition : { duration: 0.3 }}
                                 style={{ color: isActive ? '#000' : 'rgba(255,255,255,0.4)' }}
                             >
@@ -132,9 +158,15 @@ const SectionSwitcher = () => {
                                 animate={{ 
                                     width: isActive ? 'auto' : 0,
                                     opacity: isActive ? 1 : 0,
-                                    marginLeft: isActive ? 0 : -10
+                                    marginLeft: isActive ? 8 : 0,
+                                    filter: isActive ? 'blur(0px)' : 'blur(4px)'
                                 }}
-                                transition={{ type: "spring", bounce: 0, duration: 0.4 }}
+                                transition={{ 
+                                    type: "spring", 
+                                    stiffness: 350, 
+                                    damping: 35,
+                                    mass: 1
+                                }}
                             >
                                 <span className={`
                                     text-[10px] font-black tracking-[0.1em] whitespace-nowrap leading-none

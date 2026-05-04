@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { Search, Flame, Star, Trophy, LayoutGrid } from 'lucide-react'
+import { Search, Flame, Star, Trophy, LayoutGrid, Film, Tv } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
@@ -154,7 +154,7 @@ function TVDiscover() {
         
         try {
             const res = await api.get(`/movies/search?q=${encodeURIComponent(query)}&type=tv&limit=24&page=${page}`)
-            setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats[r.externalId]?.avgRating })) || [])
+            setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats?.[r.externalId]?.avgRating })) || [])
             setSearchTotalPages(res.data.totalPages || 1)
         } catch (err) {
             console.error(err)
@@ -199,8 +199,8 @@ function TVDiscover() {
                         current="tv"
                         type="cinema"
                         options={[
-                            { label: 'Movies', value: 'movie', path: '/movies/discover' },
-                            { label: 'TV Shows', value: 'tv', path: '/tv/discover' }
+                            { label: 'Movies', value: 'movie', path: '/movies/discover', icon: Film },
+                            { label: 'TV Shows', value: 'tv', path: '/tv/discover', icon: Tv }
                         ]}
                     />
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">

@@ -157,6 +157,7 @@ router.get('/activity/:userId', protect, async (req, res) => {
 router.get('/stats/:igdbId', async (req, res) => {
     try {
         const igdbId = Number(req.params.igdbId)
+        if (isNaN(igdbId)) return res.status(400).json({ success: false, message: 'Invalid IGDB ID' })
         let stats = await GlobalStats.findOne({ igdbId })
         
         // ── Self-Healing Strategy ──
@@ -186,6 +187,7 @@ router.get('/stats/:igdbId', async (req, res) => {
 router.get('/context/:igdbId', protectOptional, async (req, res) => {
     try {
         const igdbId = Number(req.params.igdbId)
+        if (isNaN(igdbId)) return res.status(400).json({ success: false, message: 'Invalid IGDB ID' })
         const userId = req.user?._id // Populated by 'protectOptional' if token is valid
 
         // 1. Fire all lookups in parallel

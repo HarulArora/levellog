@@ -2,9 +2,9 @@ function MovieFilterBar({ activeFilter, onFilter, counts }) {
     const filters = [
         { key: 'all', label: 'All' },
         { key: 'playing', label: 'Watching' },
-        { key: 'completed', label: 'Finished' },
-        { key: 'planned', label: 'Watchlist' },
-        { key: 'paused', label: 'On Hold' },
+        { key: 'completed', label: 'Completed' },
+        { key: 'planned', label: 'Planned' },
+        { key: 'paused', label: 'Paused' },
         { key: 'dropped', label: 'Dropped' },
     ]
 

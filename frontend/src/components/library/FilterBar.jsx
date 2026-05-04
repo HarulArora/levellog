@@ -5,8 +5,8 @@ function FilterBar({ activeFilter, onFilter, counts }) {
         { key: 'all', label: 'All' },
         { key: 'playing', label: 'Playing' },
         { key: 'completed', label: 'Completed' },
-        { key: 'planned', label: 'Wishlist' },
-        { key: 'paused', label: 'On Hold' },
+        { key: 'planned', label: 'Planned' },
+        { key: 'paused', label: 'Paused' },
         { key: 'dropped', label: 'Dropped' },
     ]
 

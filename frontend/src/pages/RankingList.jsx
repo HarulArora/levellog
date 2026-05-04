@@ -10,6 +10,7 @@ const RankingCard = memo(({ item, contentType, index }) => {
     const navigate = useNavigate()
     
     const handleClick = () => {
+        if (!item.contentId || isNaN(Number(item.contentId))) return;
         const pathMap = {
             game: `/game/${item.contentId}`,
             anime: `/anime/${item.contentId}?type=anime`,

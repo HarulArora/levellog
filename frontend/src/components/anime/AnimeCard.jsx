@@ -33,7 +33,8 @@ const AnimeCard = memo(({ anime, onDelete, onEdit, showAvgRating = true }) => {
     const imageUrl = anime.cover || anime.coverImage
 
     const handleCardClick = () => {
-        if (anime.externalId) {
+        const extId = Number(anime.externalId)
+        if (anime.externalId && !isNaN(extId)) {
             const destType = isManga ? 'manga' : 'anime'
             navigate(`/${destType}/${anime.externalId}?type=${destType}`)
         }

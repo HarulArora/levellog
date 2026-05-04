@@ -205,6 +205,10 @@ router.get('/discover', async (req, res) => {
 
 // ── INTERNAL HELPER ──
 export const fetchGameDetailById = async (gameId) => {
+    if (!gameId || isNaN(gameId)) {
+        logger.error(`[IGDB Detail] Invalid gameId: ${gameId}`)
+        return null
+    }
     try {
         const cacheKey = `game-detail-${gameId}`
 
@@ -408,7 +412,7 @@ router.get('/home', async (req, res) => {
             genre: r.genres?.[0] || (r.genre) || 'Game',
             year: r.year,
             releaseDate: r.year ? `Jan 1, ${r.year}` : null
-        }));
+        })).filter(g => !isNaN(g.id));
 
         // 2. Fetch Top Rated from Rankings
         let topRatedRankings = await Ranking.find({ contentType: 'game', rankType: 'top_rated' }).sort({ rankPosition: 1 }).limit(15);
@@ -433,7 +437,7 @@ router.get('/home', async (req, res) => {
             genre: r.genres?.[0] || (r.genre) || 'Game',
             year: r.year,
             releaseDate: r.year ? `Jan 1, ${r.year}` : null
-        }));
+        })).filter(g => !isNaN(g.id));
 
         // 4. Fetch Coming Soon from Rankings
         let comingSoonRankings = await Ranking.find({ contentType: 'game', rankType: 'coming_soon' }).sort({ rankPosition: 1 }).limit(15);
@@ -458,7 +462,7 @@ router.get('/home', async (req, res) => {
             genre: r.genres?.[0] || (r.genre) || 'Game',
             year: r.year,
             releaseDate: r.year ? `Jan 1, ${r.year}` : null
-        }));
+        })).filter(g => !isNaN(g.id));
 
         // ── ON-THE-FLY RECOVERY FOR MISSING YEARS ──
         const missingYearIds = [...trending, ...topRated, ...comingSoon]

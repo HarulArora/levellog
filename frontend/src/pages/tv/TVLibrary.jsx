@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
-import { Plus, LayoutGrid, List as ListIcon, Filter, Search, Tv, Sparkles, Edit3, Trash2 } from 'lucide-react'
+import { Plus, LayoutGrid, List as ListIcon, Filter, Search, Tv, Sparkles, Edit3, Trash2, Film } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -144,8 +144,8 @@ function TVLibrary() {
                         current="tv"
                         type="cinema"
                         options={[
-                            { label: 'Movies', value: 'movie', path: '/movies/library' },
-                            { label: 'TV Shows', value: 'tv', path: '/tv/library' }
+                            { label: 'Movies', value: 'movie', path: '/movies/library', icon: Film },
+                            { label: 'TV Shows', value: 'tv', path: '/tv/library', icon: Tv }
                         ]}
                     />
 

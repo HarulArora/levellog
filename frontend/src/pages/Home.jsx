@@ -56,27 +56,27 @@ const timeAgo = (date) => {
 const makeActivityConfig = (navigate) => ({
     completed: {
         icon: <Trophy size={16} />, bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
-        getText: (a) => (<>Completed{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{a.rating ? ` — rated it ${a.rating}/10` : ''}</>)
+        getText: (a) => (<>Completed{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{a.rating ? ` — rated it ${a.rating}/10` : ''}</>)
     },
     playing: {
         icon: <Play size={16} fill="currentColor" />, bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
-        getText: (a) => (<>Started playing{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span></>)
+        getText: (a) => (<>Started playing{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span></>)
     },
     rated: {
         icon: <Star size={16} fill="currentColor" />, bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
-        getText: (a) => (<>Rated{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{` ${a.rating}/10`}</>)
+        getText: (a) => (<>Rated{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{` ${a.rating}/10`}</>)
     },
     planned: {
         icon: <ListChecks size={16} />, bg: 'bg-[#2a2a35] text-[#e8e8f0]',
-        getText: (a) => (<>Added{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{' to planned list'}</>)
+        getText: (a) => (<>Added{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{' to planned list'}</>)
     },
     dropped: {
         icon: <X size={16} strokeWidth={3} />, bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
-        getText: (a) => (<>Dropped{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{a.hours ? ` after ${a.hours}h` : ''}</>)
+        getText: (a) => (<>Dropped{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{a.hours ? ` after ${a.hours}h` : ''}</>)
     },
     paused: {
         icon: <Pause size={16} fill="currentColor" />, bg: 'bg-[#c45cff]/15 text-[#c45cff]',
-        getText: (a) => (<>Paused{' '}<span onClick={() => a.game.igdbId && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span></>)
+        getText: (a) => (<>Paused{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span></>)
     },
 })
 
@@ -207,10 +207,12 @@ function GameSearchBar({ id = 'game-search' }) {
     }
 
     const handleSelect = (game) => {
+        const id = game.igdbId || game.id
+        if (!id || isNaN(Number(id))) return
         setQuery('')
         setResults([])
         setOpen(false)
-        navigate(`/game/${game.igdbId || game.id}`)
+        navigate(`/game/${id}`)
     }
 
     const handleKeyDown = (e) => {
@@ -315,8 +317,13 @@ const TrendingGameCard = memo(({ game, stats, myRating, showFullDate }) => {
 
     return (
         <div 
-            onClick={() => navigate(`/game/${game.id}`)}
-            className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+            onClick={() => {
+                if (game.id && !isNaN(Number(game.id))) {
+                    navigate(`/game/${game.id}`)
+                }
+            }}
+            className={`group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden shadow-lg transition-all duration-300
+                        ${(game.id && !isNaN(Number(game.id))) ? 'cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]' : 'cursor-default opacity-60'}`}
         >
             <div className="aspect-[3/4] relative overflow-hidden">
                 {game.cover ? (

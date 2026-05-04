@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
-import { Search, Star, Filter } from 'lucide-react'
+import { Search, Star, Filter, Tv, BookOpen } from 'lucide-react'
 import { GameCardSkeleton } from '../../components/ui/Skeleton'
 import { Helmet } from 'react-helmet-async'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
@@ -94,7 +94,7 @@ function MangaDiscover() {
         
         try {
             const res = await api.get(`/anime/search?q=${encodeURIComponent(query)}&type=manga&limit=24&page=${page}`)
-            setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats[r.externalId]?.avgRating })) || [])
+            setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats?.[r.externalId]?.avgRating })) || [])
             setSearchTotalPages(res.data.totalPages || 1)
         } catch (err) {
             console.error(err)
@@ -150,9 +150,10 @@ function MangaDiscover() {
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <SubSectionToggle 
                         current="manga"
+                        type="anime"
                         options={[
-                            { label: 'Anime', value: 'anime', path: '/anime/discover' },
-                            { label: 'Manga', value: 'manga', path: '/manga/discover' }
+                            { label: 'Anime', value: 'anime', path: '/anime/discover', icon: Tv },
+                            { label: 'Manga', value: 'manga', path: '/manga/discover', icon: BookOpen }
                         ]}
                     />
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">

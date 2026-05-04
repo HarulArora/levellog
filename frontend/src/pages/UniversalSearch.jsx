@@ -240,8 +240,11 @@ function MediaResultCard({ item, type }) {
 
     return (
         <div 
-            onClick={() => navigate(pathMap[type])}
-            className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg"
+            onClick={() => {
+                if (!id || isNaN(id)) return;
+                navigate(pathMap[type]);
+            }}
+            className={`group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden shadow-lg ${(!id || isNaN(id)) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300'}`}
         >
             <div className="aspect-[3/4] relative overflow-hidden">
                 {cover ? (

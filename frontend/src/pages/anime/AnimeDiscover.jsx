@@ -1,7 +1,7 @@
 import { useState, useEffect, memo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { Search, Star } from 'lucide-react'
+import { Search, Star, Tv, BookOpen } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
@@ -101,7 +101,7 @@ function AnimeDiscover() {
         
         try {
             const res = await api.get(`/anime/search?q=${encodeURIComponent(query)}&type=${type}&limit=24&page=${page}`)
-            setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats[r.externalId]?.avgRating })) || [])
+            setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats?.[r.externalId]?.avgRating })) || [])
             setSearchTotalPages(res.data.totalPages || 1)
         } catch (err) {
             console.error(err)
@@ -157,8 +157,8 @@ function AnimeDiscover() {
                         current="anime"
                         type="anime"
                         options={[
-                            { label: 'Anime', value: 'anime', path: '/anime/discover' },
-                            { label: 'Manga', value: 'manga', path: '/manga/discover' }
+                            { label: 'Anime', value: 'anime', path: '/anime/discover', icon: Tv },
+                            { label: 'Manga', value: 'manga', path: '/manga/discover', icon: BookOpen }
                         ]}
                     />
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">

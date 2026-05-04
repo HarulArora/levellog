@@ -102,7 +102,26 @@ function NavbarSectionAdapter() {
                 <ul className="hidden md:flex gap-6 list-none">
                     {links.map(link => {
                         const isDeals = link.path === '/deals'
-                        const isActive = location.pathname === link.path
+                        const path = location.pathname
+                        
+                        let isActive = false
+                        if (link.name === 'HOME') {
+                            isActive = path === '/' || path === '/anime' || path === '/movies' || path === '/manga' || path === '/tv'
+                        } else if (link.name === 'DISCOVER') {
+                            isActive = path.includes('/discover') || 
+                                       path.includes('/game/') || 
+                                       (path.includes('/movies/') && !path.includes('/library')) || 
+                                       (path.includes('/tv/') && !path.includes('/library')) || 
+                                       (path.includes('/anime/') && !path.includes('/library')) || 
+                                       (path.includes('/manga/') && !path.includes('/library'))
+                        } else if (link.name === 'LIBRARY') {
+                            isActive = path.includes('/library')
+                        } else if (link.name === 'FRIENDS') {
+                            isActive = path.includes('/search') || path.includes('/friends') || path.includes('/universal-search') || path.includes('/search')
+                        } else {
+                            isActive = path.includes(link.path)
+                        }
+
                         return (
                             <li key={link.path} className="relative">
                                 <Link
@@ -236,13 +255,33 @@ function NavbarSectionAdapter() {
 
                     {links.map(link => {
                         const isDeals = link.path === '/deals'
+                        const path = location.pathname
+                        
+                        let isActive = false
+                        if (link.name === 'HOME') {
+                            isActive = path === '/' || path === '/anime' || path === '/movies' || path === '/manga' || path === '/tv'
+                        } else if (link.name === 'DISCOVER') {
+                            isActive = path.includes('/discover') || 
+                                       path.includes('/game/') || 
+                                       (path.includes('/movies/') && !path.includes('/library')) || 
+                                       (path.includes('/tv/') && !path.includes('/library')) || 
+                                       (path.includes('/anime/') && !path.includes('/library')) || 
+                                       (path.includes('/manga/') && !path.includes('/library'))
+                        } else if (link.name === 'LIBRARY') {
+                            isActive = path.includes('/library')
+                        } else if (link.name === 'FRIENDS') {
+                            isActive = path.includes('/search') || path.includes('/friends') || path.includes('/universal-search')
+                        } else {
+                            isActive = path.includes(link.path)
+                        }
+
                         return (
                             <Link
                                 key={link.path}
                                 to={link.path}
                                 onClick={isDeals ? handleDealsClick : handleLinkClick}
                                 className={`text-sm font-semibold tracking-widest uppercase flex items-center gap-2
-                                           ${location.pathname === link.path ? 'text-[#c8ff57]' : 'text-[#94a3b8]'}`}
+                                           ${isActive ? 'text-[#c8ff57]' : 'text-[#94a3b8]'}`}
                             >
                                 {link.name}
                                 {isDeals && newDealsCount > 0 && (
