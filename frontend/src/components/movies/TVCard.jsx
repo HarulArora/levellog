@@ -1,8 +1,9 @@
 import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Star } from 'lucide-react'
 // import { useSection } from '../../context/SectionState'
 
-const TVCard = memo(({ movie: tvShow, onDelete, onEdit }) => {
+const TVCard = memo(({ movie: tvShow, onDelete, onEdit, showAvgRating = true }) => {
     const navigate = useNavigate()
 
     const statusConfig = {
@@ -44,7 +45,7 @@ const TVCard = memo(({ movie: tvShow, onDelete, onEdit }) => {
                         ${tvShow.externalId ? 'cursor-pointer' : 'cursor-default'}`}
             style={{ animation: 'fadeUp 0.3s ease backwards' }}
         >
-            <div className="aspect-video relative overflow-hidden bg-[#18181f] shrink-0">
+            <div className="aspect-[3/4] relative overflow-hidden bg-[#18181f] shrink-0">
                 {imageUrl ? (
                     <img 
                         src={imageUrl} 
@@ -65,6 +66,22 @@ const TVCard = memo(({ movie: tvShow, onDelete, onEdit }) => {
                         {sc.label}
                     </div>
                 )}
+
+                {/* Rating Badges */}
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
+                    {showAvgRating && tvShow.avgRating > 0 && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl min-w-[45px] justify-center">
+                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{tvShow.avgRating}</span>
+                        </div>
+                    )}
+                    {tvShow.rating > 0 && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl min-w-[45px] justify-center">
+                            <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
+                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{tvShow.rating}</span>
+                        </div>
+                    )}
+                </div>
 
                 {tvShow.externalId && (
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50

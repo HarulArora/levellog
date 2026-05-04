@@ -462,7 +462,7 @@ router.get('/home', async (req, res) => {
 
         // ── ON-THE-FLY RECOVERY FOR MISSING YEARS ──
         const missingYearIds = [...trending, ...topRated, ...comingSoon]
-            .filter(g => !g.year)
+            .filter(g => !g.year && g.id && !isNaN(g.id))
             .map(g => g.id);
 
         if (missingYearIds.length > 0) {
@@ -476,7 +476,11 @@ router.get('/home', async (req, res) => {
                 const yearMap = {};
                 (igdbRes.data || []).forEach(g => {
                     if (g.first_release_date) {
-                        yearMap[g.id] = new Date(g.first_release_date * 1000).getFullYear();
+                        const date = new Date(g.first_release_date * 1000);
+                        yearMap[g.id] = {
+                            year: date.getFullYear(),
+                            full: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        };
                     }
                 });
 
@@ -485,8 +489,8 @@ router.get('/home', async (req, res) => {
                 [trending, topRated, comingSoon].forEach(list => {
                     list.forEach(g => {
                         if (!g.year && yearMap[g.id]) {
-                            g.year = yearMap[g.id];
-                            g.releaseDate = `Jan 1, ${g.year}`;
+                            g.year = yearMap[g.id].year;
+                            g.releaseDate = yearMap[g.id].full;
                             
                             // Queue DB update
                             healingOps.push(

@@ -234,6 +234,7 @@ function MoviesLibrary() {
                                 <MovieCard 
                                     key={item._id} 
                                     movie={item} 
+                                    showAvgRating={false}
                                     onDelete={() => handleDelete(item._id)}
                                     onEdit={() => setEditingMovie(item)}
                                 />

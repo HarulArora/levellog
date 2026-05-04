@@ -80,7 +80,7 @@ export const calculateTopRated = async (type) => {
     }
 
     // 3. Apply formula and sort
-    const ranked = titles.map(t => {
+    let ranked = titles.map(t => {
         const score = (t.v / (t.v + m)) * t.R + (m / (t.v + m)) * C;
         return {
             contentId: String(t._id),
@@ -95,13 +95,34 @@ export const calculateTopRated = async (type) => {
         };
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, 100)
-    .map((item, index) => ({ ...item, rankPosition: index + 1 }));
+    .slice(0, 100);
+
+    // ── YEAR RECOVERY FOR GAMES ──
+    if (type === 'game') {
+        const missingYearIds = ranked.filter(r => !r.year).map(r => parseInt(r.contentId));
+        if (missingYearIds.length > 0) {
+            try {
+                const { getAccessToken } = await import('./igdb.js');
+                const token = await getAccessToken();
+                const headers = { 'Client-ID': process.env.IGDB_CLIENT_ID, 'Authorization': `Bearer ${token}`, 'Content-Type': 'text/plain' };
+                const resApi = await apiClient.post('https://api.igdb.com/v4/games', `fields first_release_date; where id = (${missingYearIds.join(',')}); limit 100;`, { headers });
+                const yearMap = {};
+                (resApi.data || []).forEach(g => { if (g.first_release_date) yearMap[g.id] = new Date(g.first_release_date * 1000).getFullYear(); });
+                
+                ranked = ranked.map(r => ({
+                    ...r,
+                    year: r.year || yearMap[parseInt(r.contentId)] || null
+                }));
+            } catch (err) { logger.error(`[Rankings Top Rated Year Recovery] Failed:`, err.message); }
+        }
+    }
+
+    const finalRanked = ranked.map((item, index) => ({ ...item, rankPosition: index + 1 }));
 
     // 4. Atomic Update: Clear and Insert
     await Ranking.deleteMany({ contentType: type, rankType: 'top_rated' });
-    if (ranked.length > 0) {
-        await Ranking.insertMany(ranked);
+    if (finalRanked.length > 0) {
+        await Ranking.insertMany(finalRanked);
     }
     
     logger.info(`[Rankings] Top Rated updated for ${type} (${ranked.length} items)`);
@@ -209,9 +230,30 @@ export const calculateTrending = async (type) => {
     }
 
     // 4. Atomic Update
+    let finalItems = finalRanked;
+
+    if (type === 'game') {
+        const missingYearIds = finalItems.filter(r => !r.year).map(r => parseInt(r.contentId));
+        if (missingYearIds.length > 0) {
+            try {
+                const { getAccessToken } = await import('./igdb.js');
+                const token = await getAccessToken();
+                const headers = { 'Client-ID': process.env.IGDB_CLIENT_ID, 'Authorization': `Bearer ${token}`, 'Content-Type': 'text/plain' };
+                const resApi = await apiClient.post('https://api.igdb.com/v4/games', `fields first_release_date; where id = (${missingYearIds.join(',')}); limit 100;`, { headers });
+                const yearMap = {};
+                (resApi.data || []).forEach(g => { if (g.first_release_date) yearMap[g.id] = new Date(g.first_release_date * 1000).getFullYear(); });
+                
+                finalItems = finalItems.map(r => ({
+                    ...r,
+                    year: r.year || yearMap[parseInt(r.contentId)] || null
+                }));
+            } catch (err) { logger.error(`[Rankings Trending Year Recovery] Failed:`, err.message); }
+        }
+    }
+
     await Ranking.deleteMany({ contentType: type, rankType: 'trending' });
-    if (finalRanked.length > 0) {
-        await Ranking.insertMany(finalRanked);
+    if (finalItems.length > 0) {
+        await Ranking.insertMany(finalItems);
     }
     
     logger.info(`[Rankings] Trending updated for ${type} (${finalRanked.length} items)`);

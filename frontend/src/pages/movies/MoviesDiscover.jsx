@@ -131,28 +131,6 @@ function MoviesDiscover() {
     const [searchResults, setSearchResults] = useState([])
     const [searchPerformed, setSearchPerformed] = useState(false)
     const [isSearching, setIsSearching] = useState(false)
-    const [libraryMap, setLibraryMap] = useState({})
-    const [user, setUser] = useState(null)
-
-    // Fetch library to show personal ratings/status
-    useEffect(() => {
-        const fetchLibrary = async () => {
-            if (!user) return
-            try {
-                const res = await api.get('/movies/library')
-                const map = {}
-                res.data.library.forEach(entry => {
-                    if (entry.externalId && (entry.type === 'movie' || entry.mediaType === 'movie')) {
-                        map[entry.externalId] = entry
-                    }
-                })
-                setLibraryMap(map)
-            } catch (err) {
-                console.error('Failed to fetch library for discovery mapping:', err)
-            }
-        }
-        fetchLibrary()
-    }, [user])
 
     useEffect(() => {
         const fetchGenres = async () => {

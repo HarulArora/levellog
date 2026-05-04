@@ -50,6 +50,7 @@ export const syncIGDBLists = async () => {
                 rating: g.rating ? (g.rating / 10).toFixed(1) : null,
                 ratingCount: g.rating_count || 0,
                 hypes: g.hypes || 0,
+                year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
                 releaseDate: g.first_release_date
                     ? new Date(g.first_release_date * 1000).toLocaleDateString('en-US', {
                         month: 'short', day: 'numeric', year: 'numeric'

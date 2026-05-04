@@ -239,6 +239,7 @@ function AnimeLibrary() {
                                 <AnimeCard 
                                     key={item._id} 
                                     anime={item} 
+                                    showAvgRating={false}
                                     onDelete={() => handleDelete(item._id)}
                                     onEdit={() => setEditingAnime(item)}
                                 />

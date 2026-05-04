@@ -124,13 +124,6 @@ function MediaGrid({ items, onRemove, mediaType, navigate }) {
                                 </div>
                             )}
                             
-                            {/* Community Average Rating Badge */}
-                            {item.avgRating > 0 && (
-                                <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1.5 py-0.5 shadow-xl z-10">
-                                    <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
-                                    <span className="font-black text-[11px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
-                                </div>
-                            )}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent opacity-0 group-hover/card:opacity-100 transition-opacity flex items-end p-3">
                                 <span className="text-white font-black uppercase text-[10px] tracking-widest" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>View Detail</span>
                             </div>

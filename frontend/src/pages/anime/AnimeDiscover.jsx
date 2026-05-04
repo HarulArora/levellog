@@ -1,5 +1,6 @@
 import { useState, useEffect, memo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import { Search, Star } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
@@ -29,6 +30,7 @@ const ANIME_GENRES = [
 
 
 function AnimeDiscover() {
+    const { user } = useAuth()
     const [searchParams, setSearchParams] = useSearchParams()
     const type = 'anime'
     

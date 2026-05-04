@@ -18,7 +18,7 @@ const PAGE_SIZE = 20
 function SkeletonCard() {
     return (
         <div className="rounded-xl border border-[#2a2a35] bg-[#111118] overflow-hidden animate-pulse">
-            <div className="aspect-video bg-[#1e1e28]" />
+            <div className="aspect-[3/4] bg-[#1e1e28]" />
             <div className="p-3 space-y-2">
                 <div className="h-3 bg-[#2a2a35] rounded w-3/4" />
                 <div className="h-3 bg-[#2a2a35] rounded w-1/2" />
@@ -435,20 +435,11 @@ function GameRow({ game, index, onDelete, onEdit }) {
                 </div>
             </td>
             <td className="px-6 py-4 text-center">
-                <div className="flex flex-col items-center gap-1">
+                <div className="flex flex-col items-center">
                     {game.rating > 0 ? (
-                        <div className="flex items-center gap-1">
-                            <span className="text-[#c8ff57] font-black text-xl leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.rating}</span>
-                            <span className="font-mono text-[8px] text-[#7a7a90] uppercase tracking-tighter">ME</span>
-                        </div>
+                        <span className="text-[#c8ff57] font-black text-xl leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.rating}</span>
                     ) : (
                         <span className="text-[#3a3a4a] font-mono text-[9px] uppercase tracking-tighter">NOT RATED</span>
-                    )}
-                    
-                    {game.avgRating > 0 && (
-                        <div className="flex items-center gap-1 bg-[#5c9fff]/10 px-1.5 py-0.5 rounded border border-[#5c9fff]/20">
-                            <span className="text-[#5c9fff] font-black text-sm leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
-                        </div>
                     )}
                 </div>
             </td>

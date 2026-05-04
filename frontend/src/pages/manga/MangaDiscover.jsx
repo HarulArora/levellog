@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Search, Star, Filter } from 'lucide-react'
@@ -26,6 +27,7 @@ const MANGA_GENRES = [
 ]
 
 function MangaDiscover() {
+    const { user } = useAuth()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     

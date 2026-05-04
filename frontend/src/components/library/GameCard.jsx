@@ -53,7 +53,7 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
         >
 
             {/* ── Game Cover Image ── */}
-            <div className="aspect-video relative overflow-hidden bg-[#18181f] shrink-0">
+            <div className="aspect-[3/4] relative overflow-hidden bg-[#18181f] shrink-0">
                 {imageUrl ? (
                     <img 
                         src={imageUrl} 
@@ -77,12 +77,6 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                     </div>
                 )}
 
-                {/* Community Average Rating Badge */}
-                {game.avgRating > 0 && (
-                    <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1.5 py-0.5 shadow-xl z-10">
-                        <span className="font-black text-[11px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
-                    </div>
-                )}
 
                 {/* "View Details" overlay — only if igdbId exists */}
                 {game.igdbId && (

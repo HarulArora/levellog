@@ -17,7 +17,7 @@ const router = express.Router()
 router.get('/', protect, async (req, res) => {
     try {
         let games = await Game.find({ userId: req.user._id })
-            .select('title cover status genre rating hours platforms igdbId steamId createdAt updatedAt')
+            .select('title cover status genre rating hours platforms igdbId steamId year createdAt updatedAt')
             .sort({ createdAt: -1 })
             .lean()
 
@@ -70,7 +70,7 @@ router.get('/', protect, async (req, res) => {
 router.get('/user/:userId', async (req, res) => {
     try {
         let games = await Game.find({ userId: req.params.userId })
-            .select('title cover status genre rating hours platforms igdbId createdAt updatedAt')
+            .select('title cover status genre rating hours platforms igdbId year createdAt updatedAt')
             .sort({ createdAt: -1 })
             .lean()
 

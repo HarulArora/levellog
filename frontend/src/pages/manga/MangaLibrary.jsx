@@ -238,7 +238,8 @@ function MangaLibrary() {
                             {filteredManga.map(item => (
                                 <MangaCard 
                                     key={item._id} 
-                                    anime={item} 
+                                    manga={item} 
+                                    showAvgRating={false}
                                     onDelete={() => handleDelete(item._id)}
                                     onEdit={() => setEditingAnime(item)}
                                 />

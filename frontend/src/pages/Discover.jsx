@@ -184,12 +184,6 @@ const GameCard = memo(({ game, entry, onClick }) => {
                             {game.genre || 'Game'}
                         </span>
                     </div>
-                    {userRating && (
-                        <div className="flex items-baseline gap-0.5 ml-2">
-                            <span className="font-mono text-[11px] font-bold text-[#c8ff57]">{userRating}</span>
-                            <span className="font-mono text-[7px] text-[#c8ff57]/50">/10</span>
-                        </div>
-                    )}
                 </div>
                 {/* Platform Tags - Small and subtle */}
                 <div className="flex gap-1 mt-2 overflow-hidden">
