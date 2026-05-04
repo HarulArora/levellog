@@ -54,35 +54,43 @@ export const calculateTopRated = async (type) => {
         const mediaData = await MediaStats.find({ type: type, ratingCount: { $gt: 0 } });
         // We need titles/covers from Entry models
         const EntryModel = type === 'anime' || type === 'manga' ? AnimeEntry : MovieEntry;
-        const entries = await EntryModel.find({ externalId: { $in: mediaData.map(d => d.externalId) } });
+        const entries = await EntryModel.find({ 
+            externalId: { $in: mediaData.map(d => d.externalId) },
+            type: type 
+        }).lean();
         
+        // Create a map for O(1) lookups
+        const entryMap = new Map();
+        entries.forEach(e => {
+            if (!entryMap.has(e.externalId)) entryMap.set(e.externalId, e);
+        });
+
         titles = mediaData.map(d => {
-            const entry = entries.find(e => e.externalId === d.externalId);
+            const entry = entryMap.get(d.externalId);
             return {
                 _id: d.externalId,
                 R: d.avgRating,
                 v: d.ratingCount,
                 title: entry?.title,
                 cover: entry?.cover,
-                genres: entry?.genres
+                genres: entry?.genres || (entry?.genre ? [entry.genre] : []),
+                year: entry?.year
             };
         });
     }
 
     // 3. Apply formula and sort
     const ranked = titles.map(t => {
-        const v = t.v;
-        const R = t.R;
-        const score = (v * R + m * C) / (v + m);
+        const score = (t.v / (t.v + m)) * t.R + (m / (t.v + m)) * C;
         return {
             contentId: String(t._id),
             contentType: type,
             rankType: 'top_rated',
-            score: parseFloat(score.toFixed(3)),
+            score: parseFloat(score.toFixed(1)),
             title: t.title,
             cover: t.cover,
             genres: t.genres || [t.genre],
-            avgRating: t.R,
+            avgRating: parseFloat((t.R || 0).toFixed(1)),
             year: t.year
         };
     })
@@ -165,14 +173,16 @@ export const calculateTrending = async (type) => {
             }
         } else if (['anime', 'manga', 'movie', 'tv'].includes(type)) {
             const EntryModel = (type === 'anime' || type === 'manga') ? AnimeEntry : MovieEntry;
-            const LikeModel = (type === 'anime' || type === 'manga') ? import('../models/AnimeLike.js').then(m => m.default) : import('../models/MovieLike.js').then(m => m.default);
-            const WishModel = (type === 'anime' || type === 'manga') ? import('../models/AnimeWishlist.js').then(m => m.default) : import('../models/MovieWishlist.js').then(m => m.default);
+            const LikeModelPromise = (type === 'anime' || type === 'manga') ? import('../models/AnimeLike.js').then(m => m.default) : import('../models/MovieLike.js').then(m => m.default);
+            const WishModelPromise = (type === 'anime' || type === 'manga') ? import('../models/AnimeWishlist.js').then(m => m.default) : import('../models/MovieWishlist.js').then(m => m.default);
+
+            const [LikeModel, WishModel] = await Promise.all([LikeModelPromise, WishModelPromise]);
 
             const [entry, like, wish, stats] = await Promise.all([
-                EntryModel.findOne({ externalId: extId, type }),
-                LikeModel.then(M => M.findOne({ externalId: extId, type })),
-                WishModel.then(M => M.findOne({ externalId: extId, type })),
-                MediaStats.findOne({ externalId: extId, type })
+                EntryModel.findOne({ externalId: extId, type }).lean(),
+                LikeModel.findOne({ externalId: extId, type }).lean(),
+                WishModel.findOne({ externalId: extId, type }).lean(),
+                MediaStats.findOne({ externalId: extId, type }).lean()
             ]);
 
             const source = entry || like || wish;

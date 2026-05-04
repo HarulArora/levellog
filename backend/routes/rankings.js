@@ -104,7 +104,7 @@ router.get('/top_rated', async (req, res) => {
                     const resApi = await apiClient.post('https://api.igdb.com/v4/games', `fields name, cover.url, genres.name, rating, first_release_date; where rating > 85 & rating_count > 50 & cover != null; sort rating desc; limit 100;`, { headers });
                     fallback = (resApi.data || []).map(g => ({
                         id: g.id, title: g.name, cover: normalizeCover(g.cover?.url), 
-                        genres: g.genres?.map(gn => gn.name) || [], avgRating: g.rating ? g.rating / 10 : 0,
+                        genres: g.genres?.map(gn => gn.name) || [], avgRating: g.rating ? parseFloat((g.rating / 10).toFixed(1)) : 0,
                         year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null
                     }));
                 } else if (type === 'anime' || type === 'manga') {
@@ -117,7 +117,7 @@ router.get('/top_rated', async (req, res) => {
                             });
                             const pageItems = (resApi.data?.data || []).map(item => ({
                                 id: item.mal_id, title: item.title, cover: item.images?.webp?.large_image_url,
-                                genres: item.genres?.map(g => g.name) || [], avgRating: item.score,
+                                genres: item.genres?.map(g => g.name) || [], avgRating: item.score ? parseFloat(item.score.toFixed(1)) : 0,
                                 year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year
                             }));
                             fallback = [...fallback, ...pageItems];
@@ -138,7 +138,7 @@ router.get('/top_rated', async (req, res) => {
                                 .filter(m => !m.genre_ids?.includes(16) && m.original_language !== 'ja') 
                                 .map(item => ({
                                     id: item.id, title: item.title || item.name, cover: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
-                                    avgRating: item.vote_average, year: parseInt((item.release_date || item.first_air_date || '').split('-')[0])
+                                    avgRating: item.vote_average ? parseFloat(item.vote_average.toFixed(1)) : 0, year: parseInt((item.release_date || item.first_air_date || '').split('-')[0])
                                 }));
                             fallback = [...fallback, ...pageItems];
                             if ((resApi.data?.results || []).length === 0) break;
@@ -221,7 +221,7 @@ router.get('/trending', async (req, res) => {
                     const resApi = await apiClient.post('https://api.igdb.com/v4/games', `fields name, cover.url, genres.name, rating, first_release_date; where rating > 70 & rating_count > 50 & cover != null; sort rating_count desc; limit 100;`, { headers });
                     fallback = (resApi.data || []).map(g => ({
                         id: g.id, title: g.name, cover: normalizeCover(g.cover?.url), 
-                        genres: g.genres?.map(gn => gn.name) || [], avgRating: g.rating ? g.rating / 10 : 0,
+                        genres: g.genres?.map(gn => gn.name) || [], avgRating: g.rating ? parseFloat((g.rating / 10).toFixed(1)) : 0,
                         year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null
                     }));
                 } else if (type === 'anime' || type === 'manga') {
@@ -234,7 +234,7 @@ router.get('/trending', async (req, res) => {
                             });
                             const pageItems = (resApi.data?.data || []).map(item => ({
                                 id: item.mal_id, title: item.title, cover: item.images?.webp?.large_image_url,
-                                genres: item.genres?.map(g => g.name) || [], avgRating: item.score,
+                                genres: item.genres?.map(g => g.name) || [], avgRating: item.score ? parseFloat(item.score.toFixed(1)) : 0,
                                 year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year
                             }));
                             fallback = [...fallback, ...pageItems];
@@ -255,7 +255,7 @@ router.get('/trending', async (req, res) => {
                                 .filter(m => !m.genre_ids?.includes(16) && m.original_language !== 'ja') 
                                 .map(item => ({
                                     id: item.id, title: item.title || item.name, cover: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
-                                    avgRating: item.vote_average, year: parseInt((item.release_date || item.first_air_date || '').split('-')[0])
+                                    avgRating: item.vote_average ? parseFloat(item.vote_average.toFixed(1)) : 0, year: parseInt((item.release_date || item.first_air_date || '').split('-')[0])
                                 }));
                             fallback = [...fallback, ...pageItems];
                             if ((resApi.data?.results || []).length === 0) break;

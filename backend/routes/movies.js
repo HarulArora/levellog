@@ -95,7 +95,7 @@ const formatMovieItem = (item, type) => {
         genre: genreName || fallbackType,
         genres: genreName ? [genreName] : [fallbackType],
         year: (item.release_date || item.first_air_date || '').split('-')[0],
-        score: item.vote_average,
+        avgRating: parseFloat((item.vote_average || item.score || 0).toFixed(1)),
         summary: item.overview,
         production: item.production_companies?.map(c => c.name).join(', '),
         language: item.original_language?.toUpperCase(),
@@ -132,6 +132,8 @@ router.get('/home', async (req, res) => {
             year: r.year,
             genre: r.genres?.[0] || (type === 'movie' ? 'Movie' : 'TV Show'),
             genres: r.genres || [],
+            avgRating: r.avgRating || 0,
+            score: r.score || 0,
             type: type
         }));
 
@@ -143,6 +145,8 @@ router.get('/home', async (req, res) => {
             year: r.year,
             genre: r.genres?.[0] || (type === 'movie' ? 'Movie' : 'TV Show'),
             genres: r.genres || [],
+            avgRating: r.avgRating || 0,
+            score: r.score || 0,
             type: type
         }));
 
@@ -154,6 +158,8 @@ router.get('/home', async (req, res) => {
             year: r.year,
             genre: r.genres?.[0] || (type === 'movie' ? 'Movie' : 'TV Show'),
             genres: r.genres || [],
+            avgRating: r.avgRating || 0,
+            score: r.score || 0,
             type: type
         }));
 
