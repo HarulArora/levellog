@@ -141,13 +141,13 @@ const GameCard = memo(({ game, entry, onClick }) => {
                 {/* Rating Badges */}
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
                     {game.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl min-w-[45px] justify-center">
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
                             <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
                             <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
                         </div>
                     )}
                     {userRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl min-w-[45px] justify-center">
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
                             <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
                             <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{userRating}</span>
                         </div>
@@ -372,7 +372,7 @@ export default function Discover() {
                         </div>
 
                         <form onSubmit={handleSearch} className="w-full md:w-96 relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] z-10" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#c8ff57] z-10" size={18} />
                             <input 
                                 type="text"
                                 placeholder="Search games..."

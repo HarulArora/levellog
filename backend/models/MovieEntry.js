@@ -88,7 +88,7 @@ const movieEntrySchema = new mongoose.Schema(
 );
 
 movieEntrySchema.index({ userId: 1, type: 1, status: 1 });
-movieEntrySchema.index({ userId: 1, externalId: 1 });
+movieEntrySchema.index({ userId: 1, externalId: 1, type: 1 }, { unique: true });
 movieEntrySchema.index({ userId: 1, createdAt: -1 });
 movieEntrySchema.index({ externalId: 1, type: 1 });
 

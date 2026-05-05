@@ -616,9 +616,12 @@ function GameDetail() {
 
     const myGame = userGames.find(g => {
         const pageId = Number(igdbId)
-        const entryId = Number(g.igdbId)
+        const entryId = g.igdbId ? Number(g.igdbId) : null
+        
+        // Match by ID if both exist
         if (pageId && entryId) return pageId === entryId
-        if (pageId || entryId) return false
+        
+        // Fallback to title check if ID match is not possible
         return g.title?.toLowerCase() === game?.title?.toLowerCase()
     })
 
@@ -1399,7 +1402,7 @@ function GameDetail() {
                             if (myGame) { await updateGame(myGame._id, formData) }
                             else { await addGame(formData) }
                             setShowAddModal(false)
-                            await fetchPlatformStats(true) // Silent reload to update counts
+                            await fetchPlatformStats(true) // Silent reload to update all context (stats, counts, etc)
                             return { success: true }
                         } catch (err) { 
                             console.error('Log error:', err)
@@ -1415,6 +1418,7 @@ function GameDetail() {
                         platforms: game.platforms || []
                     }}
                     existingEntry={myGame ?? null}
+                    games={userGames}
                 />
             )}
 

@@ -98,6 +98,22 @@ function Stats() {
     const { current: currentLevel, next: nextLevel } = useMemo(() => getLevelInfo(xp), [xp])
     const xpProgress = useMemo(() => getXPProgress(xp), [xp])
 
+    const mediaLabel = useMemo(() => ({
+        game: 'Games',
+        anime: 'Anime',
+        manga: 'Manga',
+        movie: 'Movies',
+        tv: 'TV Shows'
+    })[mediaType] || 'Items', [mediaType])
+
+    const mediaLabelSingular = useMemo(() => ({
+        game: 'Game',
+        anime: 'Anime',
+        manga: 'Manga',
+        movie: 'Movie',
+        tv: 'TV Show'
+    })[mediaType] || 'Item', [mediaType])
+
     const userRank = useMemo(() => {
         if (!user) return null
         return topUsers.find(tu => tu._id === (user?._id || user?.id))?.rank
@@ -338,7 +354,7 @@ function Stats() {
                         {/* Right — header stats */}
                         <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-8 gap-y-4">
                             {[
-                                { value: totalItems, label: mediaType === 'game' ? 'Games' : mediaType === 'anime' ? 'Anime' : mediaType === 'manga' ? 'Manga' : mediaType === 'movie' ? 'Movies' : 'TV Shows' },
+                                { value: totalItems, label: mediaLabel },
                                 { value: `${totalUnits}${unitLabel === 'Hours' ? 'h' : unitLabel === 'Minutes' ? 'm' : ''}`, label: unitLabel },
                                 { value: avgRating, label: 'Avg Score' },
                                 { value: `${completionRate}%`, label: 'Completion' },
@@ -416,7 +432,7 @@ function Stats() {
                                 ))
                             ) : (
                                 [
-                                    { value: totalItems, label: `Total ${mediaType === 'game' ? 'Games' : mediaType === 'anime' ? 'Anime' : mediaType === 'manga' ? 'Manga' : mediaType === 'movie' ? 'Movies' : 'Shows'}`, sub: 'Across your pond' },
+                                    { value: totalItems, label: `Total ${mediaLabel}`, sub: 'Across your pond' },
                                     { value: `${totalUnits}${unitLabel === 'Hours' ? 'h' : unitLabel === 'Minutes' ? 'm' : ''}`, label: `${unitLabel} ${mediaType === 'game' ? 'Played' : mediaType === 'movie' ? 'Watched' : 'Tracked'}`, sub: 'Total engagement' },
                                     { value: avgRating, label: 'Average Rating', sub: 'Out of 10' },
                                     { value: completed, label: 'Completed', sub: `${completionRate}% completion rate` },
@@ -735,8 +751,8 @@ function Stats() {
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden">
                                         {[
                                             { label: 'Favourite Genre', value: genreList[0]?.[0] || '—' },
-                                            { label: mediaType === 'game' ? 'Favourite Platform' : 'Total Items', value: mediaType === 'game' ? (platformList[0]?.[0] || '—') : totalItems },
-                                            { label: 'Longest Item', value: longestItem ? `${longestItem.title}` : '—' },
+                                            { label: mediaType === 'game' ? 'Favourite Platform' : `Total ${mediaLabel}`, value: mediaType === 'game' ? (platformList[0]?.[0] || '—') : totalItems },
+                                            { label: `Longest ${mediaLabelSingular}`, value: longestItem ? `${longestItem.title}` : '—' },
                                             { label: 'Highest Rated', value: highestRated ? `${highestRated.title} (${highestRated.rating}/10)` : '—' },
                                             { label: 'Completion Rate', value: `${completionRate}%` },
                                             { label: `Avg ${unitLabel} Per Entry`, value: `${avgUnits}${unitLabel === 'Hours' ? 'h' : unitLabel === 'Minutes' ? 'm' : ''}` },

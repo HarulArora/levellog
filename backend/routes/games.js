@@ -16,31 +16,10 @@ const router = express.Router()
 // ── GET /api/games ──
 router.get('/', protect, async (req, res) => {
     try {
-        let games = await Game.find({ userId: req.user._id })
+        const games = await Game.find({ userId: req.user._id })
             .select('title cover status genre rating hours platforms igdbId steamId year createdAt updatedAt')
             .sort({ createdAt: -1 })
             .lean()
-
-        // 🛡️ Auto-Healing: Deduplicate by igdbId if multiple entries exist
-        const uniqueMap = new Map()
-        games.forEach(game => {
-            if (!game.igdbId) {
-                // If no igdbId (rare), just keep it using _id
-                uniqueMap.set(game._id.toString(), game)
-                return
-            }
-            
-            const existing = uniqueMap.get(game.igdbId)
-            if (!existing) {
-                uniqueMap.set(game.igdbId, game)
-            } else {
-                // Keep the one with a rating or the more recent one
-                if (!existing.rating && game.rating) {
-                    uniqueMap.set(game.igdbId, game)
-                }
-            }
-        })
-        games = Array.from(uniqueMap.values())
 
         // ── FETCH COMMUNITY STATS FOR LIBRARY ──
         const allIds = games.map(g => g.igdbId).filter(Boolean)
@@ -279,50 +258,84 @@ router.post('/', protect, async (req, res) => {
         const session = await mongoose.startSession()
         session.startTransaction()
         try {
-            // 🛡️ Prevent Duplicates: Check if user already has this game
-            if (igdbId) {
-                const existing = await Game.findOne({ userId: req.user._id, igdbId })
-                if (existing) {
-                    return res.status(400).json({ 
-                        success: false, 
-                        message: 'This game is already in your Pond!' 
-                    })
-                }
+            // 🛡️ Prevent Duplicates: Use findOneAndUpdate with upsert for atomicity
+            const searchId = igdbId ? Number(igdbId) : null
+            let query = { userId: req.user._id }
+            
+            if (searchId) {
+                query.igdbId = searchId
+            } else {
+                query.title = { $regex: new RegExp(`^${title.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
             }
 
-            const newGame = new Game({
+            const existing = await Game.findOne(query).session(session)
+            const isNew = !existing
+
+            const updateData = {
                 userId: req.user._id,
-                title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId
-            })
-            const savedGame = await newGame.save({ session })
-            const statsUpdate = { loggedCount: 1 }
-            if (rating > 0) {
-                statsUpdate.ratingCount = 1
-                statsUpdate.ratingValue = Number(rating)
+                title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId: searchId
             }
-            await updateGlobalStats(igdbId, statsUpdate)
+
+            const savedGame = await Game.findOneAndUpdate(
+                query,
+                { $set: updateData },
+                { upsert: true, returnDocument: 'after', session }
+            )
+
+            const statsUpdate = { loggedCount: isNew ? 1 : 0 }
+            const oldRating = existing?.rating || 0
+            const ratingDelta = Number(rating) - oldRating
+            const countDelta = (isNew && rating > 0) ? 1 : (!isNew && oldRating === 0 && rating > 0) ? 1 : (!isNew && oldRating > 0 && rating === 0) ? -1 : 0
+
+            if (ratingDelta !== 0 || countDelta !== 0) {
+                statsUpdate.ratingCount = countDelta
+                statsUpdate.totalRatingSum = ratingDelta
+            }
+
+            if (searchId) {
+                await updateGlobalStats(searchId, statsUpdate, session)
+            }
+
             const userStatsUpdate = {
-                'gameStats.total': 1,
-                [`gameStats.${status}`]: 1,
-                'gameStats.totalHours': Number(hours) || 0
+                'gameStats.total': isNew ? 1 : 0,
+                'gameStats.totalHours': (Number(hours) || 0) - (existing?.hours || 0)
             }
-            if (rating > 0) {
-                userStatsUpdate['gameStats.ratingCount'] = 1
-                userStatsUpdate['gameStats.totalRatingSum'] = Number(rating)
+            if (isNew) {
+                userStatsUpdate[`gameStats.${status}`] = 1
+            } else if (existing.status !== status) {
+                userStatsUpdate[`gameStats.${existing.status}`] = -1
+                userStatsUpdate[`gameStats.${status}`] = 1
             }
-            await updateUserStats(req.user._id, userStatsUpdate)
-            let updatedUser = await awardXP(req.user._id, 1, session)
-            let xpGained = 1
-            if (rating > 0) {
+            
+            if (ratingDelta !== 0 || countDelta !== 0) {
+                userStatsUpdate['gameStats.ratingCount'] = countDelta
+                userStatsUpdate['gameStats.totalRatingSum'] = ratingDelta
+            }
+
+            await updateUserStats(req.user._id, userStatsUpdate, session)
+
+            let updatedUser = req.user
+            let xpGained = 0
+
+            if (isNew) {
                 updatedUser = await awardXP(req.user._id, 1, session)
                 xpGained += 1
-                await logEngagement(igdbId, 'game', 'rating', req.user._id)
             }
+
+            if (countDelta === 1) {
+                updatedUser = await awardXP(req.user._id, 1, session)
+                xpGained += 1
+                if (searchId) await logEngagement(searchId, 'game', 'rating', req.user._id, session)
+            } else if (countDelta === -1) {
+                updatedUser = await deductXP(req.user._id, 1, session)
+                xpGained -= 1
+            }
+
             await session.commitTransaction()
             session.endSession()
-            res.status(201).json({
+            res.status(isNew ? 201 : 200).json({
                 success: true,
-                message: 'Game added successfully',
+                message: isNew ? 'Game added successfully' : 'Game updated successfully',
                 game: savedGame,
                 xpGained,
                 xp: updatedUser.xp,
@@ -339,55 +352,7 @@ router.post('/', protect, async (req, res) => {
     }
 })
 
-router.post('/like', protect, async (req, res) => {
-    try {
-        const { externalId, title, cover, type, genre } = req.body
-        const existing = await GameLike.findOne({ userId: req.user._id, externalId: parseInt(externalId), type })
-        if (existing) {
-            const session = await mongoose.startSession()
-            session.startTransaction()
-            try {
-                await existing.deleteOne({ session })
-                await updateGlobalStats(externalId, { likeCount: -1 })
-                await deductXP(req.user._id, 1, session)
-                await logEngagement(externalId, type, 'like', req.user._id)
-                await session.commitTransaction()
-                session.endSession()
-                return res.json({ success: true, liked: false, message: 'Like removed · -1 XP' })
-            } catch (innerErr) {
-                await session.abortTransaction()
-                session.endSession()
-                throw innerErr
-            }
-        }
-        const session = await mongoose.startSession()
-        session.startTransaction()
-        try {
-            await GameLike.create([{ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre }], { session })
-            await updateGlobalStats(externalId, { likeCount: 1 })
-            await logEngagement(externalId, type, 'like', req.user._id)
-            const updatedUser = await awardXP(req.user._id, 1, session)
-            await session.commitTransaction()
-            session.endSession()
-            res.json({
-                success: true,
-                liked: true,
-                message: 'Liked · +1 XP',
-                xp: updatedUser?.xp,
-                level: updatedUser?.level,
-                badge: updatedUser?.badge
-            })
-            gameCache.delete(`game-home-${type}`)
-            gameCache.delete(`game-detail-${type}-${externalId}`)
-        } catch (innerErr) {
-            await session.abortTransaction()
-            session.endSession()
-            throw innerErr
-        }
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Like failed' })
-    }
-})
+
 
 router.put('/:id', protect, async (req, res) => {
     try {
@@ -401,7 +366,7 @@ router.put('/:id', protect, async (req, res) => {
         try {
             const game = await Game.findOneAndUpdate(
                 { _id: req.params.id, userId: req.user._id },
-                req.body,
+                { $set: req.body },
                 { returnDocument: 'after', session }
             )
             if (game.igdbId) {
@@ -410,8 +375,8 @@ router.put('/:id', protect, async (req, res) => {
                 if (ratingDelta !== 0 || countDelta !== 0) {
                     await updateGlobalStats(game.igdbId, {
                         ratingCount: countDelta,
-                        ratingValue: ratingDelta
-                    })
+                        totalRatingSum: ratingDelta
+                    }, session)
                 }
             }
             const userStatsUpdate = {}
@@ -433,7 +398,7 @@ router.put('/:id', protect, async (req, res) => {
                 userStatsUpdate['gameStats.totalRatingSum'] = ratingDelta
             }
             if (Object.keys(userStatsUpdate).length > 0) {
-                await updateUserStats(req.user._id, userStatsUpdate)
+                await updateUserStats(req.user._id, userStatsUpdate, session)
             }
             let updatedUser = null
             if (!hadRatingBefore && hasRatingNow) {
@@ -474,8 +439,8 @@ router.delete('/:id', protect, async (req, res) => {
                 await updateGlobalStats(game.igdbId, {
                     loggedCount: -1,
                     ratingCount: game.rating > 0 ? -1 : 0,
-                    ratingValue: game.rating > 0 ? -game.rating : 0
-                })
+                    totalRatingSum: game.rating > 0 ? -game.rating : 0
+                }, session)
             }
             const userStatsDelete = {
                 'gameStats.total': -1,
@@ -486,7 +451,7 @@ router.delete('/:id', protect, async (req, res) => {
                 userStatsDelete['gameStats.ratingCount'] = -1
                 userStatsDelete['gameStats.totalRatingSum'] = -game.rating
             }
-            await updateUserStats(req.user._id, userStatsDelete)
+            await updateUserStats(req.user._id, userStatsDelete, session)
             const updatedUser = await deductXP(req.user._id, xpToDeduct, session)
             await session.commitTransaction()
             session.endSession()

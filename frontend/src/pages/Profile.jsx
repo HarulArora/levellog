@@ -111,8 +111,8 @@ function Profile() {
         if (isOwnProfile || user?.isLikesPublic) {
             result.push({
                 _id: 'liked',
-                name: 'Liked Items',
-                description: `Items ${user?.username} has liked`,
+                name: `Liked ${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)}`,
+                description: `${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)} ${user?.username} has liked`,
                 isPublic: user?.isLikesPublic,
                 games: likes,
                 gameCount: likes.length,
@@ -127,8 +127,8 @@ function Profile() {
         if (isOwnProfile || user?.isWishlistPublic) {
             result.push({
                 _id: 'wishlist',
-                name: 'Wishlist',
-                description: `Items ${user?.username} wants to play/watch`,
+                name: profileMediaType === 'game' ? 'Wishlist' : `${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)} Wishlist`,
+                description: `${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)} ${user?.username} wants to play/watch`,
                 isPublic: user?.isWishlistPublic,
                 games: wishlist,
                 gameCount: wishlist.length,

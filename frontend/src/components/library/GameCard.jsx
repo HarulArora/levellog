@@ -77,6 +77,14 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                     </div>
                 )}
 
+                {/* Rating Badge */}
+                {game.rating > 0 && (
+                    <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center z-10">
+                        <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
+                        <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.rating}</span>
+                    </div>
+                )}
+
 
                 {/* "View Details" overlay — only if igdbId exists */}
                 {game.igdbId && (
@@ -125,17 +133,6 @@ const GameCard = memo(({ game, onDelete, onEdit }) => {
                             </span>
                         )}
                     </div>
-
-                    {game.rating > 0 ? (
-                        <span
-                            className="font-black text-2xl text-[#c8ff57] leading-none tracking-wide"
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                        >
-                            {game.rating}
-                        </span>
-                    ) : (
-                        <span className="text-[#7a7a90] font-mono text-xs">—</span>
-                    )}
                 </div>
 
                 {/* ── Edit + Delete Buttons ── */}

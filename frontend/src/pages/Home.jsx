@@ -343,14 +343,14 @@ const TrendingGameCard = memo(({ game, stats, myRating, showFullDate }) => {
                 
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                     {avgRating > 0 && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
                             <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
                             <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{avgRating}</span>
                         </div>
                     )}
                     {myRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-bold">ME</span>
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
+                            <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
                             <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{myRating}</span>
                         </div>
                     )}
@@ -544,7 +544,7 @@ function Home() {
                                 className="font-black uppercase leading-none tracking-wide text-white mb-6"
                                 style={{ fontSize: 'clamp(3rem, 8vw, 6rem)', fontFamily: 'Bebas Neue, sans-serif' }}
                             >
-                                Your Quest<br />
+                                Your Game<br />
                                 <span className="text-[#c8ff57]">Pond.</span>
                             </h2>
 
@@ -559,7 +559,7 @@ function Home() {
                                     <>
                                         <button onClick={() => setShowAddModal(true)}
                                             className="btn-apple btn-apple-primary px-6 py-3 gap-1.5">
-                                            <Plus size={16} strokeWidth={2.5} /> Add to Pond
+                                            <Plus size={16} strokeWidth={2.5} /> Log Game
                                         </button>
                                         <button onClick={() => navigate('/library')}
                                             className="btn-apple btn-apple-secondary px-6 py-3 gap-1.5">
@@ -585,7 +585,7 @@ function Home() {
                             {user && games.length > 0 ? (
                                 <div className="flex gap-8">
                                     {[
-                                        { value: userStats.total, label: 'In the Pond' },
+                                        { value: userStats.total, label: 'Games' },
                                         { value: userStats.totalHours, label: 'Hours Played' },
                                         { value: userStats.avgRating, label: 'Avg Rating' }
                                     ].map(stat => (

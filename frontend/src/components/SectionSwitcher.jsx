@@ -100,7 +100,7 @@ const SectionSwitcher = () => {
     };
 
     return (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-4 w-full max-w-fit pointer-events-none">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 px-4 w-full max-w-fit pointer-events-none">
             <motion.div 
                 layout
                 initial={{ y: 100, opacity: 0 }}

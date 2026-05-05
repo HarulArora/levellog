@@ -40,16 +40,16 @@ const MangaCard = memo(({ item }) => {
                 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d14] via-transparent to-transparent opacity-60" />
                 
-                <div className="absolute top-2 right-2 flex flex-col gap-1.5 items-end z-10">
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
                     {Number(item.avgRating) > 0 && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
                             <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
                             <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
                         </div>
                     )}
                     {Number(item.myRating) > 0 && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
-                            <span className="font-mono text-[8px] text-[#c8ff57] uppercase font-bold">ME</span>
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
+                            <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
                             <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.myRating}</span>
                         </div>
                     )}
@@ -465,7 +465,7 @@ function MangaHome() {
                             {user && userAnime.length > 0 ? (
                                 <div className="flex gap-8">
                                     {[
-                                        { value: userStats.total, label: 'Items' },
+                                        { value: userStats.total, label: 'Manga' },
                                         { value: userStats.progress, label: 'Chapters' },
                                         { value: userStats.avgRating, label: 'Avg Rating' }
                                     ].map(stat => (

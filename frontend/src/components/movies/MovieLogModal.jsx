@@ -65,7 +65,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
 
     return (
         <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -102,21 +102,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                         </div>
                     )}
 
-                    {/* Manual title */}
-                    {!preselectedItem && !existingEntry && !itemSelected && (
-                        <div>
-                            <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
-                                Or enter title manually
-                            </label>
-                            <input
-                                type="text"
-                                placeholder={`e.g. ${movieSubSection === 'tv' ? 'Breaking Bad' : 'Inception'}`}
-                                value={formData.title}
-                                onChange={e => handleChange('title', e.target.value)}
-                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors"
-                            />
-                        </div>
-                    )}
+
 
                     {/* Status */}
                     <div>

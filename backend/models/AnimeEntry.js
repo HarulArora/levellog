@@ -90,7 +90,7 @@ const animeEntrySchema = new mongoose.Schema(
 
 // Indexes for performance
 animeEntrySchema.index({ userId: 1, type: 1, status: 1 });
-animeEntrySchema.index({ userId: 1, externalId: 1 });
+animeEntrySchema.index({ userId: 1, externalId: 1, type: 1 }, { unique: true });
 animeEntrySchema.index({ userId: 1, createdAt: -1 });
 animeEntrySchema.index({ externalId: 1, type: 1 });
 

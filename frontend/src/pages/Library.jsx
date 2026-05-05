@@ -79,8 +79,10 @@ function Library() {
     }, [])
 
     const counts = useMemo(() => {
-        const c = { all: games.length }
-        games.forEach(g => { c[g.status] = (c[g.status] || 0) + 1 })
+        const c = { all: games.length, playing: 0, completed: 0, planned: 0, paused: 0, dropped: 0 }
+        games.forEach(g => { 
+            if (c[g.status] !== undefined) c[g.status]++ 
+        })
         return c
     }, [games])
 
@@ -201,9 +203,8 @@ function Library() {
                         <FilterBar activeFilter={activeFilter} onFilter={handleFilter} counts={counts} />
                     </div>
                     
-                    <div className="flex flex-col sm:flex-row items-center gap-4 border-l border-[#2a2a35] pl-6 ml-2 hidden lg:flex">
-                        <div className="relative w-full sm:w-72 group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors" size={18} />
+                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto lg:border-l lg:border-[#2a2a35] lg:pl-6 lg:ml-2">
+                        <div className="relative w-full sm:flex-1 lg:w-72 group">
                             <input 
                                 type="text" 
                                 placeholder="Search your vault..."
@@ -211,9 +212,10 @@ function Library() {
                                 onChange={e => handleSearch(e.target.value)}
                                 className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-12 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
                             />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#c8ff57] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
                         </div>
 
-                        <div className="flex bg-[#0d0d14] rounded-2xl border border-[#2a2a35] p-1.5 shadow-inner">
+                        <div className="flex bg-[#0d0d14] rounded-2xl border border-[#2a2a35] p-1.5 shadow-inner shrink-0">
                             <button 
                                 onClick={() => handleViewModeChange('grid')}
                                 className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-[#c8ff57] text-black shadow-lg' : 'text-[#7a7a90] hover:text-white hover:bg-[#1a1a25]'}`}

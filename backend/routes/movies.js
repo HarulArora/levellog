@@ -362,78 +362,7 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
     }
 });
 
-// ── LIKE / WISHLIST ──
-router.post('/like', protect, async (req, res) => {
-    try {
-        const { externalId, title, cover, type, genre } = req.body;
-        
-        const result = await withRetryTransaction(async (session) => {
-            const existing = await MovieLike.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
-            
-            if (existing) {
-                await existing.deleteOne({ session });
-                await updateMediaStats(externalId, type, { likeCount: -1 }, session);
-                const updatedUser = await deductXP(req.user._id, 1, session);
-                
-                return { 
-                    liked: false, 
-                    message: 'Like removed · -1 XP',
-                    xp: updatedUser?.xp,
-                    level: updatedUser?.level,
-                    badge: updatedUser?.badge
-                };
-            }
-            
-            await MovieLike.create([{ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre }], { session });
-            await updateMediaStats(externalId, type, { likeCount: 1 }, session);
-            await logEngagement(externalId, type, 'like', req.user._id, session);
-            
-            const updatedUser = await awardXP(req.user._id, 1, session);
-            return { 
-                liked: true, 
-                message: 'Liked · +1 XP',
-                xp: updatedUser?.xp,
-                level: updatedUser?.level,
-                badge: updatedUser?.badge
-            };
-        });
 
-        res.json({ success: true, ...result });
-        
-        movieCache.clear();
-    } catch (error) {
-        console.error('Movie Like Error:', error);
-        res.status(500).json({ success: false, message: 'Like failed' });
-    }
-});
-
-router.post('/wishlist', protect, async (req, res) => {
-    try {
-        const { externalId, title, cover, type, genre } = req.body;
-        
-        const result = await withRetryTransaction(async (session) => {
-            const existing = await MovieWishlist.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
-            
-            if (existing) {
-                await existing.deleteOne({ session });
-                await updateMediaStats(externalId, type, { wishlistCount: -1 }, session);
-                return { wishlisted: false };
-            }
-            
-            await MovieWishlist.create([{ userId: req.user._id, externalId: parseInt(externalId), type, title, cover, genre }], { session });
-            await updateMediaStats(externalId, type, { wishlistCount: 1 }, session);
-            await logEngagement(externalId, type, 'wishlist', req.user._id, session);
-            
-            return { wishlisted: true };
-        });
-
-        res.json({ success: true, ...result });
-        movieCache.clear();
-    } catch (error) {
-        console.error('Movie Wishlist Error:', error);
-        res.status(500).json({ success: false, message: 'Wishlist failed' });
-    }
-});
 
 // ── ACTIVITY ──
 router.get('/activity/:userId', protect, async (req, res) => {

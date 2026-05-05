@@ -129,10 +129,13 @@ export function GamesProvider({ children }) {
         
         // Check if updating existing instead of adding new
         const existing = games.find(g => {
-            const searchId = Number(gameData.igdbId)
-            const entryId = Number(g.igdbId)
+            const searchId = gameData.igdbId ? Number(gameData.igdbId) : null
+            const entryId = g.igdbId ? Number(g.igdbId) : null
+            
+            // Match by ID if both exist
             if (searchId && entryId) return searchId === entryId
-            if (searchId || entryId) return false
+            
+            // Fallback to title check
             return g.title?.toLowerCase() === gameData.title?.toLowerCase()
         })
 

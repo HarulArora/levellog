@@ -82,10 +82,13 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
     const handleGameSelect = (game) => {
         // Check if this game is already in the user's library
         const alreadyLogged = games.find(g => {
-            const searchId = Number(game.igdbId)
-            const entryId = Number(g.igdbId)
+            const searchId = game.igdbId ? Number(game.igdbId) : null
+            const entryId = g.igdbId ? Number(g.igdbId) : null
+            
+            // Match by ID if both exist
             if (searchId && entryId) return searchId === entryId
-            if (searchId || entryId) return false
+            
+            // Fallback to title check
             return g.title?.toLowerCase() === game.title?.toLowerCase()
         })
 
@@ -130,7 +133,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
 
         <div
 
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100]
 
                        flex items-center justify-center p-4"
 
@@ -257,47 +260,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
                     )}
 
 
-                    {/* Manual title — only when opened standalone and no game selected yet */}
 
-                    {!preselectedGame && !existingEntry && !gameSelected && (
-
-                        <div>
-
-                            <label className="block font-mono text-xs uppercase tracking-wider
-
-                                              text-[#7a7a90] mb-2">
-
-                                Or enter title manually
-
-                            </label>
-
-                            <input
-
-                                id="manual-game-title"
-
-                                name="manual-game-title"
-
-                                type="text"
-
-                                placeholder="e.g. Elden Ring"
-
-                                value={formData.title}
-
-                                onChange={e => handleChange('title', e.target.value)}
-
-                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded
-
-                                           px-3 py-2 text-sm text-white
-
-                                           focus:outline-none focus:border-[#c8ff57]
-
-                                           placeholder:text-[#7a7a90] transition-colors"
-
-                            />
-
-                        </div>
-
-                    )}
 
 
                     {/* Status */}

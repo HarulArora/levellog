@@ -39,9 +39,15 @@ const AnimeCard = memo(({ item, section }) => {
                 
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                     {item.avgRating && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl">
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
                             <Star size={10} className="text-[#5c9fff] fill-[#5c9fff]" />
                             <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
+                        </div>
+                    )}
+                    {item.myRating && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
+                            <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
+                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.myRating}</span>
                         </div>
                     )}
                 </div>
@@ -345,6 +351,12 @@ function AnimeHome() {
         }
     }, [userAnime])
 
+    const getMyRating = useCallback((externalId) => {
+        if (!user) return null
+        const match = userAnime.find(a => String(a.externalId) === String(externalId))
+        return match?.rating > 0 ? match.rating : null
+    }, [user, userAnime])
+
     const userRank = useMemo(() => {
         if (!user) return null
         return topUsers.find(tu => tu._id === (user.id || user._id))?.rank
@@ -437,7 +449,7 @@ function AnimeHome() {
                             {user && userAnime.length > 0 ? (
                                 <div className="flex gap-8">
                                     {[
-                                        { value: userStats.total, label: 'Items' },
+                                        { value: userStats.total, label: 'Anime' },
                                         { value: userStats.progress, label: 'Episodes' },
                                         { value: userStats.avgRating, label: 'Avg Rating' }
                                     ].map(stat => (
@@ -579,7 +591,11 @@ function AnimeHome() {
                                         {(section.items || []).slice(0, 15).map((item, idx) => (
                                             <AnimeCard 
                                                 key={`${section.title}-${item.externalId}-${idx}`} 
-                                                item={{ ...item, avgRating: homeData?.stats?.[item.externalId]?.avgRating }} 
+                                                item={{ 
+                                                    ...item, 
+                                                    avgRating: homeData?.stats?.[item.externalId]?.avgRating,
+                                                    myRating: getMyRating(item.externalId)
+                                                }} 
                                                 section="anime"
                                             />
                                         ))}

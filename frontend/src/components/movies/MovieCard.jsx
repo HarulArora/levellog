@@ -71,13 +71,13 @@ const MovieCard = memo(({ movie, onDelete, onEdit, showAvgRating = true }) => {
                 {/* Rating Badges */}
                 <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
                     {showAvgRating && movie.avgRating > 0 && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl min-w-[45px] justify-center">
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
                             <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
                             <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{movie.avgRating}</span>
                         </div>
                     )}
                     {movie.rating > 0 && (
-                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl min-w-[45px] justify-center">
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center">
                             <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
                             <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{movie.rating}</span>
                         </div>
