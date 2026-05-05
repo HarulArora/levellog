@@ -15,6 +15,16 @@ const userSchema = new mongoose.Schema(
         isLikesPublic: { type: Boolean, default: true },
         isWishlistPublic: { type: Boolean, default: true },
 
+        // Media Specific Privacy
+        isAnimeLikesPublic: { type: Boolean, default: true },
+        isAnimeWishlistPublic: { type: Boolean, default: true },
+        isMangaLikesPublic: { type: Boolean, default: true },
+        isMangaWishlistPublic: { type: Boolean, default: true },
+        isMovieLikesPublic: { type: Boolean, default: true },
+        isMovieWishlistPublic: { type: Boolean, default: true },
+        isTVLikesPublic: { type: Boolean, default: true },
+        isTVWishlistPublic: { type: Boolean, default: true },
+
         // ── Cached counters (replaces arrays) ──────────────────────
         followerCount: { type: Number, default: 0 },
         followingCount: { type: Number, default: 0 },

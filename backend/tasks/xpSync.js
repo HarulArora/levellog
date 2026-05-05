@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import Game from '../models/Game.js';
 import MovieEntry from '../models/MovieEntry.js';
 import AnimeEntry from '../models/AnimeEntry.js';
+import MovieComment from '../models/MovieComment.js';
 import GameLike from '../models/GameLike.js';
 import MovieLike from '../models/MovieLike.js';
 import AnimeLike from '../models/AnimeLike.js';
@@ -27,7 +28,7 @@ export const syncAllUsersXP = async () => {
             const [
                 games, movies, anime,
                 gameLikes, movieLikes, animeLikes,
-                gameComments, mediaComments,
+                gameComments, animeComments, movieComments,
                 following, followers
             ] = await Promise.all([
                 Game.find({ userId: user._id }),
@@ -38,6 +39,7 @@ export const syncAllUsersXP = async () => {
                 AnimeLike.find({ userId: user._id }),
                 Comment.find({ userId: user._id }),
                 AnimeComment.find({ userId: user._id }),
+                MovieComment.find({ userId: user._id }),
                 Follow.find({ followerId: user._id }),
                 Follow.find({ followingId: user._id })
             ]);
@@ -56,7 +58,7 @@ export const syncAllUsersXP = async () => {
             expectedXP += gameLikes.length + movieLikes.length + animeLikes.length;
 
             // 4. Comment (+1 XP)
-            expectedXP += gameComments.length + mediaComments.length;
+            expectedXP += gameComments.length + animeComments.length + movieComments.length;
 
             // 5. Follow Someone (+1 XP)
             expectedXP += following.length;
@@ -91,10 +93,10 @@ export const syncAllUsersXP = async () => {
  * Runs every Sunday at midnight (0 0 * * 0)
  */
 export const initXPCron = () => {
-    // 0 0 * * 0 -> Sunday at midnight
-    cron.schedule('0 0 * * 0', () => {
+    // 0 0 * * * -> Every day at midnight
+    cron.schedule('0 0 * * *', () => {
         syncAllUsersXP();
     });
     
-    logger.info('[XP Sync] Scheduled weekly audit task.');
+    logger.info('[XP Sync] Scheduled daily audit task.');
 };

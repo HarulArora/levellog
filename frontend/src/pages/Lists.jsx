@@ -169,7 +169,7 @@ function EmptyState({ icon, title, text }) {
 
 function Toggle({ enabled, onToggle, label, sublabel, color = '#c8ff57' }) {
     return (
-        <div className="flex items-center justify-between p-4 bg-[#111118]/50 border border-[#2a2a35] rounded-2xl hover:border-[#3a3a4a] transition-all">
+        <div className="flex items-center justify-between px-5 py-3.5 bg-[#0d0d14] border border-[#2a2a35] rounded-xl hover:border-[#3a3a4a] transition-all h-[64px]">
             <div>
                 <div className="text-white font-bold text-[10px] uppercase tracking-[0.1em]">{label}</div>
                 {sublabel && <div className="text-[#4a4a5e] text-[9px] font-mono uppercase mt-0.5">{sublabel}</div>}
@@ -186,7 +186,7 @@ function Toggle({ enabled, onToggle, label, sublabel, color = '#c8ff57' }) {
 }
 
 // ── ListDetail ────────────────────────────────────────────────────────────────
-function ListDetail({ list, onBack, onUpdate, showToast, mediaType }) {
+function ListDetail({ list, onBack, onUpdate, onDelete, showToast, mediaType }) {
     const navigate = useNavigate()
     const [editMode, setEditMode] = useState(false)
     const [editForm, setEditForm] = useState({ name: list.name, description: list.description || '', isPublic: list.isPublic })
@@ -290,7 +290,7 @@ function ListDetail({ list, onBack, onUpdate, showToast, mediaType }) {
             </button>
 
             <div className="bg-[#111118] border border-[#2a2a35] rounded-2xl p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-05 pointer-events-none">
+                <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
                     <Layers size={120} />
                 </div>
                 {editMode ? (
@@ -299,7 +299,7 @@ function ListDetail({ list, onBack, onUpdate, showToast, mediaType }) {
                             <div>
                                 <label className="block font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest mb-2">Collection Name</label>
                                 <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
-                                    className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#c8ff57]" />
+                                    className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl px-5 py-3 text-white focus:outline-none focus:border-[#c8ff57] h-[64px]" />
                             </div>
                             <div>
                                 <label className="block font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest mb-2">Visibility</label>
@@ -314,13 +314,14 @@ function ListDetail({ list, onBack, onUpdate, showToast, mediaType }) {
                         <div>
                             <label className="block font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest mb-2">Description</label>
                             <textarea value={editForm.description} rows={3} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
-                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#c8ff57] resize-none" />
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl px-5 py-4 text-white focus:outline-none focus:border-[#c8ff57] resize-none" />
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
                             <button onClick={handleSaveEdit} disabled={saving} className="flex-1 bg-[#c8ff57] text-black font-black uppercase text-xs tracking-widest py-4 rounded-xl hover:bg-[#d4ff6e] transition-all">
                                 {saving ? 'Saving...' : 'Save Changes'}
                             </button>
                             <button onClick={() => setEditMode(false)} className="px-8 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest rounded-xl hover:text-white transition-all">Cancel</button>
+                            <button onClick={onDelete} className="px-8 border border-[#ff5c5c]/20 bg-[#ff5c5c]/05 text-[#ff5c5c] font-mono text-[10px] uppercase tracking-widest rounded-xl hover:bg-[#ff5c5c] hover:text-white transition-all">Delete</button>
                         </div>
                     </div>
                 ) : (
@@ -339,7 +340,7 @@ function ListDetail({ list, onBack, onUpdate, showToast, mediaType }) {
                                 <span className="font-mono text-[10px] text-[#4a4a5e] uppercase tracking-widest">Created {new Date(currentList.createdAt).toLocaleDateString()}</span>
                             </div>
                         </div>
-                        <button onClick={() => setEditMode(true)} className="px-6 py-3 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest rounded-xl hover:border-[#c8ff57] hover:text-white transition-all">Edit Details</button>
+                        <button onClick={() => setEditMode(true)} className="px-6 py-3 bg-white/5 border border-white/10 text-white font-mono text-[10px] uppercase tracking-widest rounded-xl hover:bg-[#c8ff57] hover:text-black hover:border-[#c8ff57] transition-all shadow-xl backdrop-blur-sm">Edit Details</button>
                     </div>
                 )}
             </div>
@@ -450,6 +451,10 @@ function Lists() {
     const isWatchlist = mediaType === 'anime' || mediaType === 'movie' || mediaType === 'tv'
     const wishlistLabel = isWatchlist ? 'Watchlist' : 'Wishlist'
 
+    const prefix = mediaType === 'game' ? '' : (mediaType === 'tv' ? 'TV' : mediaType.charAt(0).toUpperCase() + mediaType.slice(1))
+    const likesField = prefix ? `is${prefix}LikesPublic` : 'isLikesPublic'
+    const wishField = prefix ? `is${prefix}WishlistPublic` : 'isWishlistPublic'
+
     const handleCreateList = async () => {
         if (!createForm.name.trim()) return
         setCreating(true)
@@ -471,6 +476,7 @@ function Lists() {
         try {
             await api.delete(`/lists/custom/${id}`)
             showToast('Collection deleted')
+            setSelectedListId(null)
             fetchData()
         } catch { showToast('Failed to delete', 'error') }
     }
@@ -497,12 +503,14 @@ function Lists() {
 
     const handleToggleGlobalPrivacy = async (field, value) => {
         try {
-            await api.patch('/auth/privacy-settings', { [field]: value })
-            setListBundle(prev => ({
-                ...prev,
-                user: { ...prev.user, [field]: value }
-            }))
-            showToast('Privacy updated!')
+            const res = await api.patch('/auth/privacy-settings', { [field]: value, mediaType })
+            if (res.data.success) {
+                setListBundle(prev => ({
+                    ...prev,
+                    user: res.data.user
+                }))
+                showToast('Privacy updated!')
+            }
         } catch {
             showToast('Failed to update privacy', 'error')
         }
@@ -628,7 +636,14 @@ function Lists() {
 
             {/* Content Area */}
             {selectedList ? (
-                <ListDetail list={selectedList} mediaType={mediaType} onBack={() => setSelectedListId(null)} onUpdate={fetchData} showToast={showToast} />
+                <ListDetail 
+                    list={selectedList} 
+                    mediaType={mediaType} 
+                    onBack={() => setSelectedListId(null)} 
+                    onUpdate={fetchData} 
+                    onDelete={() => handleDeleteList(selectedList._id)}
+                    showToast={showToast} 
+                />
             ) : (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {activeTab === 'lists' && (
@@ -673,8 +688,8 @@ function Lists() {
                                     </div>
                                 </div>
                                 <Toggle 
-                                    enabled={listBundle?.user?.isLikesPublic}
-                                    onToggle={() => handleToggleGlobalPrivacy('isLikesPublic', !listBundle?.user?.isLikesPublic)}
+                                    enabled={listBundle?.user?.[likesField]}
+                                    onToggle={() => handleToggleGlobalPrivacy('isLikesPublic', !listBundle?.user?.[likesField])}
                                     label="Public Likes"
                                     sublabel="Show on profile"
                                     color="#ff5c5c"
@@ -683,7 +698,7 @@ function Lists() {
 
                             <div className="flex flex-col gap-3">
                                     <div onClick={() => handleTabChange('wishlist')} className="h-56 bg-[#111118] border border-[#2a2a35] rounded-3xl p-8 relative overflow-hidden cursor-pointer group hover:border-[#5c9fff]/40 transition-all shadow-lg flex-1">
-                                        <div className="absolute -right-4 -bottom-4 text-[#5c9fff] opacity-05 group-hover:scale-110 transition-transform duration-500"><Target size={160} /></div>
+                                        <div className="absolute -right-4 -bottom-4 text-[#5c9fff] opacity-5 group-hover:scale-110 transition-transform duration-500"><Target size={160} /></div>
                                         <div className="relative z-10 flex flex-col h-full">
                                             <h3 className="font-black text-2xl text-white uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{wishlistLabel}</h3>
                                             <p className="text-[#4a4a5e] text-xs font-mono uppercase tracking-widest mb-auto">Tracking what's next 🎯</p>
@@ -694,8 +709,8 @@ function Lists() {
                                         </div>
                                     </div>
                                     <Toggle 
-                                        enabled={listBundle?.user?.isWishlistPublic}
-                                        onToggle={() => handleToggleGlobalPrivacy('isWishlistPublic', !listBundle?.user?.isWishlistPublic)}
+                                        enabled={listBundle?.user?.[wishField]}
+                                        onToggle={() => handleToggleGlobalPrivacy('isWishlistPublic', !listBundle?.user?.[wishField])}
                                         label={`Public ${wishlistLabel}`}
                                         sublabel="Show on profile"
                                         color="#5c9fff"
@@ -705,7 +720,7 @@ function Lists() {
                             {customLists.map(list => (
                                 <div key={list._id} onClick={() => setSelectedListId(list._id)}
                                     className="h-56 bg-[#111118] border border-[#2a2a35] rounded-3xl p-8 relative overflow-hidden cursor-pointer group hover:border-[#c8ff57] transition-all shadow-lg">
-                                    <div className="absolute -right-4 -bottom-4 text-[#c8ff57] opacity-05 group-hover:scale-110 transition-transform duration-500"><Layers size={160} /></div>
+                                    <div className="absolute -right-4 -bottom-4 text-[#c8ff57] opacity-5 group-hover:scale-110 transition-transform duration-500"><Layers size={160} /></div>
                                     <div className="relative z-10 flex flex-col h-full">
                                         <div className="flex items-center justify-between mb-2">
                                             <h3 className="font-black text-2xl text-white uppercase truncate group-hover:text-[#c8ff57] transition-colors" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{list.name}</h3>
@@ -719,12 +734,9 @@ function Lists() {
                                             </div>
                                         </div>
                                         <p className="text-[#4a4a5e] text-[11px] line-clamp-2 mb-auto leading-relaxed">{list.description || 'Custom collection.'}</p>
-                                        <div className="flex items-center justify-between mt-4">
-                                            <span className="font-mono text-[10px] text-[#4a4a5e] uppercase tracking-widest">{list.games?.length || 0} items</span>
-                                            <div className="flex items-center gap-4">
-                                                <button onClick={e => { e.stopPropagation(); handleDeleteList(list._id) }} className="p-2 text-[#4a4a5e] hover:text-[#ff5c5c] transition-colors"><X size={16} /></button>
-                                                <span className="text-[#c8ff57] opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 font-bold">OPEN →</span>
-                                            </div>
+                                        <div className="flex items-center justify-end mt-4">
+                                            <span className="font-mono text-[10px] text-[#4a4a5e] uppercase tracking-widest mr-auto">{list.games?.length || 0} items</span>
+                                            <span className="text-[#c8ff57] opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 font-bold">OPEN →</span>
                                         </div>
                                     </div>
                                 </div>

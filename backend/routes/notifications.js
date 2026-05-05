@@ -79,28 +79,30 @@ router.get('/requests', protect, async (req, res) => {
 // ── POST /api/notifications/requests/:id/accept ───────────────────────────────
 router.post('/requests/:id/accept', protect, async (req, res) => {
     try {
-        const request = await FollowRequest.findById(req.params.id)
-        if (!request) return res.status(404).json({ success: false, message: 'Request not found' })
+        const result = await withRetryTransaction(async (session) => {
+            const request = await FollowRequest.findById(req.params.id).session(session)
+            if (!request) throw new Error('Request not found')
 
-        // create Follow doc + delete the request
-        await Promise.all([
-            Follow.create({ followerId: request.sender, followingId: req.user._id }),
-            FollowRequest.findByIdAndDelete(request._id),
-            User.findByIdAndUpdate(req.user._id, { $inc: { followerCount: 1 } }),
-            User.findByIdAndUpdate(request.sender, { $inc: { followingCount: 1 } }),
-            awardXP(request.sender, 1),
-            awardXP(req.user._id, 1),
-            Notification.create({ recipient: request.sender, sender: req.user._id, type: 'request_accepted' }),
-        ])
+            // create Follow doc + update counts + award XP
+            await Follow.create([{ followerId: request.sender, followingId: req.user._id }], { session })
+            await FollowRequest.findByIdAndDelete(request._id, { session })
+            await User.findByIdAndUpdate(req.user._id, { $inc: { followerCount: 1 } }, { session })
+            await User.findByIdAndUpdate(request.sender, { $inc: { followingCount: 1 } }, { session })
+            await awardXP(request.sender, 1, session)
+            await awardXP(req.user._id, 1, session)
+            await Notification.create([{ recipient: request.sender, sender: req.user._id, type: 'request_accepted' }], { session })
+            
+            return { message: 'Request accepted' }
+        })
 
-        res.json({ success: true, message: 'Request accepted' })
+        res.json({ success: true, ...result })
     } catch (error) {
         if (error.code === 11000) {
             // Follow already exists — clean up the request anyway
             await FollowRequest.findByIdAndDelete(req.params.id)
             return res.json({ success: true, message: 'Already following' })
         }
-        res.status(500).json({ success: false, message: error.message })
+        res.status(error.message === 'Request not found' ? 404 : 500).json({ success: false, message: error.message })
     }
 })
 
@@ -123,29 +125,29 @@ router.post('/follow', protect, async (req, res) => {
         const targetUser = await User.findById(targetUserId)
         if (!targetUser) return res.status(404).json({ success: false, message: 'User not found' })
 
-        const alreadyFollowing = await Follow.findOne({ followerId: req.user._id, followingId: targetUserId })
+        const result = await withRetryTransaction(async (session) => {
+            const alreadyFollowing = await Follow.findOne({ followerId: req.user._id, followingId: targetUserId }).session(session)
 
-        if (alreadyFollowing) {
-            await Promise.all([
-                Follow.findByIdAndDelete(alreadyFollowing._id),
-                User.findByIdAndUpdate(targetUserId, { $inc: { followerCount: -1 } }),
-                User.findByIdAndUpdate(req.user._id, { $inc: { followingCount: -1 } }),
-                deductXP(req.user._id, 1),
-                deductXP(targetUserId, 1),
-            ])
-            return res.json({ success: true, following: false, message: 'Unfollowed · -1 XP' })
-        }
+            if (alreadyFollowing) {
+                await Follow.findByIdAndDelete(alreadyFollowing._id, { session })
+                await User.findByIdAndUpdate(targetUserId, { $inc: { followerCount: -1 } }, { session })
+                await User.findByIdAndUpdate(req.user._id, { $inc: { followingCount: -1 } }, { session })
+                await deductXP(req.user._id, 1, session)
+                await deductXP(targetUserId, 1, session)
+                return { following: false, message: 'Unfollowed · -1 XP' }
+            }
 
-        await Promise.all([
-            Follow.create({ followerId: req.user._id, followingId: targetUserId }),
-            User.findByIdAndUpdate(targetUserId, { $inc: { followerCount: 1 } }),
-            User.findByIdAndUpdate(req.user._id, { $inc: { followingCount: 1 } }),
-            awardXP(req.user._id, 1),
-            awardXP(targetUserId, 1),
-            Notification.create({ recipient: targetUserId, sender: req.user._id, type: 'follow' }),
-        ])
+            await Follow.create([{ followerId: req.user._id, followingId: targetUserId }], { session })
+            await User.findByIdAndUpdate(targetUserId, { $inc: { followerCount: 1 } }, { session })
+            await User.findByIdAndUpdate(req.user._id, { $inc: { followingCount: 1 } }, { session })
+            await awardXP(req.user._id, 1, session)
+            await awardXP(targetUserId, 1, session)
+            await Notification.create([{ recipient: targetUserId, sender: req.user._id, type: 'follow' }], { session })
+            
+            return { following: true, message: 'Following · +1 XP' }
+        })
 
-        res.json({ success: true, following: true, message: 'Following · +1 XP' })
+        res.json({ success: true, ...result })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }

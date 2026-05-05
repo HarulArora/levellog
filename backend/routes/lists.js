@@ -46,7 +46,7 @@ router.get('/me', protect, async (req, res) => {
             GameList.find(listQuery).sort({ createdAt: -1 }).lean(),
             Like.countDocuments({ userId: req.user._id, ...(mediaType !== 'game' ? { type: mediaType } : {}) }),
             WishlistModel.countDocuments({ userId: req.user._id, ...(mediaType !== 'game' ? { type: mediaType } : {}) }),
-            User.findById(req.user._id).select('xp level badge username avatar isLikesPublic isWishlistPublic').lean(),
+            User.findById(req.user._id).select('xp level badge username avatar isLikesPublic isWishlistPublic isAnimeLikesPublic isAnimeWishlistPublic isMangaLikesPublic isMangaWishlistPublic isMovieLikesPublic isMovieWishlistPublic isTVLikesPublic isTVWishlistPublic').lean(),
         ])
 
         // Get preview entries for custom lists
@@ -143,7 +143,9 @@ router.get('/user/:userId', protectOptional, async (req, res) => {
 router.get('/user/:userId/likes', protectOptional, async (req, res) => {
     try {
         const { mediaType = 'game' } = req.query
-        const targetUser = await User.findById(req.params.userId).select('isPrivate isLikesPublic').lean()
+        const prefix = mediaType === 'game' ? '' : (mediaType === 'tv' ? 'TV' : mediaType.charAt(0).toUpperCase() + mediaType.slice(1))
+        const privacyField = prefix ? `is${prefix}LikesPublic` : 'isLikesPublic'
+        const targetUser = await User.findById(req.params.userId).select(`isPrivate ${privacyField}`).lean()
         if (!targetUser) return res.status(404).json({ success: false, message: 'User not found' })
 
         // 🛡️ Privacy Wall
@@ -161,7 +163,7 @@ router.get('/user/:userId/likes', protectOptional, async (req, res) => {
             return res.json({ success: true, likes: [], isRestricted: true })
         }
 
-        if (!targetUser.isLikesPublic && !isAuthorized) {
+        if (!targetUser[privacyField] && !isAuthorized) {
             return res.json({ success: true, likes: [], isRestricted: true, message: 'This collection is private' })
         }
 
@@ -199,7 +201,9 @@ router.get('/user/:userId/likes', protectOptional, async (req, res) => {
 router.get('/user/:userId/wishlist', protectOptional, async (req, res) => {
     try {
         const { mediaType = 'game' } = req.query
-        const targetUser = await User.findById(req.params.userId).select('isPrivate isWishlistPublic').lean()
+        const prefix = mediaType === 'game' ? '' : (mediaType === 'tv' ? 'TV' : mediaType.charAt(0).toUpperCase() + mediaType.slice(1))
+        const privacyField = prefix ? `is${prefix}WishlistPublic` : 'isWishlistPublic'
+        const targetUser = await User.findById(req.params.userId).select(`isPrivate ${privacyField}`).lean()
         if (!targetUser) return res.status(404).json({ success: false, message: 'User not found' })
 
         // 🛡️ Privacy Wall
@@ -217,7 +221,7 @@ router.get('/user/:userId/wishlist', protectOptional, async (req, res) => {
             return res.json({ success: true, wishlist: [], isRestricted: true })
         }
 
-        if (!targetUser.isWishlistPublic && !isAuthorized) {
+        if (!targetUser[privacyField] && !isAuthorized) {
             return res.json({ success: true, wishlist: [], isRestricted: true, message: 'This collection is private' })
         }
 

@@ -66,6 +66,14 @@ const userPayload = (user) => ({
     isPrivate: user.isPrivate,
     isLikesPublic: user.isLikesPublic,
     isWishlistPublic: user.isWishlistPublic,
+    isAnimeLikesPublic: user.isAnimeLikesPublic,
+    isAnimeWishlistPublic: user.isAnimeWishlistPublic,
+    isMangaLikesPublic: user.isMangaLikesPublic,
+    isMangaWishlistPublic: user.isMangaWishlistPublic,
+    isMovieLikesPublic: user.isMovieLikesPublic,
+    isMovieWishlistPublic: user.isMovieWishlistPublic,
+    isTVLikesPublic: user.isTVLikesPublic,
+    isTVWishlistPublic: user.isTVWishlistPublic,
     avatar: user.avatar || '',
     bio: user.bio || '',
     xp: user.xp || 0,
@@ -620,10 +628,17 @@ router.patch('/privacy', protect, async (req, res) => {
 // ── PATCH /api/auth/privacy-settings ──────────────────────────────────────────
 router.patch('/privacy-settings', protect, async (req, res) => {
     try {
-        const { isLikesPublic, isWishlistPublic } = req.body
+        const { isLikesPublic, isWishlistPublic, mediaType } = req.body
         const update = {}
-        if (typeof isLikesPublic !== 'undefined') update.isLikesPublic = isLikesPublic
-        if (typeof isWishlistPublic !== 'undefined') update.isWishlistPublic = isWishlistPublic
+        
+        if (mediaType && mediaType !== 'game') {
+            const prefix = mediaType === 'tv' ? 'TV' : mediaType.charAt(0).toUpperCase() + mediaType.slice(1)
+            if (typeof isLikesPublic !== 'undefined') update[`is${prefix}LikesPublic`] = isLikesPublic
+            if (typeof isWishlistPublic !== 'undefined') update[`is${prefix}WishlistPublic`] = isWishlistPublic
+        } else {
+            if (typeof isLikesPublic !== 'undefined') update.isLikesPublic = isLikesPublic
+            if (typeof isWishlistPublic !== 'undefined') update.isWishlistPublic = isWishlistPublic
+        }
 
         const user = await User.findByIdAndUpdate(req.user._id, { $set: update }, { returnDocument: 'after' })
         res.json({ success: true, user: userPayload(user) })
@@ -731,29 +746,32 @@ router.post('/follow/:userId', protect, async (req, res) => {
         const userToFollow = await User.findById(targetId)
         if (!userToFollow) return res.status(404).json({ success: false, message: 'User not found' })
 
-        const alreadyFollowing = await Follow.findOne({ followerId: req.user._id, followingId: targetId })
-        if (alreadyFollowing) return res.status(400).json({ success: false, message: 'Already following this user' })
+        const result = await withRetryTransaction(async (session) => {
+            const alreadyFollowing = await Follow.findOne({ followerId: req.user._id, followingId: targetId }).session(session)
+            if (alreadyFollowing) throw new Error('Already following this user')
 
-        if (userToFollow.isPrivate) {
-            const existingRequest = await FollowRequest.findOne({ sender: req.user._id, recipient: targetId })
-            if (existingRequest) return res.status(400).json({ success: false, message: 'Follow request already sent' })
-            await FollowRequest.create({ sender: req.user._id, recipient: targetId })
-            await Notification.create({ recipient: targetId, sender: req.user._id, type: 'follow_request' })
-            return res.json({ success: true, message: 'Follow request sent', type: 'request_sent' })
-        }
+            if (userToFollow.isPrivate) {
+                const existingRequest = await FollowRequest.findOne({ sender: req.user._id, recipient: targetId }).session(session)
+                if (existingRequest) throw new Error('Follow request already sent')
+                
+                await FollowRequest.create([{ sender: req.user._id, recipient: targetId }], { session })
+                await Notification.create([{ recipient: targetId, sender: req.user._id, type: 'follow_request' }], { session })
+                return { type: 'request_sent', message: 'Follow request sent' }
+            }
 
-        await Follow.create({ followerId: req.user._id, followingId: targetId })
-        await Promise.all([
-            User.findByIdAndUpdate(targetId, { $inc: { followerCount: 1 } }),
-            User.findByIdAndUpdate(req.user._id, { $inc: { followingCount: 1 } }),
-            Notification.create({ recipient: targetId, sender: req.user._id, type: 'follow' }),
-            awardXP(req.user._id, 1),
-            awardXP(targetId, 1),
-        ])
+            await Follow.create([{ followerId: req.user._id, followingId: targetId }], { session })
+            await User.findByIdAndUpdate(targetId, { $inc: { followerCount: 1 } }, { session })
+            await User.findByIdAndUpdate(req.user._id, { $inc: { followingCount: 1 } }, { session })
+            await Notification.create([{ recipient: targetId, sender: req.user._id, type: 'follow' }], { session })
+            await awardXP(req.user._id, 1, session)
+            await awardXP(targetId, 1, session)
+            
+            return { type: 'followed', message: 'Following · +1 XP' }
+        })
 
-        res.json({ success: true, message: 'Following · +1 XP', type: 'followed' })
+        res.json({ success: true, ...result })
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to follow user', error: error.message })
+        res.status(error.message.includes('Already') ? 400 : 500).json({ success: false, message: error.message })
     }
 })
 
@@ -761,20 +779,22 @@ router.post('/follow/:userId', protect, async (req, res) => {
 router.post('/unfollow/:userId', protect, async (req, res) => {
     try {
         const targetId = req.params.userId
-        const deleted = await Follow.findOneAndDelete({ followerId: req.user._id, followingId: targetId })
-        if (!deleted) return res.status(400).json({ success: false, message: 'You are not following this user' })
+        const result = await withRetryTransaction(async (session) => {
+            const deleted = await Follow.findOneAndDelete({ followerId: req.user._id, followingId: targetId }, { session })
+            if (!deleted) throw new Error('You are not following this user')
 
-        await Promise.all([
-            User.findByIdAndUpdate(targetId, { $inc: { followerCount: -1 } }),
-            User.findByIdAndUpdate(req.user._id, { $inc: { followingCount: -1 } }),
-            FollowRequest.findOneAndDelete({ sender: req.user._id, recipient: targetId }),
-            deductXP(req.user._id, 1),
-            deductXP(targetId, 1),
-        ])
+            await User.findByIdAndUpdate(targetId, { $inc: { followerCount: -1 } }, { session })
+            await User.findByIdAndUpdate(req.user._id, { $inc: { followingCount: -1 } }, { session })
+            await FollowRequest.findOneAndDelete({ sender: req.user._id, recipient: targetId }, { session })
+            await deductXP(req.user._id, 1, session)
+            await deductXP(targetId, 1, session)
+            
+            return { message: 'Unfollowed · -1 XP' }
+        })
 
-        res.json({ success: true, message: 'Unfollowed · -1 XP' })
+        res.json({ success: true, ...result })
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to unfollow user', error: error.message })
+        res.status(error.message.includes('not following') ? 400 : 500).json({ success: false, message: error.message })
     }
 })
 

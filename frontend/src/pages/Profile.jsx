@@ -104,16 +104,20 @@ function Profile() {
         return lists.filter(l => l.isPublic)
     }, [lists, isOwnProfile])
 
+    const prefix = profileMediaType === 'game' ? '' : (profileMediaType === 'tv' ? 'TV' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1))
+    const likesField = prefix ? `is${prefix}LikesPublic` : 'isLikesPublic'
+    const wishField = prefix ? `is${prefix}WishlistPublic` : 'isWishlistPublic'
+
     const specialLists = useMemo(() => {
         const result = []
         
         // Liked Items
-        if (isOwnProfile || user?.isLikesPublic) {
+        if (isOwnProfile || user?.[likesField]) {
             result.push({
                 _id: 'liked',
                 name: `Liked ${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)}`,
                 description: `${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)} ${user?.username} has liked`,
-                isPublic: user?.isLikesPublic,
+                isPublic: user?.[likesField],
                 games: likes,
                 gameCount: likes.length,
                 isSpecial: true,
@@ -124,7 +128,7 @@ function Profile() {
         }
 
         // Wishlist
-        if (isOwnProfile || user?.isWishlistPublic) {
+        if (isOwnProfile || user?.[wishField]) {
             const isWatchlist = profileMediaType === 'anime' || profileMediaType === 'movie' || profileMediaType === 'tv'
             const label = isWatchlist ? 'Watchlist' : 'Wishlist'
             const mediaLabel = profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)
@@ -133,7 +137,7 @@ function Profile() {
                 _id: 'wishlist',
                 name: profileMediaType === 'game' ? 'Wishlist' : `${mediaLabel} ${label}`,
                 description: `${mediaLabel} ${user?.username} wants to ${isWatchlist ? 'watch' : 'play'}`,
-                isPublic: user?.isWishlistPublic,
+                isPublic: user?.[wishField],
                 games: wishlist,
                 gameCount: wishlist.length,
                 isSpecial: true,

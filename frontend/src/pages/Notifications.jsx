@@ -114,6 +114,8 @@ function Notifications() {
     const handleAccept = async (id) => {
         try {
             await api.post(`/notifications/requests/${id}/accept`)
+            // Invalidate local cache so it doesn't reappear on refresh
+            invalidateCache(`notif_req_${userId}`)
             setLocalRequests(prev => (prev ?? requests).filter(r => r._id !== id))
         } catch (err) {
             console.error('Accept error:', err)
@@ -123,6 +125,8 @@ function Notifications() {
     const handleDecline = async (id) => {
         try {
             await api.post(`/notifications/requests/${id}/decline`)
+            // Invalidate local cache so it doesn't reappear on refresh
+            invalidateCache(`notif_req_${userId}`)
             setLocalRequests(prev => (prev ?? requests).filter(r => r._id !== id))
         } catch (err) {
             console.error('Decline error:', err)
