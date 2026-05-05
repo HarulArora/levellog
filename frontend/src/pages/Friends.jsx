@@ -83,7 +83,7 @@ function Friends() {
                 </div>
 
                 <div className="relative w-full md:w-96">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] pointer-events-none">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none z-10">
                         <SearchIcon size={20} strokeWidth={2.5} />
                     </span>
                     <input

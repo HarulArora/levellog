@@ -15,7 +15,7 @@ import { getIGDBImage, SIZES } from '../utils/igdb'
 function Profile() {
     const { username } = useParams()
     const navigate = useNavigate()
-    const { user: currentUser } = useAuth()
+    const { user: currentUser, updateUser, refreshUser } = useAuth()
 
     const [privacyLoading, setPrivacyLoading] = useState(false)
     const [followModal, setFollowModal] = useState(null)
@@ -172,12 +172,23 @@ function Profile() {
         invalidateCache(`profile_${username}`)
         if (user?._id) {
             invalidateCache(`profile_games_${user._id}`)
-            invalidateCache(`profile_lists_${user._id}_${profileMediaType}`)
-            invalidateCache(`profile_likes_${user._id}_${profileMediaType}`)
-            invalidateCache(`profile_wishlist_${user._id}_${profileMediaType}`)
+            
+            // Invalidate for all media types to ensure consistency
+            const mediaTypes = ['game', 'anime', 'manga', 'movie', 'tv']
+            mediaTypes.forEach(m => {
+                invalidateCache(`profile_lists_${user._id}_${m}`)
+                invalidateCache(`profile_likes_${user._id}_${m}`)
+                invalidateCache(`profile_wishlist_${user._id}_${m}`)
+                invalidateCache(`lists_${user._id}_${m}`)
+            })
         }
+        
+        if (isOwnProfile) {
+            refreshUser()
+        }
+        
         refetchProfile(true) // 🚀 Silent refetch (background)
-    }, [username, user?._id, refetchProfile, profileMediaType])
+    }, [username, user?._id, refetchProfile, isOwnProfile, refreshUser])
 
     // ── STATS ──
     const stats = useMemo(() => {

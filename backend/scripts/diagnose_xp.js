@@ -12,7 +12,7 @@ import MovieComment from '../models/MovieComment.js';
 import AnimeComment from '../models/AnimeComment.js';
 import Follow from '../models/Follow.js';
 
-dotenv.config();
+dotenv.config({ path: '../.env' });
 
 async function diagnoseXP() {
     try {

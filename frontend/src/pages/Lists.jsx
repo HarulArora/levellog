@@ -392,7 +392,7 @@ function ListDetail({ list, onBack, onUpdate, onDelete, showToast, mediaType }) 
 
 // ── Main Lists ────────────────────────────────────────────────────────────────
 function Lists() {
-    const { user } = useAuth()
+    const { user, updateUser } = useAuth()
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     
@@ -505,10 +505,21 @@ function Lists() {
         try {
             const res = await api.patch('/auth/privacy-settings', { [field]: value, mediaType })
             if (res.data.success) {
+                // Update global auth state
+                updateUser(res.data.user)
+                
+                // Update local bundle state
                 setListBundle(prev => ({
                     ...prev,
                     user: res.data.user
                 }))
+
+                // Invalidate all media list caches for this user to ensure consistency
+                const userId = user.id || user._id
+                MEDIA_TYPES.forEach(m => {
+                    invalidateCache(`lists_${userId}_${m.id}`)
+                })
+
                 showToast('Privacy updated!')
             }
         } catch {
@@ -525,6 +536,11 @@ function Lists() {
                     ...prev,
                     customLists: prev.customLists.map(l => l._id === list._id ? { ...l, isPublic: newStatus } : l)
                 }))
+                
+                // Invalidate cache for current media type
+                const userId = user.id || user._id
+                invalidateCache(`lists_${userId}_${mediaType}`)
+                
                 showToast('Visibility updated')
             }
         } catch { showToast('Failed to update visibility', 'error') }
