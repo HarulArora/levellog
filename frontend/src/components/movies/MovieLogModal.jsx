@@ -3,15 +3,15 @@ import MovieSearch from './MovieSearch'
 import { useSection } from '../../context/SectionState'
 import { invalidatePrefix } from '../../utils/cache'
 
-function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry = null, items = [] }) {
-    const { movieSubSection } = useSection()
+function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry = null, items = [], mediaType: forcedType = null }) {
+    const { cinemaSubSection } = useSection()
+    const activeType = forcedType || cinemaSubSection
 
     const [formData, setFormData] = useState({
         title: existingEntry?.title || preselectedItem?.title || '',
         genre: existingEntry?.genre || preselectedItem?.genres?.[0] || '',
         status: existingEntry?.status || 'playing',
         rating: existingEntry?.rating || 0,
-        runtime: existingEntry?.runtime ?? '',
         episodesWatched: existingEntry?.episodesWatched ?? '',
         seasonsWatched: existingEntry?.seasonsWatched ?? '',
         cover: existingEntry?.cover || existingEntry?.coverImage || preselectedItem?.cover || '',
@@ -41,7 +41,6 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
             externalId: item.externalId || '',
             status: alreadyLogged ? alreadyLogged.status : 'playing',
             rating: alreadyLogged ? alreadyLogged.rating : 0,
-            runtime: alreadyLogged ? alreadyLogged.runtime : (item.runtime || ''),
             episodesWatched: alreadyLogged ? alreadyLogged.episodesWatched : '',
             seasonsWatched: alreadyLogged ? alreadyLogged.seasonsWatched : (item.seasonsCount || ''),
         }))
@@ -53,7 +52,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
         setSubmitting(true)
         const result = await onAdd({
             ...formData,
-            type: movieSubSection
+            type: activeType
         })
         setSubmitting(false)
         if (result.success) {
@@ -75,7 +74,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                         className="font-black text-lg tracking-widest uppercase text-white"
                         style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                     >
-                        {existingEntry ? `Edit ${movieSubSection === 'tv' ? 'TV Show' : 'Movie'}` : `Log ${movieSubSection === 'tv' ? 'TV Show' : 'Movie'}`}
+                        {existingEntry ? `Edit ${activeType === 'tv' ? 'TV Show' : 'Movie'}` : `Log ${activeType === 'tv' ? 'TV Show' : 'Movie'}`}
                     </h3>
                     <button onClick={onClose} className="text-[#7a7a90] hover:text-white transition-colors text-xl">✕</button>
                 </div>
@@ -85,7 +84,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                     {!preselectedItem && !existingEntry && (
                         <div>
                             <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
-                                Search {movieSubSection === 'tv' ? 'TV Show' : 'Movie'}
+                                Search {activeType === 'tv' ? 'TV Show' : 'Movie'}
                             </label>
                             <MovieSearch onSelect={handleItemSelect} />
                         </div>
@@ -97,7 +96,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                             <div>
                                 <div className="font-semibold text-sm text-white">{formData.title}</div>
                                 <div className="font-mono text-[10px] text-[#7a7a90] mt-1">{formData.genre}</div>
-                                <div className="text-[#c8ff57] font-mono text-[10px] mt-1">✓ {movieSubSection === 'tv' ? 'TV' : 'Movie'} data loaded</div>
+                                <div className="text-[#c8ff57] font-mono text-[10px] mt-1">✓ {activeType === 'tv' ? 'TV' : 'Movie'} data loaded</div>
                             </div>
                         </div>
                     )}
@@ -123,7 +122,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                     </div>
 
                     {/* Progress */}
-                    {movieSubSection === 'tv' ? (
+                    {activeType === 'tv' ? (
                         <div className="flex gap-4">
                             <div className="flex-1">
                                 <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
@@ -152,21 +151,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                                 />
                             </div>
                         </div>
-                    ) : (
-                        <div>
-                            <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
-                                Runtime (minutes)
-                            </label>
-                            <input
-                                type="number"
-                                placeholder="e.g. 148"
-                                min="0"
-                                value={formData.runtime}
-                                onChange={e => handleChange('runtime', e.target.value)}
-                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors"
-                            />
-                        </div>
-                    )}
+                    ) : null}
 
                     {/* Rating */}
                     <div>
@@ -197,7 +182,7 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                         disabled={submitting || !formData.title.trim()}
                         className="w-full py-3 bg-[#c8ff57] text-black font-bold text-sm rounded hover:bg-[#d4ff6e] transition-all disabled:opacity-40 disabled:cursor-not-allowed mt-2"
                     >
-                        {submitting ? 'Logging...' : existingEntry ? '💾 Save Changes' : `🐥 Log ${movieSubSection === 'tv' ? 'TV Show' : 'Movie'}`}
+                        {submitting ? 'Logging...' : existingEntry ? '💾 Save Changes' : `🐥 Log ${activeType === 'tv' ? 'TV Show' : 'Movie'}`}
                     </button>
                 </div>
             </div>

@@ -2,6 +2,7 @@ import { useState, useRef, useMemo, useEffect, lazy, Suspense, memo, useCallback
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
+import { useSection } from '../../context/SectionState'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Film, Flame, Plus, Tv, ChevronRight } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
@@ -11,6 +12,7 @@ import { useLeaderboard } from '../../context/LeaderboardContext'
 import { Helmet } from 'react-helmet-async'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
 import StatsBar from '../../components/ui/StatsBar'
+import RecentActivityFeed from '../../components/ui/RecentActivityFeed'
 
 
 
@@ -246,6 +248,11 @@ function MoviesHome() {
     const navigate = useNavigate()
     const location = useLocation()
     const { topUsers } = useLeaderboard()
+    const { setCinemaSubSection } = useSection()
+
+    useEffect(() => {
+        setCinemaSubSection('movie')
+    }, [setCinemaSubSection])
     
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
@@ -596,9 +603,16 @@ function MoviesHome() {
 
             {showAddModal && (
                 <Suspense fallback={null}>
-                    <MovieLogModal onClose={() => setShowAddModal(false)} onAdd={handleAddMovie} items={userMovies} />
+                    <MovieLogModal 
+                        onClose={() => setShowAddModal(false)} 
+                        onAdd={handleAddMovie} 
+                        items={userMovies} 
+                        mediaType="movie"
+                    />
                 </Suspense>
             )}
+
+            <RecentActivityFeed defaultMedia="movie" />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </div>

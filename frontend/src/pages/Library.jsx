@@ -212,7 +212,7 @@ function Library() {
                                 onChange={e => handleSearch(e.target.value)}
                                 className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-12 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
                             />
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#c8ff57] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
                         </div>
 
                         <div className="flex bg-[#0d0d14] rounded-2xl border border-[#2a2a35] p-1.5 shadow-inner shrink-0">

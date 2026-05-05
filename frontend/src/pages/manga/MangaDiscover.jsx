@@ -166,8 +166,8 @@ function MangaDiscover() {
                             </p>
                         </div>
 
-                        <form onSubmit={handleSearch} className="w-full md:w-96 relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] z-10" size={18} />
+                        <form onSubmit={handleSearch} className="w-full md:w-96 relative group">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
                             <input 
                                 type="text"
                                 placeholder="Search manga..."

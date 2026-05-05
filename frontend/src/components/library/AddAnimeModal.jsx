@@ -9,7 +9,6 @@ function AddAnimeModal({ onClose, onAdd, preselectedAnime = null, existingEntry 
         rating: existingEntry?.rating || 0,
         episodesWatched: existingEntry?.episodesWatched ?? '',
         chaptersRead: existingEntry?.chaptersRead ?? '',
-        notes: existingEntry?.notes || '',
         cover: existingEntry?.cover || existingEntry?.coverImage || preselectedAnime?.cover || '',
         externalId: existingEntry?.externalId || preselectedAnime?.externalId || '',
         type: existingEntry?.type || existingEntry?.mediaType || preselectedAnime?.type || 'anime',
@@ -153,17 +152,7 @@ function AddAnimeModal({ onClose, onAdd, preselectedAnime = null, existingEntry 
                         </div>
                     </div>
 
-                    {/* Notes */}
-                    <div>
-                        <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">Private Notes</label>
-                        <textarea
-                            value={formData.notes}
-                            onChange={e => handleChange('notes', e.target.value)}
-                            placeholder="Add your thoughts..."
-                            rows={3}
-                            className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors resize-none"
-                        />
-                    </div>
+
 
                     <button
                         onClick={handleSubmit}

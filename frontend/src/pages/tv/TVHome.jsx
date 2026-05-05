@@ -51,11 +51,11 @@ const HeroBanner = memo(({ movies }) => {
         return url;
     }
 
-    const covers = useMemo(() => 
+    const covers = useMemo(() =>
         movies.filter(m => m.cover).map(m => getSmallCover(m.cover)).filter((v, i, a) => a.indexOf(v) === i),
         [movies]
     )
-    
+
     const sizePatterns = useMemo(() => [
         { w: 'w-[180px]', h: 'h-[240px]' }, { w: 'w-[130px]', h: 'h-[170px]' },
         { w: 'w-[160px]', h: 'h-[210px]' }, { w: 'w-[140px]', h: 'h-[185px]' },
@@ -92,15 +92,15 @@ const HeroBanner = memo(({ movies }) => {
             <div className="absolute top-0 left-0 right-0 h-[55%] flex items-end gap-3 pb-2">
                 <div className="flex gap-3 items-end will-change-transform" style={{ animation: `mosaicLeft ${isMobile ? '25s' : '40s'} linear infinite`, width: 'max-content' }}>
                     {[...row1Tiles, ...row1Tiles].map((tile, i) => (
-                        <img 
-                            key={i} 
-                            src={tile.img} 
-                            alt="TV Cover Mosaic" 
+                        <img
+                            key={i}
+                            src={tile.img}
+                            alt="TV Cover Mosaic"
                             width={tile.w.match(/\d+/)[0]}
                             height={tile.h.match(/\d+/)[0]}
                             fetchPriority={i < 4 ? "high" : "low"}
                             decoding="async"
-                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} 
+                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`}
                         />
                     ))}
                 </div>
@@ -108,15 +108,15 @@ const HeroBanner = memo(({ movies }) => {
             <div className="absolute bottom-0 left-0 right-0 h-[55%] flex items-start gap-3 pt-2">
                 <div className="flex gap-3 items-start will-change-transform" style={{ animation: `mosaicRight ${isMobile ? '20s' : '32s'} linear infinite`, width: 'max-content' }}>
                     {[...row2Tiles, ...row2Tiles].map((tile, i) => (
-                        <img 
-                            key={i} 
-                            src={tile.img} 
-                            alt="Trending TV Collection" 
+                        <img
+                            key={i}
+                            src={tile.img}
+                            alt="Trending TV Collection"
                             width={tile.w.match(/\d+/)[0]}
                             height={tile.h.match(/\d+/)[0]}
                             decoding="async"
                             loading="lazy"
-                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`} 
+                            className={`${tile.w} ${tile.h} object-contain rounded-lg flex-shrink-0`}
                         />
                     ))}
                 </div>
@@ -201,22 +201,22 @@ function TVSearchBar({ id = 'tv-search' }) {
                 <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-[60] bg-[#111118] border border-[#2a2a35] rounded-2xl shadow-2xl overflow-hidden">
                     {results.length > 0 ? (
                         <>
-                                <div style={{ maxHeight: '256px', overflowY: 'auto' }} className="overscroll-contain">
-                                    {results.map((item) => (
-                                        <div
-                                            key={item.externalId}
-                                            onClick={() => handleSelect(item)}
-                                            className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a1a25] cursor-pointer border-b border-[#2a2a35] last:border-b-0 transition-colors group"
-                                        >
-                                            <div className="w-8 h-11 rounded bg-[#18181f] flex-shrink-0 overflow-hidden">
-                                                {item.cover ? (
-                                                    <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-[#3a3a4a]">
-                                                        <Tv size={14} />
-                                                    </div>
-                                                )}
-                                            </div>
+                            <div style={{ maxHeight: '256px', overflowY: 'auto' }} className="overscroll-contain">
+                                {results.map((item) => (
+                                    <div
+                                        key={item.externalId}
+                                        onClick={() => handleSelect(item)}
+                                        className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a1a25] cursor-pointer border-b border-[#2a2a35] last:border-b-0 transition-colors group"
+                                    >
+                                        <div className="w-8 h-11 rounded bg-[#18181f] flex-shrink-0 overflow-hidden">
+                                            {item.cover ? (
+                                                <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-[#3a3a4a]">
+                                                    <Tv size={14} />
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="text-white font-semibold text-sm truncate group-hover:text-[#c8ff57] transition-colors">
                                                 {item.title}
@@ -258,7 +258,7 @@ function TVHome() {
     useEffect(() => {
         setCinemaSubSection('tv')
     }, [setCinemaSubSection])
-    
+
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
     const [userMovies, setUserMovies] = useState([])
@@ -298,7 +298,7 @@ function TVHome() {
         '/movies/home?type=tv',
         { ttl: 10 * 60 * 1000, deps: [location.key] }
     )
-    
+
     const stats = homeData?.stats ?? {}
 
     const userStats = useMemo(() => {
@@ -356,7 +356,7 @@ function TVHome() {
                 {(allMovies.length > 0 || !loading) && <HeroBanner movies={allMovies} />}
 
                 <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10 w-full">
-                    <SubSectionToggle 
+                    <SubSectionToggle
                         current="tv"
                         type="cinema"
                         options={[
@@ -377,7 +377,7 @@ function TVHome() {
                             </h2>
 
                             <p className="text-[#a0a0b8] text-sm leading-relaxed mb-8 max-w-md">
-                                Track every episode of your favorite TV series. 
+                                Track every episode of your favorite TV series.
                                 Log progress, rate seasons, and see what's trending.
                             </p>
                             <div className="flex flex-wrap gap-3 mb-10">
@@ -473,9 +473,9 @@ function TVHome() {
                 </div>
             </section>
 
-            <StatsBar 
-                user={user} 
-                userRank={userRank} 
+            <StatsBar
+                user={user}
+                userRank={userRank}
                 mediaType="tv"
                 stats={{
                     total: userStats.total,
@@ -484,7 +484,7 @@ function TVHome() {
                     planned: userStats.planned
                 }}
             />
-            
+
             {error && (
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-12">
                     <div className="bg-[#1a1111] border border-red-500/20 rounded-xl p-10 text-center">
@@ -495,7 +495,7 @@ function TVHome() {
                         <p className="text-[#7a7a90] text-sm max-w-md mx-auto mb-8 font-mono">
                             We're having trouble reaching the TV database. This is usually a temporary connection reset.
                         </p>
-                        <button 
+                        <button
                             onClick={() => refetchHome()}
                             className="bg-white text-black px-8 py-3 rounded font-black uppercase text-xs tracking-widest hover:bg-[#c8ff57] transition-all"
                         >
@@ -526,19 +526,19 @@ function TVHome() {
                                 <div className="flex items-center justify-between mb-8 group">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 bg-[#111118] border border-[#2a2a35] rounded-lg text-[#c8ff57] group-hover:bg-[#c8ff57] group-hover:text-black transition-all duration-300 shadow-lg">
-                                            {section.title.toLowerCase().includes('trending') ? <Flame size={20} /> : 
-                                             section.title.toLowerCase().includes('popular') ? <Trophy size={20} /> : 
-                                             <Star size={20} />}
+                                            {section.title.toLowerCase().includes('trending') ? <Flame size={20} /> :
+                                                section.title.toLowerCase().includes('popular') ? <Trophy size={20} /> :
+                                                    <Star size={20} />}
                                         </div>
                                         <h2 className="font-black text-2xl uppercase text-white tracking-widest" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                             {section.title}
                                         </h2>
                                     </div>
-                                    <div 
+                                    <div
                                         onClick={() => {
                                             const lowerTitle = section.title.toLowerCase();
-                                            const type = lowerTitle.includes('trending') ? 'trending' : 
-                                                         (lowerTitle.includes('top') || lowerTitle.includes('popular')) ? 'top_rated' : 'coming_soon';
+                                            const type = lowerTitle.includes('trending') ? 'trending' :
+                                                (lowerTitle.includes('top') || lowerTitle.includes('popular')) ? 'top_rated' : 'coming_soon';
                                             navigate(`/explore/tv/${type}`);
                                         }}
                                         className="flex items-center gap-2 text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest group-hover:text-white transition-colors cursor-pointer"
@@ -549,8 +549,8 @@ function TVHome() {
 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                                     {section.items.map((item, idx) => (
-                                        <div 
-                                            key={`${section.title}-${item.externalId}-${idx}`} 
+                                        <div
+                                            key={`${section.title}-${item.externalId}-${idx}`}
                                             onClick={() => navigate(`/tv/${item.externalId}`)}
                                             className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg"
                                         >
@@ -611,7 +611,12 @@ function TVHome() {
 
             {showAddModal && (
                 <Suspense fallback={null}>
-                    <MovieLogModal onClose={() => setShowAddModal(false)} onAdd={handleAddMovie} items={userMovies} />
+                    <MovieLogModal 
+                        onClose={() => setShowAddModal(false)} 
+                        onAdd={handleAddMovie} 
+                        items={userMovies} 
+                        mediaType="tv"
+                    />
                 </Suspense>
             )}
 

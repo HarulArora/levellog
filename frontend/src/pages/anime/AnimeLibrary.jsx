@@ -25,6 +25,7 @@ function AnimeLibrary() {
     
     const [showAddModal, setShowAddModal] = useState(false)
     const [editingAnime, setEditingAnime] = useState(null)
+    const [confirmDelete, setConfirmDelete] = useState(null)
     const [toast, setToast] = useState(null)
 
     const fetchLibrary = async () => {
@@ -87,11 +88,17 @@ function AnimeLibrary() {
         }
     }
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Remove from library?')) return
+    const handleDeleteRequest = (id, title) => {
+        setConfirmDelete({ id, title })
+    }
+
+    const handleDeleteConfirmed = async () => {
+        if (!confirmDelete) return
+        const { id, title } = confirmDelete
+        setConfirmDelete(null)
         try {
             await api.delete(`/anime/log/${id}`)
-            showToast('Removed from library')
+            showToast(`"${title}" removed from library`)
             fetchLibrary()
         } catch {
             showToast('Failed to remove', 'error')
@@ -211,7 +218,7 @@ function AnimeLibrary() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-12 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
                             />
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#c8ff57] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
                         </div>
                         
                         <div className="flex bg-[#0d0d14] rounded-2xl border border-[#2a2a35] p-1.5 shadow-inner shrink-0">
@@ -240,7 +247,7 @@ function AnimeLibrary() {
                                     key={item._id} 
                                     anime={item} 
                                     showAvgRating={false}
-                                    onDelete={() => handleDelete(item._id)}
+                                    onDelete={() => handleDeleteRequest(item._id, item.title)}
                                     onEdit={() => setEditingAnime(item)}
                                 />
                             ))}
@@ -265,7 +272,7 @@ function AnimeLibrary() {
                                             key={anime._id} 
                                             anime={anime} 
                                             index={idx + 1}
-                                            onDelete={() => handleDelete(anime._id)}
+                                            onDelete={() => handleDeleteRequest(anime._id, anime.title)}
                                             onEdit={() => setEditingAnime(anime)}
                                         />
                                     ))}
@@ -317,6 +324,52 @@ function AnimeLibrary() {
                     />
                 )}
             </Suspense>
+
+            {confirmDelete && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300"
+                >
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setConfirmDelete(null)} />
+                    <div
+                        className="relative bg-[#111118] border border-[#2a2a35] rounded-[2rem] p-8 w-full max-w-md
+                                   shadow-[0_40px_100px_rgba(0,0,0,0.8)] overflow-hidden"
+                    >
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#ff5c5c] to-transparent opacity-50" />
+                        <div className="w-20 h-20 bg-[#ff5c5c]/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-[#ff5c5c]/20">
+                            <Plus size={32} className="text-[#ff5c5c] rotate-45" />
+                        </div>
+                        <h3
+                            className="text-white font-black text-3xl tracking-widest uppercase text-center mb-2"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                        >
+                            Remove Entry?
+                        </h3>
+                        <p className="text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest text-center mb-8 leading-relaxed">
+                            Are you sure you want to remove <span className="text-white">"{confirmDelete.title}"</span>? This action is permanent and will deduct any associated XP.
+                        </p>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => setConfirmDelete(null)}
+                                className="flex-1 py-4 text-xs font-black uppercase tracking-widest
+                                           text-white bg-[#1a1a25] border border-[#2a2a35] rounded-xl
+                                           hover:bg-[#2a2a35] transition-all"
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                            >
+                                Keep it
+                            </button>
+                            <button
+                                onClick={handleDeleteConfirmed}
+                                className="flex-1 py-4 text-xs font-black uppercase tracking-widest
+                                           text-white bg-[#ff5c5c] rounded-xl shadow-[0_10px_20px_rgba(255,92,92,0.2)]
+                                           hover:bg-[#ff4b4b] transition-all"
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </div>

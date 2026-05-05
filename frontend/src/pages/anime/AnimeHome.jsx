@@ -12,6 +12,7 @@ import { Helmet } from 'react-helmet-async'
 import { ChevronRight } from 'lucide-react'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
 import StatsBar from '../../components/ui/StatsBar'
+import RecentActivityFeed from '../../components/ui/RecentActivityFeed'
 
 const AnimeCard = memo(({ item, section }) => {
     const navigate = useNavigate()
@@ -611,6 +612,8 @@ function AnimeHome() {
                     <AnimeLogModal onClose={() => setShowAddModal(false)} onAdd={handleAddAnime} items={userAnime} />
                 </Suspense>
             )}
+
+            <RecentActivityFeed defaultMedia="anime" />
 
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         </div>

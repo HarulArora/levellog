@@ -7,7 +7,7 @@ function MovieSearch({ onSelect }) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [showResults, setShowResults] = useState(false)
-  const { movieSubSection } = useSection()
+  const { cinemaSubSection } = useSection()
 
   const timerRef = useRef(null)
 
@@ -30,7 +30,7 @@ function MovieSearch({ onSelect }) {
     clearTimeout(timerRef.current)
     timerRef.current = setTimeout(async () => {
       try {
-        const res = await api.get(`/movies/search?q=${query}&type=${movieSubSection}`)
+        const res = await api.get(`/movies/search?q=${query}&type=${cinemaSubSection}`)
         setResults(res.data.results)
       } catch (err) {
         console.error('Search error:', err)
@@ -40,7 +40,7 @@ function MovieSearch({ onSelect }) {
     }, 250)
 
     return () => clearTimeout(timerRef.current)
-  }, [query, movieSubSection])
+  }, [query, cinemaSubSection])
 
   const handleSelect = (item) => {
     onSelect(item)
@@ -55,7 +55,7 @@ function MovieSearch({ onSelect }) {
         id="movie-search-modal"
         name="movie-search-modal"
         type="text"
-        placeholder={`Search for ${movieSubSection === 'tv' ? 'TV Shows' : 'Movies'}...`}
+        placeholder={`Search for ${cinemaSubSection === 'tv' ? 'TV Shows' : 'Movies'}...`}
         value={query}
         onChange={handleQueryChange}
         onFocus={() => { if (query.length >= 2) setShowResults(true) }}
@@ -94,7 +94,7 @@ function MovieSearch({ onSelect }) {
               ) : (
                 <div className="w-10 h-14 bg-[#2a2a35] rounded flex-shrink-0
                                 flex items-center justify-center text-lg">
-                  {movieSubSection === 'tv' ? '📺' : '🎬'}
+                  {cinemaSubSection === 'tv' ? '📺' : '🎬'}
                 </div>
               )}
 
