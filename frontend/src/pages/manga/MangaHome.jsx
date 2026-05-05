@@ -349,7 +349,13 @@ function MangaHome() {
 
 
 
-    const sections = useMemo(() => homeData?.sections || [], [homeData?.sections])
+    const sections = useMemo(() => {
+        const rawSections = homeData?.sections || []
+        return rawSections.filter(s => 
+            !s.title.toLowerCase().includes('upcoming') && 
+            !s.title.toLowerCase().includes('coming soon')
+        )
+    }, [homeData?.sections])
 
     const userStats = useMemo(() => {
         const filtered = userAnime.filter(a => (a.type || a.mediaType) === 'manga')

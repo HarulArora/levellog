@@ -1,5 +1,7 @@
 import express from 'express'
 import Game from '../models/Game.js'
+import AnimeEntry from '../models/AnimeEntry.js'
+import MovieEntry from '../models/MovieEntry.js'
 import GameLike from '../models/GameLike.js'
 import Wishlist from '../models/Wishlist.js'
 import { protect, protectOptional } from '../middleware/auth.js'
@@ -98,35 +100,76 @@ router.get('/user/:userId', async (req, res) => {
 // ── GET /api/games/activity/:userId ──
 router.get('/activity/:userId', protect, async (req, res) => {
     try {
-        const games = await Game.find({ userId: req.params.userId })
-            .select('title cover status rating hours igdbId createdAt updatedAt')
-            .sort({ updatedAt: -1 })
-            .limit(20)
-            .lean()
+        const [games, anime, movies] = await Promise.all([
+            Game.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(15).lean(),
+            AnimeEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(15).lean(),
+            MovieEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(15).lean()
+        ]);
+
         const activity = []
 
+        // ── GAMES ──
         games.forEach(game => {
-            const gameInfo = { title: game.title, cover: game.cover, id: game._id, igdbId: game.igdbId || null }
-
+            const info = { title: game.title, cover: game.cover, id: game._id, igdbId: game.igdbId || null, mediaType: 'game' }
             if (game.status === 'completed') {
-                activity.push({ type: 'completed', game: gameInfo, rating: game.rating > 0 ? game.rating : null, time: game.updatedAt })
+                activity.push({ type: 'completed', media: info, rating: game.rating > 0 ? game.rating : null, time: game.updatedAt })
             } else if (game.status === 'playing') {
-                activity.push({ type: 'playing', game: gameInfo, time: game.updatedAt })
+                activity.push({ type: 'playing', media: info, time: game.updatedAt })
             } else if (game.status === 'dropped') {
-                activity.push({ type: 'dropped', game: gameInfo, hours: game.hours, time: game.updatedAt })
+                activity.push({ type: 'dropped', media: info, hours: game.hours, time: game.updatedAt })
             } else if (game.status === 'planned') {
-                activity.push({ type: 'planned', game: gameInfo, time: game.createdAt })
+                activity.push({ type: 'planned', media: info, time: game.createdAt })
             } else if (game.status === 'paused') {
-                activity.push({ type: 'paused', game: gameInfo, time: game.updatedAt })
+                activity.push({ type: 'paused', media: info, time: game.updatedAt })
             }
-
             if (game.rating > 0 && game.status !== 'completed') {
-                activity.push({ type: 'rated', game: gameInfo, rating: game.rating, time: game.updatedAt })
+                activity.push({ type: 'rated', media: info, rating: game.rating, time: game.updatedAt })
+            }
+        })
+
+        // ── ANIME & MANGA ──
+        anime.forEach(entry => {
+            const info = { title: entry.title, cover: entry.cover || entry.coverImage, id: entry._id, externalId: entry.externalId, mediaType: entry.type }
+            const type = entry.type === 'anime' ? 'watching' : 'reading';
+            
+            if (entry.status === 'completed') {
+                activity.push({ type: 'completed', media: info, rating: entry.rating > 0 ? entry.rating : null, time: entry.updatedAt })
+            } else if (entry.status === 'playing') {
+                activity.push({ type: entry.type === 'manga' ? 'reading' : 'watching', media: info, time: entry.updatedAt })
+            } else if (entry.status === 'dropped') {
+                activity.push({ type: 'dropped', media: info, time: entry.updatedAt })
+            } else if (entry.status === 'planned') {
+                activity.push({ type: 'planned', media: info, time: entry.createdAt })
+            } else if (entry.status === 'paused') {
+                activity.push({ type: 'paused', media: info, time: entry.updatedAt })
+            }
+            if (entry.rating > 0 && entry.status !== 'completed') {
+                activity.push({ type: 'rated', media: info, rating: entry.rating, time: entry.updatedAt })
+            }
+        })
+
+        // ── MOVIES & TV ──
+        movies.forEach(entry => {
+            const info = { title: entry.title, cover: entry.cover || entry.coverImage, id: entry._id, externalId: entry.externalId, mediaType: entry.type }
+            
+            if (entry.status === 'completed' || entry.status === 'watched') {
+                activity.push({ type: 'completed', media: info, rating: entry.rating > 0 ? entry.rating : null, time: entry.updatedAt })
+            } else if (entry.status === 'watching') {
+                activity.push({ type: 'watching', media: info, time: entry.updatedAt })
+            } else if (entry.status === 'dropped') {
+                activity.push({ type: 'dropped', media: info, time: entry.updatedAt })
+            } else if (entry.status === 'planned' || entry.status === 'plan_to_watch') {
+                activity.push({ type: 'planned', media: info, time: entry.createdAt })
+            } else if (entry.status === 'on_hold') {
+                activity.push({ type: 'paused', media: info, time: entry.updatedAt })
+            }
+            if (entry.rating > 0 && entry.status !== 'completed' && entry.status !== 'watched') {
+                activity.push({ type: 'rated', media: info, rating: entry.rating, time: entry.updatedAt })
             }
         })
 
         activity.sort((a, b) => new Date(b.time) - new Date(a.time))
-        res.json({ success: true, activity: activity.slice(0, 20) })
+        res.json({ success: true, activity: activity.slice(0, 30) })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch activity', error: error.message })
     }

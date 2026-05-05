@@ -369,9 +369,9 @@ function AnimeDetail() {
     const [listToast, setListToast] = useState(null)
     const [userLibrary, setUserLibrary] = useState([])
     const [liked, setLiked] = useState(false)
-    const [wishlisted, setWishlisted] = useState(false)
+    const [watchlisted, setWatchlisted] = useState(false)
     const [liking, setLiking] = useState(false)
-    const [wishing, setWishing] = useState(false)
+    const [watching, setWatching] = useState(false)
     const [commentText, setCommentText] = useState('')
     const [showGifPicker, setShowGifPicker] = useState(false)
     const [submittingComment, setSubmittingComment] = useState(false)
@@ -397,7 +397,7 @@ function AnimeDetail() {
     useEffect(() => {
         if (contextData?.userStatus) {
             setLiked(contextData.userStatus.liked)
-            setWishlisted(contextData.userStatus.wishlisted)
+            setWatchlisted(contextData.userStatus.wishlisted)
         }
         const fetchLib = async () => {
             if (user) {
@@ -465,17 +465,17 @@ function AnimeDetail() {
         } finally { setLiking(false) }
     }
 
-    const handleWishlist = async () => {
+    const handleWatchlist = async () => {
         if (!user) { navigate('/login'); return }
-        if (wishing) return
-        const wasWishlisted = wishlisted
+        if (watching) return
+        const wasWatchlisted = watchlisted
         const oldData = contextData
-        setWishlisted(!wasWishlisted)
-        setWishing(true)
+        setWatchlisted(!wasWatchlisted)
+        setWatching(true)
         if (oldData) setContextData({
             ...oldData,
-            stats: { ...oldData.stats, wishlistCount: Math.max(0, (oldData.stats.wishlistCount || 0) + (wasWishlisted ? -1 : 1)) },
-            userStatus: { ...(oldData.userStatus || {}), wishlisted: !wasWishlisted }
+            stats: { ...oldData.stats, wishlistCount: Math.max(0, (oldData.stats.wishlistCount || 0) + (wasWatchlisted ? -1 : 1)) },
+            userStatus: { ...(oldData.userStatus || {}), wishlisted: !wasWatchlisted }
         })
         try {
             const res = await api.post('/lists/wishlist', { 
@@ -485,14 +485,14 @@ function AnimeDetail() {
                 mediaType: type, 
                 genre: anime.genres?.[0] 
             })
-            setWishlisted(res.data.wishlisted)
-            if (res.data.wishlisted) showXpToast('🎯 Wishlisted!', 'gain')
+            setWatchlisted(res.data.wishlisted)
+            if (res.data.wishlisted) showXpToast('🎯 Added to Watchlist!', 'gain')
             refetchContext(true)
         } catch (err) {
-            console.error('Wishlist error:', err)
-            setWishlisted(wasWishlisted)
+            console.error('Watchlist error:', err)
+            setWatchlisted(wasWatchlisted)
             if (oldData) setContextData(oldData)
-        } finally { setWishing(false) }
+        } finally { setWatching(false) }
     }
 
     const handleOpenListModal = async () => {
@@ -655,13 +655,13 @@ function AnimeDetail() {
                                     <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Likes</div>
                                 </div>
 
-                                {/* Wishlists */}
+                                {/* Watchlist */}
                                 <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#5c9fff]/10 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
                                     <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
                                         <Target size={16} />
                                     </div>
                                     <span className="text-2xl font-bold text-white tracking-tight">{stats?.wishlistCount ?? '—'}</span>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Wishlists</div>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Watchlists</div>
                                 </div>
                             </div>
 
@@ -672,8 +672,8 @@ function AnimeDetail() {
                                 <button onClick={handleLike} disabled={liking} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border backdrop-blur-md ${liked ? 'border-[#ff5c5c] text-[#ff5c5c] bg-[#ff5c5c]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'} transition-all`}>
                                     <Heart size={16} className={liked ? 'fill-current' : ''} /> {liked ? 'Liked' : 'Like'}
                                 </button>
-                                <button onClick={handleWishlist} disabled={wishing} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border backdrop-blur-md ${wishlisted ? 'border-[#5c9fff] text-[#5c9fff] bg-[#5c9fff]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#5c9fff] hover:text-[#5c9fff]'} transition-all`}>
-                                    {wishlisted ? <Check size={16} /> : <Plus size={16} />} {wishlisted ? 'Wishlisted' : 'Wishlist'}
+                                <button onClick={handleWatchlist} disabled={watching} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border backdrop-blur-md ${watchlisted ? 'border-[#5c9fff] text-[#5c9fff] bg-[#5c9fff]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#5c9fff] hover:text-[#5c9fff]'} transition-all`}>
+                                    {watchlisted ? <Check size={16} /> : <Plus size={16} />} {watchlisted ? 'Watchlisted' : 'Watchlist'}
                                 </button>
                                 <button onClick={handleShare} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border transition-all ${shareCopied ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#c8ff57] hover:text-[#c8ff57]'}`}>
                                     {shareCopied ? <Check size={16} /> : <Share size={16} />} {shareCopied ? 'Copied!' : 'Share'}

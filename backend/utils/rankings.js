@@ -99,7 +99,11 @@ export const calculateTopRated = async (type) => {
 
     // ── YEAR RECOVERY FOR GAMES ──
     if (type === 'game') {
-        const missingYearIds = ranked.filter(r => !r.year).map(r => parseInt(r.contentId));
+        const missingYearIds = ranked
+            .filter(r => !r.year && r.contentId)
+            .map(r => parseInt(r.contentId))
+            .filter(id => !isNaN(id) && id > 0);
+
         if (missingYearIds.length > 0) {
             try {
                 const { getAccessToken } = await import('./igdb.js');
@@ -113,7 +117,7 @@ export const calculateTopRated = async (type) => {
                     ...r,
                     year: r.year || yearMap[parseInt(r.contentId)] || null
                 }));
-            } catch (err) { logger.error(`[Rankings Top Rated Year Recovery] Failed:`, err.message); }
+            } catch (err) { logger.error(`[Rankings Top Rated Year Recovery] Failed: ${err.message}`); }
         }
     }
 
@@ -233,7 +237,11 @@ export const calculateTrending = async (type) => {
     let finalItems = finalRanked;
 
     if (type === 'game') {
-        const missingYearIds = finalItems.filter(r => !r.year).map(r => parseInt(r.contentId));
+        const missingYearIds = finalItems
+            .filter(r => !r.year && r.contentId)
+            .map(r => parseInt(r.contentId))
+            .filter(id => !isNaN(id) && id > 0);
+
         if (missingYearIds.length > 0) {
             try {
                 const { getAccessToken } = await import('./igdb.js');
@@ -247,7 +255,7 @@ export const calculateTrending = async (type) => {
                     ...r,
                     year: r.year || yearMap[parseInt(r.contentId)] || null
                 }));
-            } catch (err) { logger.error(`[Rankings Trending Year Recovery] Failed:`, err.message); }
+            } catch (err) { logger.error(`[Rankings Trending Year Recovery] Failed: ${err.message}`); }
         }
     }
 

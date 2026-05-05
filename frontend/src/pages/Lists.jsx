@@ -447,6 +447,9 @@ function Lists() {
     const filteredWish = useMemo(() => filterByQuery(fullWish || [], wishSearch), [fullWish, wishSearch])
     const pagedWish = useMemo(() => paginate(filteredWish, wishPage), [filteredWish, wishPage])
 
+    const isWatchlist = mediaType === 'anime' || mediaType === 'movie' || mediaType === 'tv'
+    const wishlistLabel = isWatchlist ? 'Watchlist' : 'Wishlist'
+
     const handleCreateList = async () => {
         if (!createForm.name.trim()) return
         setCreating(true)
@@ -618,7 +621,7 @@ function Lists() {
                     </button>
                     <button onClick={() => handleTabChange('wishlist')}
                         className={`px-6 py-2.5 rounded-xl font-mono text-[10px] uppercase tracking-widest transition-all ${activeTab === 'wishlist' ? 'bg-[#2a2a35] text-[#5c9fff] shadow-lg' : 'text-[#4a4a5e] hover:text-white'}`}>
-                        Wishlist
+                        {wishlistLabel}
                     </button>
                 </div>
             </div>
@@ -679,24 +682,24 @@ function Lists() {
                             </div>
 
                             <div className="flex flex-col gap-3">
-                                <div onClick={() => handleTabChange('wishlist')} className="h-56 bg-[#111118] border border-[#2a2a35] rounded-3xl p-8 relative overflow-hidden cursor-pointer group hover:border-[#5c9fff]/40 transition-all shadow-lg flex-1">
-                                    <div className="absolute -right-4 -bottom-4 text-[#5c9fff] opacity-05 group-hover:scale-110 transition-transform duration-500"><Target size={160} /></div>
-                                    <div className="relative z-10 flex flex-col h-full">
-                                        <h3 className="font-black text-2xl text-white uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Wishlist</h3>
-                                        <p className="text-[#4a4a5e] text-xs font-mono uppercase tracking-widest mb-auto">Tracking what's next 🎯</p>
-                                        <div className="flex items-center justify-between mt-4">
-                                            <span className="font-mono text-[10px] text-[#5c9fff] uppercase tracking-widest">{wishlistCount} items</span>
-                                            <span className="text-[#5c9fff] opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 font-bold">OPEN →</span>
+                                    <div onClick={() => handleTabChange('wishlist')} className="h-56 bg-[#111118] border border-[#2a2a35] rounded-3xl p-8 relative overflow-hidden cursor-pointer group hover:border-[#5c9fff]/40 transition-all shadow-lg flex-1">
+                                        <div className="absolute -right-4 -bottom-4 text-[#5c9fff] opacity-05 group-hover:scale-110 transition-transform duration-500"><Target size={160} /></div>
+                                        <div className="relative z-10 flex flex-col h-full">
+                                            <h3 className="font-black text-2xl text-white uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{wishlistLabel}</h3>
+                                            <p className="text-[#4a4a5e] text-xs font-mono uppercase tracking-widest mb-auto">Tracking what's next 🎯</p>
+                                            <div className="flex items-center justify-between mt-4">
+                                                <span className="font-mono text-[10px] text-[#5c9fff] uppercase tracking-widest">{wishlistCount} items</span>
+                                                <span className="text-[#5c9fff] opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 font-bold">OPEN →</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <Toggle 
-                                    enabled={listBundle?.user?.isWishlistPublic}
-                                    onToggle={() => handleToggleGlobalPrivacy('isWishlistPublic', !listBundle?.user?.isWishlistPublic)}
-                                    label="Public Wishlist"
-                                    sublabel="Show on profile"
-                                    color="#5c9fff"
-                                />
+                                    <Toggle 
+                                        enabled={listBundle?.user?.isWishlistPublic}
+                                        onToggle={() => handleToggleGlobalPrivacy('isWishlistPublic', !listBundle?.user?.isWishlistPublic)}
+                                        label={`Public ${wishlistLabel}`}
+                                        sublabel="Show on profile"
+                                        color="#5c9fff"
+                                    />
                             </div>
 
                             {customLists.map(list => (
@@ -754,7 +757,7 @@ function Lists() {
                             {loadingTab ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-[#c8ff57]" /></div> : (
                                 <>
                                     <div className="flex items-center justify-between mb-8">
-                                        <SearchBar value={wishSearch} onChange={setWishSearch} placeholder={`Search ${mediaType} wishlist...`} />
+                                        <SearchBar value={wishSearch} onChange={setWishSearch} placeholder={`Search ${mediaType} ${wishlistLabel.toLowerCase()}...`} />
                                     </div>
                                     {filteredWish.length > 0 ? (
                                         <>
@@ -762,7 +765,7 @@ function Lists() {
                                             <Pagination currentPage={wishPage} total={filteredWish.length} onPageChange={setWishPage} />
                                         </>
                                     ) : (
-                                        <EmptyState icon="🎯" title="Wishlist Empty" text={`Keep track of ${mediaType} you want to check out later.`} />
+                                        <EmptyState icon="🎯" title={`${wishlistLabel} Empty`} text={`Keep track of ${mediaType} you want to check out later.`} />
                                     )}
                                 </>
                             )}

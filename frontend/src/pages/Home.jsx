@@ -4,7 +4,7 @@ import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
-import { Trophy, Play, Star, ListChecks, X, Pause, Search, Gamepad2, Flame, Plus, ChevronRight, Calendar } from 'lucide-react'
+import { Trophy, Play, Star, ListChecks, X, Pause, Search, Gamepad2, Flame, Plus, ChevronRight, Calendar, BookOpen } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../components/ui/Skeleton'
 import Toast from '../components/ui/Toast'
 import AvatarFrame from '../components/ui/AvatarFrame'
@@ -12,6 +12,7 @@ import { getIGDBImage, SIZES } from '../utils/igdb'
 import { useLeaderboard } from '../context/LeaderboardContext'
 import { Helmet } from 'react-helmet-async'
 import StatsBar from '../components/ui/StatsBar'
+import RecentActivityFeed from '../components/ui/RecentActivityFeed'
 
 
 
@@ -41,6 +42,21 @@ const RatingDisplay = memo(({ myRating, platformAvg, hasUser }) => {
     )
 })
 
+const getMediaPath = (item) => {
+    const media = item.media
+    if (!media) return null
+    const type = media.mediaType || 'game'
+    const id = media.igdbId || media.externalId
+    if (!id) return null
+    
+    if (type === 'game') return `/game/${id}`
+    if (type === 'anime') return `/anime/${id}`
+    if (type === 'manga') return `/manga/${id}`
+    if (type === 'movie') return `/movie/${id}`
+    if (type === 'tv') return `/tv/${id}`
+    return null
+}
+
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000)
     if (seconds < 60) return 'just now'
@@ -52,33 +68,6 @@ const timeAgo = (date) => {
     if (days < 7) return `${days}d ago`
     return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
-
-const makeActivityConfig = (navigate) => ({
-    completed: {
-        icon: <Trophy size={16} />, bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
-        getText: (a) => (<>Completed{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{a.rating ? ` — rated it ${a.rating}/10` : ''}</>)
-    },
-    playing: {
-        icon: <Play size={16} fill="currentColor" />, bg: 'bg-[#c8ff57]/15 text-[#c8ff57]',
-        getText: (a) => (<>Started playing{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span></>)
-    },
-    rated: {
-        icon: <Star size={16} fill="currentColor" />, bg: 'bg-[#ff9f5c]/15 text-[#ff9f5c]',
-        getText: (a) => (<>Rated{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{` ${a.rating}/10`}</>)
-    },
-    planned: {
-        icon: <ListChecks size={16} />, bg: 'bg-[#2a2a35] text-[#e8e8f0]',
-        getText: (a) => (<>Added{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{' to planned list'}</>)
-    },
-    dropped: {
-        icon: <X size={16} strokeWidth={3} />, bg: 'bg-[#ff5c5c]/15 text-[#ff5c5c]',
-        getText: (a) => (<>Dropped{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span>{a.hours ? ` after ${a.hours}h` : ''}</>)
-    },
-    paused: {
-        icon: <Pause size={16} fill="currentColor" />, bg: 'bg-[#c45cff]/15 text-[#c45cff]',
-        getText: (a) => (<>Paused{' '}<span onClick={() => a.game.igdbId && !isNaN(Number(a.game.igdbId)) && navigate(`/game/${a.game.igdbId}`)} className={`text-[#c8ff57] font-bold ${a.game.igdbId && !isNaN(Number(a.game.igdbId)) ? 'cursor-pointer hover:underline' : ''}`}>{a.game.title}</span></>)
-    },
-})
 
 // ── Mosaic banner ──
 const HeroBanner = memo(({ games }) => {
@@ -164,9 +153,6 @@ const HeroBanner = memo(({ games }) => {
         </div>
     )
 })
-
-// normalizeGame removed because it was unused.
-
 
 // ── IGDB Search Bar ──
 function GameSearchBar({ id = 'game-search' }) {
@@ -388,7 +374,6 @@ function Home() {
     const { topUsers } = useLeaderboard()
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
-    const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
 
     const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type })
@@ -413,17 +398,11 @@ function Home() {
         { ttl: 10 * 60 * 1000 } // home data is stable — cache 10 min
     )
     const userId = user?.id || user?._id
-    const { data: activityData } = useCachedFetch(
-        userId ? `activity_${userId}` : null,
-        userId ? `/games/activity/${userId}` : null,
-        { enabled: !!userId, ttl: 2 * 60 * 1000 }
-    )
-
+    
     const trending   = useMemo(() => homeData?.trending   ?? [], [homeData?.trending])
     const topRated   = useMemo(() => homeData?.topRated   ?? [], [homeData?.topRated])
     const comingSoon = useMemo(() => homeData?.comingSoon ?? [], [homeData?.comingSoon])
     const gameStats  = homeData?.gameStats  ?? {}
-    const activity   = activityData?.activity ?? []
 
     const userStats = useMemo(() => ({
         total: games.length,
@@ -852,59 +831,7 @@ function Home() {
             {/* ══════════════════════════
                 RECENT ACTIVITY
             ══════════════════════════ */}
-            {user && (
-                <section className="max-w-[1200px] mx-auto px-5 md:px-10 py-12 border-t border-[#2a2a35]">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="font-black text-2xl tracking-widest uppercase text-white" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Recent Activity</h2>
-                    </div>
-                    {loading && activity.length === 0 ? (
-                        <div className="flex flex-col gap-3">
-                            {Array.from({ length: 3 }).map((_, i) => (
-                                <div key={i} className="flex items-center gap-4 px-5 py-4 bg-[#111118] border border-[#2a2a35] rounded-lg">
-                                    <Skeleton variant="block" width="36px" height="36px" />
-                                    <div className="flex-1">
-                                        <Skeleton variant="line" width="60%" height="12px" />
-                                    </div>
-                                    <Skeleton variant="line" width="40px" height="10px" />
-                                </div>
-                            ))}
-                        </div>
-                    ) : activity.length > 0 ? (
-                        <>
-                            <div className="flex flex-col divide-y divide-[#2a2a35] border border-[#2a2a35] rounded-lg overflow-hidden">
-                                {activity.slice(0, 5).map((item, index) => {
-                                    const config = activityConfig[item.type] || activityConfig.planned
-                                    return (
-                                        <div key={index} className="flex items-center gap-4 px-5 py-4 bg-[#111118] hover:bg-[#18181f] transition-all">
-                                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${config.bg}`}>{config.icon}</div>
-                                            <div className="flex-1 text-sm text-[#7a7a90]">{config.getText(item)}</div>
-                                            <div className="font-mono text-[10px] text-[#7a7a90] flex-shrink-0">{timeAgo(item.time)}</div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                            <div className="mt-4 text-center">
-                                <Link to="/activity">
-                                    <button className="px-6 py-3 border border-[#2a2a35] text-[#7a7a90] font-mono text-xs rounded-lg hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
-                                        Show More Activity →
-                                    </button>
-                                </Link>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-center py-10 flex flex-col items-center">
-                            <Gamepad2 size={48} className="text-[#2a2a35] mb-4" />
-                            <div className="text-[#7a7a90] font-mono text-sm mb-4">No activity yet. Start adding games!</div>
-                            <button 
-                                onClick={() => setShowAddModal(true)}
-                                className="btn-apple btn-apple-primary px-6 py-2.5"
-                            >
-                                + Add to Pond
-                            </button>
-                        </div>
-                    )}
-                </section>
-            )}
+            <RecentActivityFeed defaultMedia="game" />
 
             {/* ── Add Game Modal ── */}
             {showAddModal && (

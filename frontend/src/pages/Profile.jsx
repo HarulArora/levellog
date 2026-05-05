@@ -125,10 +125,14 @@ function Profile() {
 
         // Wishlist
         if (isOwnProfile || user?.isWishlistPublic) {
+            const isWatchlist = profileMediaType === 'anime' || profileMediaType === 'movie' || profileMediaType === 'tv'
+            const label = isWatchlist ? 'Watchlist' : 'Wishlist'
+            const mediaLabel = profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)
+            
             result.push({
                 _id: 'wishlist',
-                name: profileMediaType === 'game' ? 'Wishlist' : `${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)} Wishlist`,
-                description: `${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)} ${user?.username} wants to play/watch`,
+                name: profileMediaType === 'game' ? 'Wishlist' : `${mediaLabel} ${label}`,
+                description: `${mediaLabel} ${user?.username} wants to ${isWatchlist ? 'watch' : 'play'}`,
                 isPublic: user?.isWishlistPublic,
                 games: wishlist,
                 gameCount: wishlist.length,
