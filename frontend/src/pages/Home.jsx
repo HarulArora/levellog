@@ -492,7 +492,7 @@ function Home() {
             </Helmet>
  
             {/* Mobile search bar — sticky just below navbar, hidden on desktop */}
-            <div className="md:hidden sticky top-[57px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center">
+            <div className="md:hidden sticky top-[64px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center">
                 <div className="w-full">
                     <GameSearchBar id="game-search-mobile" />
                 </div>

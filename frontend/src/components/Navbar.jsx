@@ -69,7 +69,7 @@ function Navbar() {
 
     return (
         <nav className="relative border-b border-[#2a2a35] bg-[#0a0a0f]/90 backdrop-blur-md sticky top-0 z-50">
-            <div className="flex items-center justify-between px-5 md:px-10 py-4">
+            <div className="flex items-center justify-between px-5 md:px-10 h-16">
 
                 {/* Logo */}
                 <Link to="/" onClick={handleLinkClick}>
@@ -178,7 +178,7 @@ function Navbar() {
                                 </button>
 
                                 {dropdownOpen && (
-                                    <div className="absolute right-0 top-[calc(100%+10px)] w-56 bg-[#111118] border border-[#2a2a35] rounded-lg shadow-2xl overflow-hidden z-50">
+                                    <div className="absolute right-0 top-full mt-2 w-56 bg-[#111118] border border-[#2a2a35] rounded-lg shadow-2xl overflow-hidden z-50">
                                         {/* User header (if logged in) */}
                                         {user && (
                                             <div className="px-4 py-4 border-b border-[#2a2a35] bg-[#1a1a25]/30">
