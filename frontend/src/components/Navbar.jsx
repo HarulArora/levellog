@@ -12,7 +12,6 @@ function Navbar() {
     const navigate = useNavigate()
     const { user, logout, loading } = useAuth()
     const { unreadCount, setUnreadCount } = useNotifications()
-    const [menuOpen, setMenuOpen] = useState(false)
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const { newDealsCount, clearNewDealsCount } = useDeals()
     const dropdownRef = useRef(null)
@@ -50,25 +49,21 @@ function Navbar() {
         } catch (err) {
             console.error('Logout error:', err)
         } finally {
-            setMenuOpen(false)
             setDropdownOpen(false)
         }
     }
 
     const handleLinkClick = () => {
-        setMenuOpen(false)
         setDropdownOpen(false)
     }
 
     const handleNotificationClick = () => {
         setUnreadCount(0)
-        setMenuOpen(false)
         setDropdownOpen(false)
     }
 
     const handleDealsClick = () => {
         clearNewDealsCount()
-        setMenuOpen(false)
         setDropdownOpen(false)
     }
 
@@ -151,12 +146,17 @@ function Navbar() {
                     </form>
                 </div>
 
-                {/* Desktop right */}
-                <div className="hidden md:flex gap-3 items-center min-w-[120px] justify-end">
+                {/* Right side actions */}
+                <div className="flex gap-2 sm:gap-3 items-center min-w-[120px] justify-end">
                     {!loading && (
-                        user ? (
-                            <>
-                                {/* Notifications */}
+                        <>
+                            {/* Global Search Button */}
+                            <Link to="/search" onClick={handleLinkClick} className="p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
+                                <Search size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
+                            </Link>
+
+                            {/* Notifications (Logged in only) */}
+                            {user && (
                                 <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
                                     <Bell size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
                                     {unreadCount > 0 && (
@@ -165,18 +165,22 @@ function Navbar() {
                                         </div>
                                     )}
                                 </Link>
+                            )}
 
-                                {/* Avatar dropdown */}
-                                <div className="relative" ref={dropdownRef}>
-                                    <button onClick={() => setDropdownOpen(o => !o)} className="flex items-center gap-1.5 focus:outline-none p-1 pr-2 hover:bg-[#2a2a35]/30 rounded-full transition-all border border-transparent hover:border-[#2a2a35]">
-                                        <Avatar />
-                                        <ChevronDown size={14} className={`text-[#7a7a90] transition-transform duration-300 ${dropdownOpen ? 'rotate-180' : ''}`} />
-                                    </button>
+                            {/* Profile Avatar & Dropdown */}
+                            <div className="relative" ref={dropdownRef}>
+                                <button 
+                                    onClick={() => setDropdownOpen(o => !o)} 
+                                    className="flex items-center gap-1.5 focus:outline-none p-1 pr-2 hover:bg-[#2a2a35]/30 rounded-full transition-all border border-transparent hover:border-[#2a2a35]"
+                                >
+                                    {user ? <Avatar /> : <div className="w-10 h-10 rounded-full bg-[#1a1a25] flex items-center justify-center border border-[#2a2a35]"><User size={20} className="text-[#7a7a90]" /></div>}
+                                    <ChevronDown size={14} className={`text-[#7a7a90] transition-transform duration-300 hidden sm:block ${dropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
 
-                                    {dropdownOpen && (
-                                        <div className="absolute right-0 top-[calc(100%+10px)] w-52 bg-[#111118] border border-[#2a2a35] rounded-lg shadow-2xl overflow-hidden z-50">
-
-                                            {/* User info */}
+                                {dropdownOpen && (
+                                    <div className="absolute right-0 top-[calc(100%+10px)] w-56 bg-[#111118] border border-[#2a2a35] rounded-lg shadow-2xl overflow-hidden z-50">
+                                        {/* User header (if logged in) */}
+                                        {user && (
                                             <div className="px-4 py-4 border-b border-[#2a2a35] bg-[#1a1a25]/30">
                                                 <div className="flex items-center gap-3 mb-2">
                                                     <Avatar size="sm" />
@@ -190,196 +194,84 @@ function Navbar() {
                                                     <span className="font-mono text-[10px] text-[#c8ff57] uppercase font-black tracking-widest whitespace-nowrap leading-none pt-[1px] group-hover/lv:underline">Lv.{user.level || 1}</span>
                                                 </Link>
                                             </div>
+                                        )}
 
-                                            {/* Dropdown Menu Links... (same as original) */}
-                                            <div className="py-1">
-                                                <Link to={`/user/${user.username}`} onClick={handleLinkClick}
-                                                    className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
-                                                    <User size={14} className="opacity-70" />
-                                                    <span>My Profile</span>
-                                                </Link>
-
-                                                <Link to="/lists" onClick={handleLinkClick}
-                                                    className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
-                                                    <ListChecks size={14} className="opacity-70" strokeWidth={2.5} />
-                                                    <span>My Lists</span>
-                                                </Link>
-
-                                                <Link to="/deals" onClick={handleDealsClick}
-                                                    className="flex items-center justify-between px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider group/deals">
-                                                    <div className="flex items-center gap-3">
-                                                        <Flame size={14} className={`opacity-70 ${newDealsCount > 0 ? 'text-[#ff5c5c]' : ''}`} />
-                                                        <span>Deals</span>
-                                                    </div>
-                                                    {newDealsCount > 0 && (
-                                                        <span className="bg-[#ff5c5c] text-white text-[9px] px-1.5 py-0.5 rounded-full ring-1 ring-white/10 group-hover/deals:scale-110 transition-transform">
-                                                            {newDealsCount > 9 ? '9+' : newDealsCount}
-                                                        </span>
-                                                    )}
-                                                </Link>
-
-                                                <div className="border-t border-[#2a2a35] my-1" />
-
-                                                <button onClick={handleLogout}
-                                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-[#ff5c5c] hover:bg-[#ff5c5c]/10 transition-all text-[11px] font-bold uppercase tracking-wider">
-                                                    <LogOut size={14} className="opacity-70" />
-                                                    <span>Logout</span>
-                                                </button>
-                                            </div>
+                                        {/* Mobile Navigation Links (Hidden on desktop) */}
+                                        <div className="md:hidden py-1 border-b border-[#2a2a35] bg-[#1a1a25]/10">
+                                            {links.map(link => {
+                                                const isActive = location.pathname === link.path || (link.name === 'HOME' && location.pathname === '/')
+                                                return (
+                                                    <Link
+                                                        key={link.path}
+                                                        to={link.path}
+                                                        onClick={handleLinkClick}
+                                                        className={`flex items-center gap-3 px-4 py-2.5 transition-all text-[11px] font-bold uppercase tracking-wider
+                                                                   ${isActive ? 'text-[#c8ff57] bg-[#c8ff57]/5' : 'text-[#94a3b8] hover:text-white hover:bg-[#1a1a25]'}`}
+                                                    >
+                                                        <span>{link.name}</span>
+                                                    </Link>
+                                                )
+                                            })}
                                         </div>
-                                    )}
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <Link to="/login">
-                                    <button className="px-4 py-2 text-sm font-semibold border border-[#2a2a35] text-white rounded hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all">
-                                        Login
-                                    </button>
-                                </Link>
-                                <Link to="/signup">
-                                    <button className="px-4 py-2 text-sm font-semibold bg-[#c8ff57] text-black rounded hover:bg-[#d4ff6e] transition-all">
-                                        Sign Up
-                                    </button>
-                                </Link>
-                            </>
-                        )
+
+                                        {/* Dropdown Actions */}
+                                        <div className="py-1">
+                                            {user ? (
+                                                <>
+                                                    <Link to={`/user/${user.username}`} onClick={handleLinkClick}
+                                                        className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                        <User size={14} className="opacity-70" />
+                                                        <span>My Profile</span>
+                                                    </Link>
+
+                                                    <Link to="/lists" onClick={handleLinkClick}
+                                                        className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                        <ListChecks size={14} className="opacity-70" strokeWidth={2.5} />
+                                                        <span>My Lists</span>
+                                                    </Link>
+
+                                                    <Link to="/deals" onClick={handleDealsClick}
+                                                        className="flex items-center justify-between px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider group/deals">
+                                                        <div className="flex items-center gap-3">
+                                                            <Flame size={14} className={`opacity-70 ${newDealsCount > 0 ? 'text-[#ff5c5c]' : ''}`} />
+                                                            <span>Deals</span>
+                                                        </div>
+                                                        {newDealsCount > 0 && (
+                                                            <span className="bg-[#ff5c5c] text-white text-[9px] px-1.5 py-0.5 rounded-full ring-1 ring-white/10 group-hover/deals:scale-110 transition-transform">
+                                                                {newDealsCount > 9 ? '9+' : newDealsCount}
+                                                            </span>
+                                                        )}
+                                                    </Link>
+
+                                                    <div className="border-t border-[#2a2a35] my-1" />
+
+                                                    <button onClick={handleLogout}
+                                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-[#ff5c5c] hover:bg-[#ff5c5c]/10 transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                        <LogOut size={14} className="opacity-70" />
+                                                        <span>Logout</span>
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Link to="/login" onClick={handleLinkClick}
+                                                        className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                        <span>Login</span>
+                                                    </Link>
+                                                    <Link to="/signup" onClick={handleLinkClick}
+                                                        className="flex items-center gap-3 px-4 py-2.5 text-[#c8ff57] hover:bg-[#c8ff57]/10 transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                        <span>Sign Up</span>
+                                                    </Link>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                 </div>
-
-                {/* Hamburger */}
-                <button 
-                    onClick={() => setMenuOpen(!menuOpen)} 
-                    className="md:hidden flex flex-col items-center justify-center gap-[5px] w-12 h-12 -mr-2" 
-                    aria-label={menuOpen ? "Close menu" : "Open menu"}
-                >
-                    <span className={`block w-6 h-[2px] bg-white transition-all duration-200 ${menuOpen ? 'rotate-45 translate-y-[7px]' : ''}`} />
-                    <span className={`block w-6 h-[2px] bg-white transition-all duration-200 ${menuOpen ? 'opacity-0' : ''}`} />
-                    <span className={`block w-6 h-[2px] bg-white transition-all duration-200 ${menuOpen ? '-rotate-45 -translate-y-[7px]' : ''}`} />
-                </button>
             </div>
 
-            {/* Mobile menu */}
-            {menuOpen && (
-                <div className="md:hidden border-t border-[#2a2a35] bg-[#0a0a0f] px-5 py-4 flex flex-col gap-4">
-
-                    {links.map(link => {
-                        const isDeals = link.path === '/deals'
-                        const path = location.pathname
-                        
-                        let isActive = false
-                        if (link.name === 'HOME') {
-                            isActive = path === '/' || path === '/anime' || path === '/movies' || path === '/manga' || path === '/tv'
-                        } else if (link.name === 'DISCOVER') {
-                            isActive = path.includes('/discover') || 
-                                       path.includes('/game/') || 
-                                       (path.includes('/movies/') && !path.includes('/library')) || 
-                                       (path.includes('/tv/') && !path.includes('/library')) || 
-                                       (path.includes('/anime/') && !path.includes('/library')) || 
-                                       (path.includes('/manga/') && !path.includes('/library'))
-                        } else if (link.name === 'LIBRARY') {
-                            isActive = path.includes('/library')
-                        } else if (link.name === 'FRIENDS') {
-                            isActive = path.includes('/search') || path.includes('/friends') || path.includes('/universal-search')
-                        } else {
-                            isActive = path.includes(link.path)
-                        }
-
-                        return (
-                            <Link
-                                key={link.path}
-                                to={link.path}
-                                onClick={isDeals ? handleDealsClick : handleLinkClick}
-                                className={`text-sm font-semibold tracking-widest uppercase flex items-center gap-2
-                                           ${isActive ? 'text-[#c8ff57]' : 'text-[#94a3b8]'}`}
-                            >
-                                {link.name}
-                                {isDeals && newDealsCount > 0 && (
-                                    <span className="bg-[#c8ff57] text-black rounded-full px-2 text-[9px] font-bold font-mono">
-                                        {newDealsCount > 9 ? '9+' : newDealsCount}
-                                    </span>
-                                )}
-                            </Link>
-                        )
-                    })}
-
-                    {user && (
-                        <Link to="/notifications" onClick={handleNotificationClick}
-                            className="text-sm font-semibold tracking-widest uppercase text-[#94a3b8] flex items-center gap-3 py-1">
-                            <Bell size={18} />
-                            <span>Notifications</span>
-                            {unreadCount > 0 && (
-                                <span className="bg-[#ff5c5c] text-white rounded-full px-2 text-[10px] font-bold">
-                                    {unreadCount}
-                                </span>
-                            )}
-                        </Link>
-                    )}
-
-                    <div className="border-t border-[#2a2a35]" />
-
-                    {!loading && (
-                        user ? (
-                            <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-3 py-2">
-                                    <Avatar size="w-9 h-9 text-xs" />
-                                    <div>
-                                        <div className="text-white font-bold text-sm tracking-tight">{user.username}</div>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <Link to="/stats?tab=xp" onClick={handleLinkClick} className="flex items-center gap-1.5 bg-[#111118] rounded-full px-2 py-0.5 border border-[#2a2a35] shadow-sm shadow-black/40 hover:border-[#c8ff57]/50 transition-colors group/mlv">
-                                                <span className="flex items-center justify-center text-[10px] leading-none relative -top-[1.8px]">{user.badge || '🎮'}</span>
-                                                <span className="font-mono text-[9px] text-[#c8ff57] uppercase font-black tracking-widest leading-none group-hover/mlv:underline">Lv.{user.level || 1}</span>
-                                            </Link>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <Link to={`/user/${user.username}`} onClick={handleLinkClick}
-                                    className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
-                                    <User size={16} />
-                                    <span>My Profile</span>
-                                </Link>
-
-                                <Link to="/lists" onClick={handleLinkClick}
-                                    className="flex items-center gap-3 py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
-                                    <ListChecks size={16} />
-                                    <span>My Lists</span>
-                                </Link>
-
-                                <Link to="/deals" onClick={handleDealsClick}
-                                    className="flex items-center justify-between py-3 text-[#a0a0b8] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider">
-                                    <div className="flex items-center gap-3">
-                                        <Flame size={16} className={newDealsCount > 0 ? 'text-[#ff5c5c]' : ''} />
-                                        <span>Deals</span>
-                                    </div>
-                                    {newDealsCount > 0 && (
-                                        <span className="bg-[#ff5c5c] text-white text-[10px] px-2 py-0.5 rounded-full">
-                                            {newDealsCount}
-                                        </span>
-                                    )}
-                                </Link>
-
-                                <div className="border-t border-[#2a2a35] my-1" />
-
-                                <button onClick={handleLogout}
-                                    className="flex items-center gap-3 py-3 text-[#ff5c5c] w-full transition-colors text-xs font-bold uppercase tracking-wider">
-                                    <LogOut size={16} />
-                                    <span>Logout</span>
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-3">
-                                <Link to="/login" onClick={handleLinkClick}>
-                                    <button className="w-full py-2 text-sm font-semibold border border-[#2a2a35] text-white rounded transition-all">Login</button>
-                                </Link>
-                                <Link to="/signup" onClick={handleLinkClick}>
-                                    <button className="w-full py-2 text-sm font-semibold bg-[#c8ff57] text-black rounded transition-all">Sign Up</button>
-                                </Link>
-                            </div>
-                        )
-                    )}
-                </div>
-            )}
         </nav>
     )
 }
