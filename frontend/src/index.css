@@ -156,4 +156,28 @@
 .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
-}
+}
+/* ?? Site-wide Horizontal Overflow Protection */
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+    position: relative;
+    width: 100%;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* Ensure images don't break layouts */
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* ?? Responsive Text Utilities */
+.break-words {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+}

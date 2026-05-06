@@ -48,6 +48,7 @@ const formatJikanItem = (item, type) => ({
     airingStatus: item.status, 
     episodes: item.episodes,
     chapters: item.chapters,
+    volumes: item.volumes,
     studios: item.studios?.map(s => s.name).join(', '),
     producers: item.producers?.map(p => p.name).join(', '),
     source: item.source,
@@ -128,6 +129,7 @@ const fetchAnilistFullDetail = async (idMal, type = 'anime') => {
             }
             episodes
             chapters
+            volumes
             format
             trailer { id site }
             externalLinks { url site }
@@ -200,6 +202,7 @@ const fetchAnilistFullDetail = async (idMal, type = 'anime') => {
                 }).map(e => e.node.name.full).filter((v, i, a) => a.indexOf(v) === i).join(', '),
             episodes: data.episodes,
             chapters: data.chapters,
+            volumes: data.volumes,
             type: type,
             format: data.format,
             trailer: data.trailer?.site === 'youtube' ? data.trailer.id : null,
@@ -878,12 +881,26 @@ router.get('/user/:userId', async (req, res) => {
         const library = await AnimeEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 });
         
         // Populate legacy fields for frontend compatibility
-        const sanitizedLibrary = library.map(entry => {
+        const sanitizedLibrary = await Promise.all(library.map(async (entry) => {
             const obj = entry.toObject();
             if (!obj.cover && obj.coverImage) obj.cover = obj.coverImage;
             if (!obj.type && obj.mediaType) obj.type = obj.mediaType;
+
+            // Heal generic genres if possible
+            const isGeneric = !obj.genre || ['anime', 'manga'].includes(obj.genre.toLowerCase());
+            if (isGeneric && obj.externalId) {
+                try {
+                    const response = await apiClient.get(`${JIKAN_BASE_URL}/${obj.type}/${obj.externalId}`, { retry: 1 });
+                    const fresh = formatJikanItem(response.data.data, obj.type);
+                    if (fresh.genre && !['anime', 'manga'].includes(fresh.genre.toLowerCase())) {
+                        obj.genre = fresh.genre;
+                        // Save back to DB asynchronously to fix it permanently
+                        AnimeEntry.updateOne({ _id: obj._id }, { genre: fresh.genre }).catch(e => console.error('Genre heal save error:', e));
+                    }
+                } catch (e) { /* ignore */ }
+            }
             return obj;
-        });
+        }));
 
         res.json({ success: true, games: sanitizedLibrary }); // Named "games" for profile component compatibility
     } catch (error) {
@@ -896,12 +913,26 @@ router.get('/library', protect, async (req, res) => {
         const library = await AnimeEntry.find({ userId: req.user._id }).sort({ updatedAt: -1 });
         
         // Populate legacy fields for frontend compatibility
-        const sanitizedLibrary = library.map(entry => {
+        const sanitizedLibrary = await Promise.all(library.map(async (entry) => {
             const obj = entry.toObject();
             if (!obj.cover && obj.coverImage) obj.cover = obj.coverImage;
             if (!obj.type && obj.mediaType) obj.type = obj.mediaType;
+
+            // Heal generic genres if possible
+            const isGeneric = !obj.genre || ['anime', 'manga'].includes(obj.genre.toLowerCase());
+            if (isGeneric && obj.externalId) {
+                try {
+                    const response = await apiClient.get(`${JIKAN_BASE_URL}/${obj.type}/${obj.externalId}`, { retry: 1 });
+                    const fresh = formatJikanItem(response.data.data, obj.type);
+                    if (fresh.genre && !['anime', 'manga'].includes(fresh.genre.toLowerCase())) {
+                        obj.genre = fresh.genre;
+                        // Save back to DB asynchronously to fix it permanently
+                        AnimeEntry.updateOne({ _id: obj._id }, { genre: fresh.genre }).catch(e => console.error('Genre heal save error:', e));
+                    }
+                } catch (e) { /* ignore */ }
+            }
             return obj;
-        });
+        }));
 
         res.json({ success: true, library: sanitizedLibrary });
     } catch (error) {
@@ -911,13 +942,13 @@ router.get('/library', protect, async (req, res) => {
 
 router.post('/log', protect, async (req, res) => {
     try {
-        let { externalId, type, status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre, year } = req.body;
+        let { externalId, type, status, rating, episodesWatched, chaptersRead, volumesRead, totalEpisodes, totalChapters, totalVolumes, airingStatus, notes, title, cover, genre, year } = req.body;
         
         const result = await withRetryTransaction(async (session) => {
             const oldEntry = await AnimeEntry.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
             const isNew = !oldEntry;
 
-            const updateData = { status, rating, episodesWatched, chaptersRead, totalEpisodes, totalChapters, airingStatus, notes, title, cover, genre, year };
+            const updateData = { status, rating, episodesWatched, chaptersRead, volumesRead, totalEpisodes, totalChapters, totalVolumes, airingStatus, notes, title, cover, genre, year };
             const entry = await AnimeEntry.findOneAndUpdate(
                 { userId: req.user._id, externalId: parseInt(externalId), type },
                 updateData,

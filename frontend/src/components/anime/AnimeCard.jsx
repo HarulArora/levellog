@@ -111,18 +111,25 @@ const AnimeCard = memo(({ anime, onDelete, onEdit, showAvgRating = true }) => {
                     )}
                 </div>
 
-                <div className="mt-auto flex justify-between items-end">
-                    <div className="flex flex-col gap-0.5">
-                        <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[100px]">
-                            {anime.genres?.[0] || anime.genre}
-                        </span>
-                        {(isManga ? anime.chaptersRead : anime.episodesWatched) > 0 && (
-                            <span className="text-[#c8ff57] font-mono text-[9px] uppercase tracking-widest">
-                                {isManga ? '📖' : '📺'} {isManga ? anime.chaptersRead : anime.episodesWatched} {isManga ? 'ch' : 'ep'} tracked
-                            </span>
-                        )}
-                    </div>
+                <div className="mt-auto flex justify-between items-end pb-2">
+                    <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[1200px]">
+                        {anime.genres?.[0] || anime.genre}
+                    </span>
+                </div>
 
+                <div className="pt-2 border-t border-[#2a2a35] flex flex-col gap-1.5">
+                    {/* Episodes Progress */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#c8ff57] transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (anime.episodesWatched / (anime.totalEpisodes || 1)) * 100)}%` }} 
+                            />
+                        </div>
+                        <span className="text-[#7a7a90] font-mono text-[8px] min-w-[32px] text-right">
+                            E{anime.episodesWatched || 0}/{anime.totalEpisodes || '?'}
+                        </span>
+                    </div>
                 </div>
 
                 {(onEdit || onDelete) && (

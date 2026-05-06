@@ -40,8 +40,8 @@ const movieEntrySchema = new mongoose.Schema(
         status: {
             type: String,
             enum: [
-                'watched', 'completed', 'plan_to_watch', 'dropped', // movies
-                'watching', 'on_hold' // TV additions
+                'playing', 'completed', 'planned', 'paused', 'dropped', // Frontend standard
+                'watching', 'watched', 'plan_to_watch', 'on_hold' // Legacy compatibility
             ],
             required: true
         },

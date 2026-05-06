@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
@@ -33,16 +33,16 @@ function Profile() {
     )
 
     const user = profileData?.user
-    const isOwnProfile = currentUser?.username === username
+    const isOwnProfile = currentUser?.username?.toLowerCase() === username?.toLowerCase()
     const { getFollowStatus, handleFollowToggle, loadingMap } = useFollow()
-    
+
     const followStatus = getFollowStatus(user)
     const isFollowing = followStatus === 'following'
     const requestSent = followStatus === 'requested'
     const canSeeGames = !user?.isPrivate || isOwnProfile || isFollowing
 
-    const baseEndpoint = profileMediaType === 'game' ? 'games' : 
-                         (profileMediaType === 'anime' || profileMediaType === 'manga') ? 'anime' : 'movies';
+    const baseEndpoint = profileMediaType === 'game' ? 'games' :
+        (profileMediaType === 'anime' || profileMediaType === 'manga') ? 'anime' : 'movies';
 
     const { data: gamesData } = useCachedFetch(
         user?._id && canSeeGames ? `profile_items_${user._id}_${baseEndpoint}` : null,
@@ -50,11 +50,6 @@ function Profile() {
         { enabled: !!user?._id && canSeeGames, deps: [user?._id, baseEndpoint] }
     )
 
-    const { data: listsData } = useCachedFetch(
-        user?._id && canSeeGames ? `profile_lists_${user._id}_${profileMediaType}` : null,
-        user?._id && canSeeGames ? `/lists/user/${user._id}?mediaType=${profileMediaType}` : null,
-        { enabled: !!user?._id && canSeeGames, deps: [user?._id, profileMediaType] }
-    )
 
     const { data: likesData } = useCachedFetch(
         user?._id && canSeeGames ? `profile_likes_${user._id}_${profileMediaType}` : null,
@@ -78,7 +73,6 @@ function Profile() {
             return itemType === profileMediaType;
         });
     }, [rawItems, profileMediaType])
-    const lists = useMemo(() => listsData?.lists || [], [listsData])
     const likes = useMemo(() => likesData?.likes || [], [likesData])
     const wishlist = useMemo(() => wishlistData?.wishlist || [], [wishlistData])
     const followLoading = user ? loadingMap[user._id] : false
@@ -98,11 +92,6 @@ function Profile() {
 
 
 
-    const visibleLists = useMemo(() => {
-        if (!lists.length) return []
-        if (isOwnProfile) return lists
-        return lists.filter(l => l.isPublic)
-    }, [lists, isOwnProfile])
 
     const prefix = profileMediaType === 'game' ? '' : (profileMediaType === 'tv' ? 'TV' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1))
     const likesField = prefix ? `is${prefix}LikesPublic` : 'isLikesPublic'
@@ -110,7 +99,7 @@ function Profile() {
 
     const specialLists = useMemo(() => {
         const result = []
-        
+
         // Liked Items
         if (isOwnProfile || user?.[likesField]) {
             result.push({
@@ -132,7 +121,7 @@ function Profile() {
             const isWatchlist = profileMediaType === 'anime' || profileMediaType === 'movie' || profileMediaType === 'tv'
             const label = isWatchlist ? 'Watchlist' : 'Wishlist'
             const mediaLabel = profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)
-            
+
             result.push({
                 _id: 'wishlist',
                 name: profileMediaType === 'game' ? 'Wishlist' : `${mediaLabel} ${label}`,
@@ -150,68 +139,53 @@ function Profile() {
         return result
     }, [user, isOwnProfile, likes, wishlist])
 
-    const allCollections = useMemo(() => [...specialLists, ...visibleLists], [specialLists, visibleLists])
+    const allCollections = useMemo(() => [...specialLists], [specialLists])
 
-    useEffect(() => {
-        const loadFullCustomList = async () => {
-            if (selectedList && !selectedList.isSpecial && selectedList.gameCount > (selectedList.games?.length || 0)) {
-                try {
-                    const res = await api.get(`/lists/custom/${selectedList._id}/game`)
-                    if (res.data.success) {
-                        setSelectedList(res.data.list)
-                    }
-                } catch (err) {
-                    console.error('Failed to load full list:', err)
-                }
-            }
-        }
-        loadFullCustomList()
-    }, [selectedList])
 
     const handleInvalidateAndRefetch = useCallback(() => {
         invalidateCache(`profile_${username}`)
         if (user?._id) {
             invalidateCache(`profile_games_${user._id}`)
-            
+
             // Invalidate for all media types to ensure consistency
             const mediaTypes = ['game', 'anime', 'manga', 'movie', 'tv']
             mediaTypes.forEach(m => {
-                invalidateCache(`profile_lists_${user._id}_${m}`)
                 invalidateCache(`profile_likes_${user._id}_${m}`)
                 invalidateCache(`profile_wishlist_${user._id}_${m}`)
-                invalidateCache(`lists_${user._id}_${m}`)
             })
         }
-        
+
         if (isOwnProfile) {
             refreshUser()
         }
-        
+
         refetchProfile(true) // 🚀 Silent refetch (background)
     }, [username, user?._id, refetchProfile, isOwnProfile, refreshUser])
 
     // ── STATS ──
     const stats = useMemo(() => {
         const isGame = profileMediaType === 'game';
-        const s = isGame ? (user?.gameStats || {}) : {};
         
-        const total = isGame ? (s.total ?? games.length) : games.length;
-        const completed = isGame ? (s.completed ?? games.filter(g => g.status === 'completed').length) : games.filter(g => g.status === 'completed').length;
-        const playing = isGame ? (s.playing ?? games.filter(g => g.status === 'playing').length) : games.filter(g => g.status === 'playing').length;
-        const planned = isGame ? (s.planned ?? games.filter(g => g.status === 'planned').length) : games.filter(g => g.status === 'planned').length;
-        const dropped = isGame ? (s.dropped ?? games.filter(g => g.status === 'dropped').length) : games.filter(g => g.status === 'dropped').length;
-        const paused = isGame ? (s.paused ?? games.filter(g => g.status === 'paused').length) : games.filter(g => g.status === 'paused').length;
-        
+        // For Games, we calculate from the actual loaded games array to ensure 100% accuracy
+        // even if the backend counters get out of sync.
+        const total = games.length;
+        const completed = games.filter(g => g.status === 'completed').length;
+        const playing = games.filter(g => g.status === 'playing').length;
+        const planned = games.filter(g => g.status === 'planned').length;
+        const dropped = games.filter(g => g.status === 'dropped').length;
+        const paused = games.filter(g => g.status === 'paused').length;
+
         let secondaryMetric = 0;
+        const s = user?.gameStats || {};
         if (profileMediaType === 'game') secondaryMetric = s.totalHours ?? games.reduce((sum, g) => sum + (g.hours || 0), 0);
         else if (profileMediaType === 'anime') secondaryMetric = games.reduce((sum, g) => sum + (g.episodesWatched || 0), 0);
         else if (profileMediaType === 'manga') secondaryMetric = games.reduce((sum, g) => sum + (g.chaptersRead || 0), 0);
-        
+
         const ratedItems = games.filter(g => g.rating > 0);
-        const avgRating = isGame && s.avgRating ? s.avgRating : (ratedItems.length > 0 
+        const avgRating = isGame && s.avgRating ? s.avgRating : (ratedItems.length > 0
             ? (ratedItems.reduce((sum, g) => sum + g.rating, 0) / ratedItems.length).toFixed(1)
             : null);
-            
+
         return {
             total,
             completed,
@@ -226,6 +200,20 @@ function Profile() {
     }, [user, games, profileMediaType])
 
     const recentGames = games.slice(0, 10)
+    const location = useLocation();
+
+    // Auto-switch tab based on URL param
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tab = params.get('tab');
+        if (tab === 'collections') {
+            setActiveTab('lists');
+        } else if (tab === 'stats') {
+            setActiveTab('stats');
+        } else if (tab === 'recent') {
+            setActiveTab('recent');
+        }
+    }, [location.search]);
 
     // ── FOLLOW / UNFOLLOW ──
     const handleFollow = async () => {
@@ -305,7 +293,7 @@ function Profile() {
     const theme = rankThemes[rank]
 
     return (
-        <div className="w-full max-w-[1200px] mx-auto px-5 md:px-10 py-8 md:py-10 min-h-[80vh]">
+        <div className="w-full max-w-[1200px] mx-auto px-5 md:px-10 pt-4 md:pt-6 pb-12 min-h-[80vh]">
             <Helmet>
                 <title>{user.username}'s Profile | QuestDuck</title>
                 <meta name="description" content={`Check out ${user.username}'s gaming library, stats, and lists on QuestDuck.`} />
@@ -316,7 +304,7 @@ function Profile() {
 
             {/* XP Toast */}
             {xpToast && (
-                <div className={`fixed bottom-8 md:bottom-12 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
+                <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
                                 ${xpToast.type === 'loss'
                         ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]'
                         : xpToast.type === 'pending'
@@ -329,7 +317,7 @@ function Profile() {
             {/* ── Profile Header ── */}
             <div className={`relative border rounded-lg p-6 md:p-8 mb-6 overflow-hidden transition-all duration-700
                            ${theme ? `${theme.bg} ${theme.border} shadow-[0_0_30px_-10px_rgba(0,0,0,0.5)]` : 'bg-[#111118] border-[#2a2a35]'}`}>
-                
+
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 relative z-10">
 
                     {/* Avatar with Ranking System */}
@@ -487,25 +475,25 @@ function Profile() {
                 {canSeeGames && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-[#2a2a35]">
                         {[
-                            { 
-                                label: profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1), 
-                                value: stats.total, 
-                                color: 'text-[#c8ff57]' 
+                            {
+                                label: profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1),
+                                value: stats.total,
+                                color: 'text-[#c8ff57]'
                             },
-                            { 
-                                label: 'Completed', 
-                                value: stats.completed, 
-                                color: 'text-[#5c9fff]' 
+                            {
+                                label: 'Completed',
+                                value: stats.completed,
+                                color: 'text-[#5c9fff]'
                             },
-                            { 
+                            {
                                 label: profileMediaType === 'game' ? 'Playing' : 'Playing', // Keep label but dynamic if needed
-                                value: stats.playing, 
-                                color: 'text-[#c8ff57]' 
+                                value: stats.playing,
+                                color: 'text-[#c8ff57]'
                             },
-                            { 
-                                label: profileMediaType === 'game' ? 'Hours' : profileMediaType === 'anime' ? 'Episodes' : profileMediaType === 'manga' ? 'Chapters' : 'Rated', 
-                                value: profileMediaType === 'game' ? stats.secondaryMetric : (profileMediaType === 'anime' || profileMediaType === 'manga') ? stats.secondaryMetric : stats.rated, 
-                                color: 'text-[#ff9f5c]' 
+                            {
+                                label: profileMediaType === 'game' ? 'Hours' : profileMediaType === 'anime' ? 'Episodes' : profileMediaType === 'manga' ? 'Chapters' : 'Rated',
+                                value: profileMediaType === 'game' ? stats.secondaryMetric : (profileMediaType === 'anime' || profileMediaType === 'manga') ? stats.secondaryMetric : stats.rated,
+                                color: 'text-[#ff9f5c]'
                             },
                         ].map(stat => (
                             <div key={stat.label} className="text-center">
@@ -523,31 +511,31 @@ function Profile() {
             </div>
 
             {/* ── Tab Bar ── */}
-                <div className="flex gap-1 mb-4 flex-wrap">
-                    {[
-                        { 
-                            id: 'recent', 
-                            label: (
-                                <>
-                                    <History size={14} className="mr-1" />
-                                    Recent
-                                </>
-                            ) 
-                        },
-                        { id: 'stats', label: <><BarChart2 size={14} className="mr-1" /> Stats</> },
-                        ...(canSeeGames ? [{ id: 'lists', label: <><Layers size={14} className="mr-1" /> Collections</> }] : []),
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => { setActiveTab(tab.id); setSelectedList(null) }}
-                            className={`font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-lg border transition-all
+            <div className="flex gap-1 mb-4 flex-wrap">
+                {[
+                    {
+                        id: 'recent',
+                        label: (
+                            <>
+                                <History size={14} className="mr-1" />
+                                Recent
+                            </>
+                        )
+                    },
+                    { id: 'stats', label: <><BarChart2 size={14} className="mr-1" /> Stats</> },
+                    ...(canSeeGames ? [{ id: 'lists', label: <><Layers size={14} className="mr-1" /> Collections</> }] : []),
+                ].map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => { setActiveTab(tab.id); setSelectedList(null) }}
+                        className={`font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-lg border transition-all
                                        ${activeTab === tab.id
-                                    ? 'bg-[#c8ff57]/10 border-[#c8ff57]/40 text-[#c8ff57]'
-                                    : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]/30 hover:text-[#c8ff57]'}`}>
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
+                                ? 'bg-[#c8ff57]/10 border-[#c8ff57]/40 text-[#c8ff57]'
+                                : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]/30 hover:text-[#c8ff57]'}`}>
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
 
             {/* ── Games Tab ── */}
             {(!canSeeGames || activeTab === 'recent') && (
@@ -566,9 +554,9 @@ function Profile() {
                                     key={m.id}
                                     onClick={() => { setProfileMediaType(m.id); setSelectedList(null) }}
                                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-[10px] uppercase tracking-widest transition-all
-                                            ${profileMediaType === m.id 
-                                                    ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]' 
-                                                    : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
+                                            ${profileMediaType === m.id
+                                            ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]'
+                                            : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
                                 >
                                     <m.icon size={14} />
                                     <span className="hidden sm:inline">{m.label}</span>
@@ -588,78 +576,78 @@ function Profile() {
                             )}
                         </h2>
 
-                    {!canSeeGames ? (
-                        <div className="flex flex-col items-center justify-center py-16 gap-4">
-                            <Lock size={48} strokeWidth={1.5} className="text-[#2a2a35]" />
-                            <div className="text-white font-black text-xl tracking-widest uppercase"
-                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                Private Profile
-                            </div>
-                            <div className="text-[#7a7a90] font-mono text-sm text-center max-w-xs mb-2">
-                                {requestSent
-                                    ? `Your follow request is pending. Wait for ${user.username} to accept.`
-                                    : `Follow ${user.username} to see their games`}
-                            </div>
-                            {!currentUser && (
-                                <Link to="/login">
-                                    <button className="btn-apple btn-apple-primary px-6 py-2.5">
-                                        Login to Follow
-                                    </button>
-                                </Link>
-                            )}
-                        </div>
-                    ) : recentGames.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                            {recentGames.map(item => {
-                                const sc = statusConfig[item.status] || statusConfig.planned
-                                const isGame = profileMediaType === 'game'
-                                const imageUrl = isGame 
-                                    ? getIGDBImage(item.cover || (item.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${item.steamId}/header.jpg` : null), SIZES.COVER_BIG)
-                                    : (item.cover || item.coverImage)
-                                
-                                const itemId = item.igdbId || item.externalId
-                                const pathMap = {
-                                    game: `/game/${itemId}`,
-                                    anime: `/anime/${itemId}`,
-                                    manga: `/manga/${itemId}`,
-                                    movie: `/movies/${itemId}`,
-                                    tv: `/tv/${itemId}`
-                                }
-                                const detailPath = pathMap[profileMediaType] || '#'
-
-                                return (
-                                    <Link
-                                        key={item._id}
-                                        to={detailPath}
-                                        className="bg-[#18181f] border border-[#2a2a35] rounded-lg overflow-hidden
-                                                   hover:border-[#c8ff57]/50 transition-all group"
-                                    >
-                                        <div className="h-[120px] bg-cover bg-center bg-[#2a2a35] relative flex items-center justify-center"
-                                            style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}>
-                                            {!imageUrl && (
-                                                isGame ? <Gamepad2 size={32} className="text-[#3a3a4a]" /> : <Film size={32} className="text-[#3a3a4a]" />
-                                            )}
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all" />
-                                        </div>
-                                        <div className="p-2">
-                                            <div className="text-white font-semibold text-xs truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
-                                                {item.title_english || item.title}
-                                            </div>
-                                            <span className={`font-mono text-[9px] uppercase tracking-wider px-1 py-[1px] rounded-sm ${sc.bg} ${sc.color}`}>
-                                                {sc.label}
-                                            </span>
-                                        </div>
+                        {!canSeeGames ? (
+                            <div className="flex flex-col items-center justify-center py-16 gap-4">
+                                <Lock size={48} strokeWidth={1.5} className="text-[#2a2a35]" />
+                                <div className="text-white font-black text-xl tracking-widest uppercase"
+                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                    Private Profile
+                                </div>
+                                <div className="text-[#7a7a90] font-mono text-sm text-center max-w-xs mb-2">
+                                    {requestSent
+                                        ? `Your follow request is pending. Wait for ${user.username} to accept.`
+                                        : `Follow ${user.username} to see their games`}
+                                </div>
+                                {!currentUser && (
+                                    <Link to="/login">
+                                        <button className="btn-apple btn-apple-primary px-6 py-2.5">
+                                            Login to Follow
+                                        </button>
                                     </Link>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">
-                            No {profileMediaType}s logged yet
-                        </div>
-                    )}
+                                )}
+                            </div>
+                        ) : recentGames.length > 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                                {recentGames.map(item => {
+                                    const sc = statusConfig[item.status] || statusConfig.planned
+                                    const isGame = profileMediaType === 'game'
+                                    const imageUrl = isGame
+                                        ? getIGDBImage(item.cover || (item.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${item.steamId}/header.jpg` : null), SIZES.COVER_BIG)
+                                        : (item.cover || item.coverImage)
+
+                                    const itemId = item.igdbId || item.externalId
+                                    const pathMap = {
+                                        game: `/game/${itemId}`,
+                                        anime: `/anime/${itemId}`,
+                                        manga: `/manga/${itemId}`,
+                                        movie: `/movies/${itemId}`,
+                                        tv: `/tv/${itemId}`
+                                    }
+                                    const detailPath = pathMap[profileMediaType] || '#'
+
+                                    return (
+                                        <Link
+                                            key={item._id}
+                                            to={detailPath}
+                                            className="bg-[#18181f] border border-[#2a2a35] rounded-lg overflow-hidden
+                                                   hover:border-[#c8ff57]/50 transition-all group"
+                                        >
+                                            <div className="h-[120px] bg-cover bg-center bg-[#2a2a35] relative flex items-center justify-center"
+                                                style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}>
+                                                {!imageUrl && (
+                                                    isGame ? <Gamepad2 size={32} className="text-[#3a3a4a]" /> : <Film size={32} className="text-[#3a3a4a]" />
+                                                )}
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all" />
+                                            </div>
+                                            <div className="p-2">
+                                                <div className="text-white font-semibold text-xs truncate mb-1 group-hover:text-[#c8ff57] transition-colors">
+                                                    {item.title_english || item.title}
+                                                </div>
+                                                <span className={`font-mono text-[9px] uppercase tracking-wider px-1 py-[1px] rounded-sm ${sc.bg} ${sc.color}`}>
+                                                    {sc.label}
+                                                </span>
+                                            </div>
+                                        </Link>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center py-10 text-[#7a7a90] font-mono text-sm">
+                                No {profileMediaType}s logged yet
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
             )}
 
             {/* ── Stats Tab ── */}
@@ -678,9 +666,9 @@ function Profile() {
                                 key={m.id}
                                 onClick={() => { setProfileMediaType(m.id); setSelectedList(null) }}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-[10px] uppercase tracking-widest transition-all
-                                           ${profileMediaType === m.id 
-                                                ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]' 
-                                                : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
+                                           ${profileMediaType === m.id
+                                        ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]'
+                                        : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
                             >
                                 <m.icon size={14} />
                                 <span className="hidden sm:inline">{m.label}</span>
@@ -701,20 +689,20 @@ function Profile() {
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             {[
                                 { label: `Total ${profileMediaType === 'game' ? 'Games' : profileMediaType === 'tv' ? 'Shows' : profileMediaType.charAt(0).toUpperCase() + profileMediaType.slice(1)}`, value: stats.total, color: 'text-[#c8ff57]' },
-                                { 
-                                    label: profileMediaType === 'game' ? 'Hours Played' : profileMediaType === 'anime' ? 'Episodes' : profileMediaType === 'manga' ? 'Chapters' : 'Avg Rating', 
-                                    value: profileMediaType === 'game' ? `${stats.secondaryMetric}h` : (profileMediaType === 'anime' || profileMediaType === 'manga') ? stats.secondaryMetric : (stats.avgRating ? `${stats.avgRating}/10` : '—'), 
-                                    color: 'text-[#ff9f5c]' 
+                                {
+                                    label: profileMediaType === 'game' ? 'Hours Played' : profileMediaType === 'anime' ? 'Episodes' : profileMediaType === 'manga' ? 'Chapters' : 'Avg Rating',
+                                    value: profileMediaType === 'game' ? `${stats.secondaryMetric}h` : (profileMediaType === 'anime' || profileMediaType === 'manga') ? stats.secondaryMetric : (stats.avgRating ? `${stats.avgRating}/10` : '—'),
+                                    color: 'text-[#ff9f5c]'
                                 },
-                                { 
-                                    label: (profileMediaType === 'movie' || profileMediaType === 'tv') ? 'Rated' : 'Avg Rating', 
-                                    value: (profileMediaType === 'movie' || profileMediaType === 'tv') ? stats.rated : (stats.avgRating ? `${stats.avgRating}/10` : '—'), 
-                                    color: 'text-[#5c9fff]' 
+                                {
+                                    label: (profileMediaType === 'movie' || profileMediaType === 'tv') ? 'Rated' : 'Avg Rating',
+                                    value: (profileMediaType === 'movie' || profileMediaType === 'tv') ? stats.rated : (stats.avgRating ? `${stats.avgRating}/10` : '—'),
+                                    color: 'text-[#5c9fff]'
                                 },
-                                { 
-                                    label: (profileMediaType === 'movie' || profileMediaType === 'tv') ? 'Top Genre' : 'Rated', 
-                                    value: (profileMediaType === 'movie' || profileMediaType === 'tv') ? (games.length > 0 ? (games[0].genre || 'N/A') : '—') : stats.rated, 
-                                    color: 'text-[#c45cff]' 
+                                {
+                                    label: (profileMediaType === 'movie' || profileMediaType === 'tv') ? 'Top Genre' : 'Rated',
+                                    value: (profileMediaType === 'movie' || profileMediaType === 'tv') ? (games.length > 0 ? (games[0].genre || 'N/A') : '—') : stats.rated,
+                                    color: 'text-[#c45cff]'
                                 },
                             ].map(s => (
                                 <div key={s.label} className="text-center bg-[#18181f] border border-[#2a2a35] rounded-lg p-4">
@@ -777,9 +765,9 @@ function Profile() {
                                 key={m.id}
                                 onClick={() => { setProfileMediaType(m.id); setSelectedList(null) }}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-[10px] uppercase tracking-widest transition-all
-                                           ${profileMediaType === m.id 
-                                                ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]' 
-                                                : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
+                                           ${profileMediaType === m.id
+                                        ? 'bg-[#c8ff57] text-black font-bold shadow-[0_0_15px_rgba(200,255,87,0.3)]'
+                                        : 'text-[#7a7a90] hover:text-white hover:bg-[#18181f]'}`}
                             >
                                 <m.icon size={14} />
                                 <span className="hidden sm:inline">{m.label}</span>
@@ -801,9 +789,9 @@ function Profile() {
                                     <div className="w-12 h-12 rounded-lg bg-[#c8ff57]/15 flex items-center justify-center flex-shrink-0">
                                         <List size={24} className="text-[#c8ff57]" />
                                     </div>
-                                    <div>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <h2 className="font-black text-xl text-white tracking-widest uppercase"
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                            <h2 className="font-black text-xl text-white tracking-widest uppercase break-all w-full"
                                                 style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                                 {selectedList.name}
                                             </h2>
@@ -819,7 +807,7 @@ function Profile() {
                                             )}
                                         </div>
                                         {selectedList.description && (
-                                            <div className="font-mono text-xs text-[#7a7a90] mt-1">{selectedList.description}</div>
+                                            <div className="font-mono text-xs text-[#7a7a90] mt-1 break-all w-full">{selectedList.description}</div>
                                         )}
                                         <div className="font-mono text-[10px] text-[#7a7a90] mt-1">
                                             {selectedList.games?.length || 0} {profileMediaType === 'game' ? 'games' : 'items'}
@@ -832,36 +820,36 @@ function Profile() {
                                     {selectedList.games.map((game, i) => {
                                         const gameId = game.igdbId || game.externalId
                                         const detailPath = profileMediaType === 'game' ? `/game/${gameId}` : `/${profileMediaType === 'tv' ? 'tv' : profileMediaType === 'movie' ? 'movies' : profileMediaType}/${gameId}`
-                                        
+
                                         return (
                                             <Link key={`${gameId}-${i}`} to={detailPath}
                                                 className="bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden hover:border-[#c8ff57]/50 transition-all group">
-                                            <div className="relative">
-                                                {game.gameCover ? (
-                                                    <img src={game.gameCover} alt={game.gameTitle}
-                                                        className="w-full h-[140px] object-cover group-hover:opacity-90 transition-opacity" />
-                                                ) : (
-                                                    <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center">
-                                                        <Gamepad2 size={40} className="text-[#3a3a4a]" />
-                                                    </div>
-                                                )}
-                                                
-                                                {/* Community Average Rating Badge */}
-                                                {game.avgRating > 0 && (
-                                                    <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1.5 py-0.5 shadow-xl z-10">
-                                                        <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
-                                                        <span className="font-black text-[10px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="p-2">
-                                                <div className="text-white font-semibold text-xs truncate group-hover:text-[#c8ff57] transition-colors">
-                                                    {game.title_english || game.gameTitle}
+                                                <div className="relative">
+                                                    {game.gameCover ? (
+                                                        <img src={game.gameCover} alt={game.gameTitle}
+                                                            className="w-full h-[140px] object-cover group-hover:opacity-90 transition-opacity" />
+                                                    ) : (
+                                                        <div className="w-full h-[140px] bg-[#18181f] flex items-center justify-center">
+                                                            <Gamepad2 size={40} className="text-[#3a3a4a]" />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Community Average Rating Badge */}
+                                                    {game.avgRating > 0 && (
+                                                        <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-1.5 py-0.5 shadow-xl z-10">
+                                                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                                                            <span className="font-black text-[10px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.avgRating}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        </Link>
+                                                <div className="p-2">
+                                                    <div className="text-white font-semibold text-xs truncate group-hover:text-[#c8ff57] transition-colors">
+                                                        {game.title_english || game.gameTitle}
+                                                    </div>
+                                                </div>
+                                            </Link>
                                         )
-                                    }) }
+                                    })}
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-16 gap-3 bg-[#111118] border border-[#2a2a35] rounded-lg">
@@ -874,14 +862,14 @@ function Profile() {
                         allCollections.length > 0 ? (
                             allCollections.map(list => (
                                 <div key={list._id} onClick={() => setSelectedList(list)}
-                                    className="bg-[#111118] border border-[#2a2a35] rounded-lg hover:border-[#c8ff57]/30 transition-all overflow-hidden cursor-pointer">
-                                    <div className="flex items-center gap-4 p-4">
+                                    className="bg-[#111118] border border-[#2a2a35] rounded-lg hover:border-[#c8ff57]/30 transition-all overflow-hidden cursor-pointer min-w-0">
+                                    <div className="flex items-center gap-3 p-3 md:gap-4 md:p-4 min-w-0">
                                         <div className={`w-12 h-12 rounded-lg ${list.bg || 'bg-[#c8ff57]/15'} flex items-center justify-center flex-shrink-0`}>
                                             {list.icon ? <list.icon size={20} className={list.color || 'text-[#c8ff57]'} /> : <List size={20} className="text-[#c8ff57]" />}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <div className="text-white font-semibold text-sm truncate">{list.name}</div>
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="text-white font-semibold text-xs md:text-sm truncate flex-1 min-w-0">{list.name}</div>
                                                 {list.isSpecial ? (
                                                     <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-[2px] rounded-sm bg-[#c8ff57]/15 text-[#c8ff57]">
                                                         System

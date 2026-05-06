@@ -1,7 +1,5 @@
 import express from 'express'
 import { protect, protectOptional } from '../middleware/auth.js'
-import GameList from '../models/GameList.js'
-import GameListEntry from '../models/GameListEntry.js'
 import GameLike from '../models/GameLike.js'
 import Wishlist from '../models/Wishlist.js'
 import GameReview from '../models/GameReview.js'
@@ -38,26 +36,17 @@ router.get('/me', protect, async (req, res) => {
         const { mediaType = 'game' } = req.query
         const { Like, Wishlist: WishlistModel } = getMediaModels(mediaType)
 
-        const listQuery = mediaType === 'game' 
-            ? { userId: req.user._id, $or: [{ mediaType: 'game' }, { mediaType: { $exists: false } }] }
-            : { userId: req.user._id, mediaType }
-
-        const [customLists, likeCount, wishCount, user] = await Promise.all([
-            GameList.find(listQuery).sort({ createdAt: -1 }).lean(),
+        const [likeCount, wishCount, user] = await Promise.all([
             Like.countDocuments({ userId: req.user._id, ...(mediaType !== 'game' ? { type: mediaType } : {}) }),
             WishlistModel.countDocuments({ userId: req.user._id, ...(mediaType !== 'game' ? { type: mediaType } : {}) }),
             User.findById(req.user._id).select('xp level badge username avatar isLikesPublic isWishlistPublic isAnimeLikesPublic isAnimeWishlistPublic isMangaLikesPublic isMangaWishlistPublic isMovieLikesPublic isMovieWishlistPublic isTVLikesPublic isTVWishlistPublic').lean(),
         ])
 
-        // Get preview entries for custom lists
-        const listIds = customLists.map(l => l._id)
-        const entriesPreview = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 }).lean()
-        
         // Get previews for likes/wishlist
         const likesPreview = await Like.find({ userId: req.user._id, ...(mediaType !== 'game' ? { type: mediaType } : {}) }).sort({ createdAt: -1 }).limit(6).lean()
         const wishlistPreview = await WishlistModel.find({ userId: req.user._id, ...(mediaType !== 'game' ? { type: mediaType } : {}) }).sort({ createdAt: -1 }).limit(6).lean()
 
-        // Normalize previews for frontend (map externalId/igdbId to a common format)
+        // Normalize previews for frontend
         const normalize = (item) => ({
             ...item,
             igdbId: item.igdbId || item.externalId,
@@ -65,14 +54,9 @@ router.get('/me', protect, async (req, res) => {
             gameCover: item.gameCover || item.cover
         })
 
-        const listsWithPreviews = customLists.map(list => ({
-            ...list,
-            games: entriesPreview.filter(e => e.listId.toString() === list._id.toString()).slice(0, 6).map(normalize)
-        }))
-
         res.json({ 
             success: true, 
-            customLists: listsWithPreviews, 
+            customLists: [], 
             likesCount: likeCount, 
             wishlistCount: wishCount,
             likesPreview: likesPreview.map(normalize),
@@ -91,49 +75,7 @@ router.get('/user/:userId', protectOptional, async (req, res) => {
         const targetUser = await User.findById(req.params.userId).select('isPrivate').lean()
         if (!targetUser) return res.status(404).json({ success: false, message: 'User not found' })
 
-        // 🛡️ Privacy Wall
-        let isAuthorized = false
-        if (req.user) {
-            const requesterId = req.user._id.toString()
-            if (requesterId === req.params.userId) {
-                isAuthorized = true // Owner
-            } else {
-                const isFollowing = await Follow.findOne({ followerId: requesterId, followingId: req.params.userId }).lean()
-                if (isFollowing) isAuthorized = true // Approved Follower
-            }
-        }
-
-        if (targetUser.isPrivate && !isAuthorized) {
-            return res.json({ success: true, lists: [], isRestricted: true })
-        }
-
-        const listQuery = mediaType === 'game' 
-            ? { userId: req.params.userId, $or: [{ mediaType: 'game' }, { mediaType: { $exists: false } }] }
-            : { userId: req.params.userId, mediaType }
-
-        if (!isAuthorized) {
-            listQuery.isPublic = true
-        }
-
-        const customLists = await GameList.find(listQuery).sort({ createdAt: -1 }).lean()
-        
-        // Get preview entries for custom lists
-        const listIds = customLists.map(l => l._id)
-        const entriesPreview = await GameListEntry.find({ listId: { $in: listIds } }).sort({ createdAt: -1 }).lean()
-        
-        const normalize = (item) => ({
-            ...item,
-            igdbId: item.igdbId || item.externalId,
-            gameTitle: item.gameTitle || item.title,
-            gameCover: item.gameCover || item.cover
-        })
-
-        const listsWithPreviews = customLists.map(list => ({
-            ...list,
-            games: entriesPreview.filter(e => e.listId.toString() === list._id.toString()).slice(0, 6).map(normalize)
-        }))
-
-        res.json({ success: true, lists: listsWithPreviews })
+        res.json({ success: true, lists: [] })
     } catch (err) {
         res.status(500).json({ success: false, message: err.message })
     }
@@ -295,151 +237,7 @@ router.get('/wishlist', protect, async (req, res) => {
     }
 })
 
-// ── POST /api/lists/custom ────────────────────────────────────────────────────
-router.post('/custom', protect, async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id).lean()
-        if (user.level < 2)
-            return res.status(403).json({ success: false, message: 'You need Level 2 to create a custom list', locked: true })
 
-        const { name, description, isPublic, mediaType = 'game' } = req.body
-        
-        // Count existing lists for THIS mediaType (handling legacy 'game' lists)
-        const listQuery = mediaType === 'game' 
-            ? { userId: req.user._id, $or: [{ mediaType: 'game' }, { mediaType: { $exists: false } }] }
-            : { userId: req.user._id, mediaType }
-            
-        const existing = await GameList.countDocuments(listQuery)
-        if (existing >= 2)
-            return res.status(403).json({ success: false, message: `You can have up to 2 custom lists for ${mediaType}.` })
-
-        if (!name?.trim()) return res.status(400).json({ success: false, message: 'List name is required' })
-
-        const list = await GameList.create({
-            userId: req.user._id,
-            name: name.trim(),
-            description: description?.trim() || '',
-            isPublic: isPublic !== false,
-            mediaType,
-            gameCount: 0,
-        })
-
-        res.status(201).json({ success: true, list: { ...list.toObject(), games: [] } })
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
-    }
-})
-
-// ── GET /api/lists/custom/:id/game ── fetch full list with all games ──────────
-router.get('/custom/:id/game', protect, async (req, res) => {
-    try {
-        const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id }).lean()
-        if (!list) return res.status(404).json({ success: false, message: 'List not found' })
-
-        const entries = await GameListEntry.find({ listId: list._id }).sort({ createdAt: -1 }).lean()
-        
-        const normalized = entries.map(item => ({
-            ...item,
-            igdbId: item.igdbId || item.externalId,
-            gameTitle: item.gameTitle || item.title,
-            gameCover: item.gameCover || item.cover
-        }))
-
-        // ── FETCH COMMUNITY STATS FOR GAMES IN CUSTOM LIST ──
-        if (list.mediaType === 'game') {
-            const allIds = normalized.map(g => g.igdbId).filter(Boolean)
-            if (allIds.length > 0) {
-                const { default: GlobalStats } = await import('../models/GlobalStats.js')
-                const reviewData = await GlobalStats.find({ igdbId: { $in: allIds } })
-                const stats = {}
-                reviewData.forEach(s => { stats[s.igdbId] = s.avgRating || null })
-                normalized.forEach(g => { g.avgRating = stats[g.igdbId] || null })
-            }
-        }
-
-        res.json({ success: true, list: { ...list, games: normalized } })
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
-    }
-})
-
-// ── PUT /api/lists/custom/:id ──────────────────────────────────────────────────
-router.put('/custom/:id', protect, async (req, res) => {
-    try {
-        const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id })
-        if (!list) return res.status(404).json({ success: false, message: 'List not found' })
-
-        const { name, description, isPublic } = req.body
-        if (name !== undefined) list.name = name.trim()
-        if (description !== undefined) list.description = description.trim()
-        if (isPublic !== undefined) list.isPublic = isPublic
-
-        await list.save()
-        res.json({ success: true, list })
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
-    }
-})
-
-// ── PUT /api/lists/custom/:id/game ── add or remove a game ────────────────────
-router.put('/custom/:id/game', protect, async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id).lean()
-        if (user.level < 2)
-            return res.status(403).json({ success: false, message: 'Reach Level 2 to use custom lists.', locked: true })
-
-        const list = await GameList.findOne({ _id: req.params.id, userId: req.user._id }).lean()
-        if (!list) return res.status(404).json({ success: false, message: 'List not found' })
-
-        const { igdbId, externalId, gameTitle, gameCover, genre, action } = req.body
-        const mediaId = igdbId || externalId
-
-        if (action === 'add') {
-            try {
-                await GameListEntry.create({ 
-                    listId: list._id, 
-                    igdbId: list.mediaType === 'game' ? mediaId : undefined,
-                    externalId: list.mediaType !== 'game' ? mediaId : undefined,
-                    mediaType: list.mediaType,
-                    gameTitle, 
-                    gameCover, 
-                    genre 
-                })
-                await GameList.findByIdAndUpdate(list._id, { $inc: { gameCount: 1 } })
-            } catch (e) {
-                // already in list
-            }
-        } else if (action === 'remove') {
-            const query = list.mediaType === 'game' ? { igdbId: mediaId } : { externalId: mediaId }
-            const deleted = await GameListEntry.findOneAndDelete({ listId: list._id, ...query })
-            if (deleted) await GameList.findByIdAndUpdate(list._id, { $inc: { gameCount: -1 } })
-        }
-
-        const entries = await GameListEntry.find({ listId: list._id }).sort({ createdAt: -1 }).lean()
-        const normalized = entries.map(item => ({
-            ...item,
-            igdbId: item.igdbId || item.externalId,
-            gameTitle: item.gameTitle || item.title,
-            gameCover: item.gameCover || item.cover
-        }))
-
-        const updatedList = await GameList.findById(list._id).lean()
-        res.json({ success: true, list: { ...updatedList, games: normalized } })
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
-    }
-})
-
-// ── DELETE /api/lists/custom/:id ──────────────────────────────────────────────
-router.delete('/custom/:id', protect, async (req, res) => {
-    try {
-        const list = await GameList.findOneAndDelete({ _id: req.params.id, userId: req.user._id })
-        if (list) await GameListEntry.deleteMany({ listId: list._id })
-        res.json({ success: true, message: 'List deleted' })
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message })
-    }
-})
 
 // ── POST /api/lists/like ──────────────────────────────────────────────────────
 router.post('/like', protect, async (req, res) => {

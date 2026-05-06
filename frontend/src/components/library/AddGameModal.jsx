@@ -115,7 +115,7 @@ function AddGameModal({ onClose, onAdd, preselectedGame = null, existingEntry = 
             platforms: alreadyLogged ? alreadyLogged.platforms : mappedPlatforms,
             status: alreadyLogged ? alreadyLogged.status : 'playing',
             rating: alreadyLogged ? alreadyLogged.rating : 0,
-            hours: alreadyLogged ? alreadyLogged.hours : '',
+            hours: alreadyLogged ? (alreadyLogged.hours ?? '') : '',
         }))
         setGameSelected(true)
     }

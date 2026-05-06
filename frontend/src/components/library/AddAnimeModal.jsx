@@ -9,11 +9,13 @@ function AddAnimeModal({ onClose, onAdd, preselectedAnime = null, existingEntry 
         rating: existingEntry?.rating || 0,
         episodesWatched: existingEntry?.episodesWatched ?? '',
         chaptersRead: existingEntry?.chaptersRead ?? '',
+        volumesRead: existingEntry?.volumesRead ?? '',
         cover: existingEntry?.cover || existingEntry?.coverImage || preselectedAnime?.cover || '',
         externalId: existingEntry?.externalId || preselectedAnime?.externalId || '',
         type: existingEntry?.type || existingEntry?.mediaType || preselectedAnime?.type || 'anime',
         totalEpisodes: existingEntry?.totalEpisodes || preselectedAnime?.episodes || 0,
         totalChapters: existingEntry?.totalChapters || preselectedAnime?.chapters || 0,
+        totalVolumes: existingEntry?.totalVolumes || preselectedAnime?.volumes || 0,
         airingStatus: existingEntry?.airingStatus || preselectedAnime?.airingStatus || preselectedAnime?.status || '',
         year: existingEntry?.year || preselectedAnime?.year || null
     })
@@ -27,13 +29,16 @@ function AddAnimeModal({ onClose, onAdd, preselectedAnime = null, existingEntry 
                     if (res.data.anime) {
                         const totalEp = res.data.anime.episodes || 0;
                         const totalCh = res.data.anime.chapters || 0;
+                        const totalVol = res.data.anime.volumes || 0;
                         setFormData(prev => ({
                             ...prev,
                             totalEpisodes: totalEp,
                             totalChapters: totalCh,
+                            totalVolumes: totalVol,
                             year: prev.year || res.data.anime.year,
                             episodesWatched: totalEp > 0 && prev.episodesWatched > totalEp ? totalEp : prev.episodesWatched,
-                            chaptersRead: totalCh > 0 && prev.chaptersRead > totalCh ? totalCh : prev.chaptersRead
+                            chaptersRead: totalCh > 0 && prev.chaptersRead > totalCh ? totalCh : prev.chaptersRead,
+                            volumesRead: totalVol > 0 && prev.volumesRead > totalVol ? totalVol : prev.volumesRead
                         }));
                     }
                 } catch (err) { console.error('Failed to fetch totals:', err); }
@@ -51,8 +56,12 @@ function AddAnimeModal({ onClose, onAdd, preselectedAnime = null, existingEntry 
         let val = value;
         if (value !== '') {
             const num = parseInt(value);
-            const total = isManga ? formData.totalChapters : formData.totalEpisodes;
-            if ((field === 'episodesWatched' || field === 'chaptersRead') && total > 0) {
+            let total = 0;
+            if (field === 'episodesWatched') total = formData.totalEpisodes;
+            if (field === 'chaptersRead') total = formData.totalChapters;
+            if (field === 'volumesRead') total = formData.totalVolumes;
+
+            if (total > 0) {
                 val = Math.min(Math.max(0, num || 0), total);
             }
         }
@@ -109,26 +118,42 @@ function AddAnimeModal({ onClose, onAdd, preselectedAnime = null, existingEntry 
                     </div>
 
                     {/* Progress */}
-                    <div>
-                        <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
-                            {isManga ? 'Chapters Read' : 'Episodes Watched'}
-                        </label>
-                        <input
-                            type="number"
-                            placeholder={isManga ? "e.g. 150" : "e.g. 12"}
-                            min="0"
-                            value={isManga ? formData.chaptersRead : formData.episodesWatched}
-                            onChange={e => handleChange(isManga ? 'chaptersRead' : 'episodesWatched', e.target.value)}
-                            className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors"
-                        />
-                        <div className="mt-1.5 flex items-center justify-between px-1">
-                            <div className="font-mono text-[11px] font-bold text-[#c8ff57] uppercase tracking-wider">
-                                Total: {(isManga ? formData.totalChapters : formData.totalEpisodes) || (formData.airingStatus?.toLowerCase().includes('airing') ? 'Ongoing' : '?')}
-                            </div>
-                            <div className="font-mono text-[9px] text-[#7a7a90] uppercase">
-                                {(isManga ? formData.totalChapters : formData.totalEpisodes) > 0 ? 'Limit Enforced' : 'Flexible Progress'}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className={isManga ? 'col-span-1' : 'col-span-2'}>
+                            <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
+                                {isManga ? 'Chapters Read' : 'Episodes Watched'}
+                            </label>
+                            <input
+                                type="number"
+                                placeholder={isManga ? "e.g. 150" : "e.g. 12"}
+                                min="0"
+                                value={isManga ? formData.chaptersRead : formData.episodesWatched}
+                                onChange={e => handleChange(isManga ? 'chaptersRead' : 'episodesWatched', e.target.value)}
+                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors"
+                            />
+                            <div className="mt-1 font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                Total: {(isManga ? formData.totalChapters : formData.totalEpisodes) || '?'}
                             </div>
                         </div>
+
+                        {isManga && (
+                            <div className="col-span-1">
+                                <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
+                                    Volumes Read
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="e.g. 15"
+                                    min="0"
+                                    value={formData.volumesRead}
+                                    onChange={e => handleChange('volumesRead', e.target.value)}
+                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors"
+                                />
+                                <div className="mt-1 font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                    Total: {formData.totalVolumes || '?'}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Rating */}

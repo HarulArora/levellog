@@ -400,7 +400,7 @@ function AnimeRow({ anime, index, onDelete, onEdit }) {
             <td className="px-6 py-4">
                 <div 
                     onClick={() => anime.externalId && navigate(`/anime/${anime.externalId}`)}
-                    className="w-12 h-16 bg-[#1a1a25] rounded-lg overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all"
+                    className="w-14 h-[76px] bg-[#1a1a25] rounded-xl overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all flex-shrink-0 shadow-lg group-hover:scale-105"
                 >
                     {imageUrl ? (
                         <img src={imageUrl} alt="" className="w-full h-full object-cover" />
@@ -417,7 +417,7 @@ function AnimeRow({ anime, index, onDelete, onEdit }) {
                     >
                         {anime.title}
                     </h4>
-                    <p className="text-[#4a4a5e] font-mono text-[10px] uppercase tracking-wider mt-0.5">{anime.genre}</p>
+                    <p className="text-[#4a4a5e] font-mono text-[10px] uppercase tracking-wider mt-0.5">{anime.genre || 'Anime'}</p>
                 </div>
             </td>
             <td className="px-6 py-4 text-center">

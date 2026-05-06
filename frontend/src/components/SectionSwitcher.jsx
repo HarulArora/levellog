@@ -93,9 +93,8 @@ const SectionSwitcher = () => {
             targetPath = sectionId === 'games' ? '/discover' : (sectionId === 'anime' ? (isManga ? '/manga/discover' : '/anime/discover') : (isTV ? '/tv/discover' : '/movies/discover'));
         } else if (currentPath.includes('/library')) {
             targetPath = sectionId === 'games' ? '/library' : (sectionId === 'anime' ? (isManga ? '/manga/library' : '/anime/library') : (isTV ? '/tv/library' : '/movies/library'));
-        } else if (currentPath.includes('/lists')) {
-            targetPath = sectionId === 'games' ? '/lists' : (sectionId === 'anime' ? (isManga ? '/manga/lists' : '/anime/lists') : (isTV ? '/tv/lists' : '/movies/lists'));
         }
+        
         navigate(targetPath);
     };
 

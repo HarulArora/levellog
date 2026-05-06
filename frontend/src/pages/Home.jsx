@@ -492,7 +492,7 @@ function Home() {
             </Helmet>
  
             {/* Mobile search bar — sticky just below navbar, hidden on desktop */}
-            <div className="md:hidden sticky top-[64px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center">
+            <div className="md:hidden sticky top-[80px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center">
                 <div className="w-full">
                     <GameSearchBar id="game-search-mobile" />
                 </div>
@@ -501,7 +501,7 @@ function Home() {
             {/* ══════════════════════════
                 HERO
             ══════════════════════════ */}
-            <section className="relative pt-20 pb-16 md:pt-24 md:pb-24 min-h-[600px] flex items-center">
+            <section className="relative pt-24 pb-16 md:pt-28 md:pb-24 min-h-[600px] flex items-center">
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     {(allGames.length > 0 || !loading) && (
                         <HeroBanner games={allGames} />
@@ -852,37 +852,6 @@ function Home() {
                     onClose={() => setToast(null)} 
                 />
             )}
-                    {/* ══════════════════════════
-                FAQ / KNOWLEDGE BASE (SEO BOOST)
-            ══════════════════════════ */}
-            <section className="max-w-[1200px] mx-auto px-5 md:px-10 py-20 border-t border-[#2a2a35]/50">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                    <div className="flex flex-col gap-4">
-                        <h3 className="font-black text-xl text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            What is QuestDuck?
-                        </h3>
-                        <p className="text-[#7a7a90] text-xs leading-relaxed">
-                            QuestDuck is the ultimate gaming log and discovery platform designed for gamers who want to organize their digital lives. Whether you play on PC, PlayStation 5, Xbox Series X, or Nintendo Switch, our tracker helps you maintain a personal gaming diary, rate titles, and log your precious hours played. Join the "QuestPond" and transform your backlog into a completed masterpiece.
-                        </p>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                        <h3 className="font-black text-xl text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            How to track games?
-                        </h3>
-                        <p className="text-[#7a7a90] text-xs leading-relaxed">
-                            Log games instantly using our integrated database. Simply search for any title, select your platform, and update your status to "Playing," "Completed," or "Planned." You can record your play sessions, set personal ratings out of 10, and see how your tastes compare to the rest of the gaming community. Our system acts as your permanent gaming record and backlog manager.
-                        </p>
-                    </div>
-                    <div className="flex flex-col gap-4">
-                        <h3 className="font-black text-xl text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            Discovery & Deals
-                        </h3>
-                        <p className="text-[#7a7a90] text-xs leading-relaxed">
-                            Beyond simple tracking, QuestDuck is a powerful game discovery tool. Explore "Trending Now" sections to see what the community is playing, or browse "Coming Soon" for upcoming releases. Our integrated deals tracker surfaces the best discounts across digital storefronts, ensuring you never miss a bargain. Level up your profile, earn gaming XP, and climb the leaderboard as you log more adventures.
-                        </p>
-                    </div>
-                </div>
-            </section>
         </div>
     )
 }

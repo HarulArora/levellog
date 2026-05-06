@@ -262,7 +262,8 @@ function MangaLibrary() {
                                         <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Title</th>
                                         <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Score</th>
                                         <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Status</th>
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Progress</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Chapters</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Volumes</th>
                                         <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Action</th>
                                     </tr>
                                 </thead>
@@ -400,7 +401,7 @@ function MangaRow({ manga, index, onDelete, onEdit }) {
             <td className="px-6 py-4">
                 <div 
                     onClick={() => manga.externalId && navigate(`/manga/${manga.externalId}`)}
-                    className="w-12 h-16 bg-[#1a1a25] rounded-lg overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all"
+                    className="w-14 h-[76px] bg-[#1a1a25] rounded-xl overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all flex-shrink-0 shadow-lg group-hover:scale-105"
                 >
                     {imageUrl ? (
                         <img src={imageUrl} alt="" className="w-full h-full object-cover" />
@@ -417,7 +418,7 @@ function MangaRow({ manga, index, onDelete, onEdit }) {
                     >
                         {manga.title}
                     </h4>
-                    <p className="text-[#4a4a5e] font-mono text-[10px] uppercase tracking-wider mt-0.5">{manga.genre}</p>
+                    <p className="text-[#4a4a5e] font-mono text-[10px] uppercase tracking-wider mt-0.5">{manga.genre || 'Manga'}</p>
                 </div>
             </td>
             <td className="px-6 py-4 text-center">
@@ -444,6 +445,19 @@ function MangaRow({ manga, index, onDelete, onEdit }) {
                     </div>
                     <span className="text-[#7a7a90] font-mono text-[10px]">
                         {manga.chaptersRead || 0} / {manga.totalChapters || '?'}
+                    </span>
+                </div>
+            </td>
+            <td className="px-6 py-4">
+                <div className="flex items-center gap-2">
+                    <div className="h-1 flex-1 max-w-[60px] bg-[#1a1a25] rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full ${sc.color}`} 
+                            style={{ width: `${Math.min(100, (manga.volumesRead / (manga.totalVolumes || 1)) * 100)}%` }} 
+                        />
+                    </div>
+                    <span className="text-[#7a7a90] font-mono text-[10px]">
+                        {manga.volumesRead || 0} / {manga.totalVolumes || '?'}
                     </span>
                 </div>
             </td>

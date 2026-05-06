@@ -310,7 +310,7 @@ function Stats() {
                 <div className={`absolute inset-0 bg-gradient-to-b via-[#0a0a0f]/75 to-[#0a0a0f] 
                                 ${theme ? theme.bg : 'from-[#0a0a0f]/60'}`} />
 
-                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 py-10">
+                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-14 pb-10">
 
                     {/* Back button */}
                     <button onClick={() => navigate(-1)}

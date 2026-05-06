@@ -519,10 +519,6 @@ function GameDetail() {
     const [activeTab, setActiveTab] = useState('overview')
     const [expanded, setExpanded] = useState(false)
     const [showAddModal, setShowAddModal] = useState(false)
-    const [showListModal, setShowListModal] = useState(false)
-    const [customLists, setCustomLists] = useState([])
-    const [loadingLists, setLoadingLists] = useState(false)
-    const [listToast, setListToast] = useState(null)
 
     const [liked, setLiked] = useState(false)
     const [wishlisted, setWishlisted] = useState(false)
@@ -609,10 +605,6 @@ function GameDetail() {
         setTimeout(() => setXpToast(null), 3000)
     }, [])
 
-    const showListToast = useCallback((msg, type = 'success') => { 
-        setListToast({ msg, type })
-        setTimeout(() => setListToast(null), 3000) 
-    }, [])
 
     const myGame = userGames.find(g => {
         const pageId = Number(igdbId)
@@ -732,31 +724,6 @@ function GameDetail() {
         } finally { setWishing(false) }
     }
 
-    const handleOpenListModal = async () => {
-        setShowListModal(true)
-        setLoadingLists(true)
-        try {
-            const res = await api.get('/lists/me')
-            setCustomLists(res.data.customLists || [])
-        } catch (err) {
-            console.error('Error fetching context:', err)
-        } finally { setLoadingLists(false) }
-    }
-
-    const handleAddToList = async (listId, listName) => {
-        try {
-            await api.put(`/lists/custom/${listId}/game`, {
-                igdbId: parseInt(igdbId), gameTitle: game.title,
-                gameCover: game.cover, genre: game.genre, action: 'add'
-            })
-            showListToast(`Added to "${listName}"`)
-            invalidateCache(`lists_${user.id || user._id}`)
-            setShowListModal(false)
-        } catch (err) { 
-            console.error('Add to list error:', err)
-            showListToast('Failed to add to list', 'error') 
-        }
-    }
 
     const handlePostComment = async () => {
         if (!commentText.trim() || submittingComment) return
@@ -905,7 +872,7 @@ function GameDetail() {
 
             {/* XP Toast */}
             {xpToast && (
-                <div className={`fixed bottom-8 md:bottom-12 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
+                <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
                                 ${xpToast.type === 'loss'
                         ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]'
                         : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
@@ -914,13 +881,6 @@ function GameDetail() {
             )}
 
             {/* List Toast */}
-            {listToast && (
-                <div className={`fixed bottom-8 md:bottom-12 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
-                                ${listToast.type === 'error' ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]'
-                        : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
-                    {listToast.msg}
-                </div>
-            )}
 
             {/* ══ HERO ══ */}
             <div className="relative overflow-hidden min-h-[420px]">
@@ -931,7 +891,7 @@ function GameDetail() {
                 <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f]/40 via-[#0a0a0f]/55 to-[#0a0a0f]" />
                 <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0a0a0f] to-transparent" />
 
-                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 py-10">
+                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-24 pb-10">
                     <button onClick={() => navigate(-1)}
                         className="flex items-center gap-2 font-mono text-xs text-[#7a7a90] hover:text-[#c8ff57] transition-colors mb-8">
                         ← BACK
@@ -1067,11 +1027,6 @@ function GameDetail() {
                                     </button>
                                 )}
 
-                                {user && (
-                                    <button onClick={handleOpenListModal} className="btn-apple btn-apple-secondary px-4 py-2.5 gap-1.5">
-                                        <ListChecks size={16} /> Add to List
-                                    </button>
-                                )}
 
                                 <button onClick={handleShare}
                                     className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 backdrop-blur-md border 
@@ -1085,7 +1040,7 @@ function GameDetail() {
             </div>
 
             {/* ══ TAB BAR ══ */}
-            <div className="border-b border-[#2a2a35] bg-[#0a0a0f] sticky top-[65px] z-40">
+            <div className="border-b border-[#2a2a35] bg-[#0a0a0f] sticky top-[80px] z-40">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <div className="flex gap-6">
                         {['overview', 'comments'].map(tab => (
@@ -1189,17 +1144,8 @@ function GameDetail() {
                                 {user ? (
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-3">Leave a Comment</div>
-                                        <div className="flex gap-3">
-                                            {user.avatar ? (
-                                                <img src={user.avatar} alt={user.username}
-                                                    className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35] mt-0.5" />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff]
-                                                                flex items-center justify-center text-sm font-black text-black flex-shrink-0 mt-0.5"
-                                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                                    {user.username.charAt(0).toUpperCase()}
-                                                </div>
-                                            )}
+                                        <div className="flex gap-3 items-start">
+                                            <Avatar user={user} size="32" className="mt-0.5" />
                                             <div className="flex-1">
                                                 <textarea 
                                                     value={commentText} 
@@ -1422,66 +1368,6 @@ function GameDetail() {
                 />
             )}
 
-            {showListModal && (
-                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                    onClick={e => e.target === e.currentTarget && setShowListModal(false)}>
-                    <div className="bg-[#111118] border border-[#2a2a35] rounded-lg w-full max-w-sm">
-                        <div className="flex items-center justify-between p-5 border-b border-[#2a2a35]">
-                            <div>
-                                <div className="font-black text-lg text-white tracking-widest uppercase"
-                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Add to List</div>
-                                <div className="font-mono text-[10px] text-[#7a7a90] mt-0.5 truncate max-w-[220px]">{game.title}</div>
-                            </div>
-                            <button onClick={() => setShowListModal(false)} className="text-[#7a7a90] hover:text-white text-xl">✕</button>
-                        </div>
-                        <div className="p-5">
-                            {user?.level < 2 ? (
-                                <div className="flex flex-col items-center gap-4 py-8 text-center">
-                                    <div className="w-14 h-14 bg-[#1a1a25] border border-[#3a3a4a] rounded-full flex items-center justify-center mb-2">
-                                        <span className="text-2xl">🔒</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="font-black text-white uppercase tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>Feature Locked</div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] max-w-[200px] leading-relaxed">Reach Level 2 to create and use custom collections.</div>
-                                    </div>
-                                    <button onClick={() => setShowListModal(false)}
-                                        className="mt-2 px-6 py-2 border border-[#2a2a35] text-[#7a7a90] font-mono text-[10px] rounded hover:text-white hover:border-white transition-all">
-                                        GOT IT
-                                    </button>
-                                </div>
-                            ) : loadingLists ? (
-                                <div className="text-center py-8 font-mono text-xs text-[#7a7a90]">Loading lists...</div>
-                            ) : customLists.length === 0 ? (
-                                <div className="flex flex-col items-center gap-3 py-8">
-                                    <div className="text-3xl">📋</div>
-                                    <div className="font-mono text-xs text-[#7a7a90] text-center">No custom lists yet.</div>
-                                    <button onClick={() => { setShowListModal(false); navigate('/lists') }}
-                                        className="px-4 py-2 bg-[#c8ff57] text-black font-bold text-xs rounded hover:bg-[#d4ff6e] transition-all">
-                                        Create a List →
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col gap-2">
-                                    {customLists.map(list => (
-                                        <button key={list._id} onClick={() => handleAddToList(list._id, list.name)}
-                                            className="flex items-center gap-3 p-3 rounded-lg border border-[#2a2a35]
-                                                       hover:border-[#c8ff57] hover:bg-[#c8ff57]/05 transition-all text-left group">
-                                            <div className="w-8 h-8 rounded bg-[#c8ff57]/15 flex items-center justify-center text-sm flex-shrink-0">📋</div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-white font-semibold text-sm truncate group-hover:text-[#c8ff57] transition-colors">{list.name}</div>
-                                                <div className="font-mono text-[9px] text-[#7a7a90] mt-0.5">
-                                                    {list.games?.length || 0} games · {list.isPublic ? 'Public' : 'Private'}
-                                                </div>
-                                            </div>
-                                            <span className="font-mono text-[10px] text-[#c8ff57] opacity-0 group-hover:opacity-100 transition-opacity">+ Add</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

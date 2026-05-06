@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense, useEffect, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Outlet, useLocation, Link } from 'react-router-dom'
 import NavbarSectionAdapter from './components/NavbarSectionAdapter'
 import SectionSwitcher from './components/SectionSwitcher'
 import Footer from './components/Footer'
@@ -10,7 +10,6 @@ import ScrollToTop from './components/ScrollToTop'
 
 const Home = lazy(() => import('./pages/Home'))
 const Library = lazy(() => import('./pages/Library'))
-const Lists = lazy(() => import('./pages/Lists'))
 const Activity = lazy(() => import('./pages/Activity'))
 const Login = lazy(() => import('./pages/Login'))
 const Signup = lazy(() => import('./pages/Signup'))
@@ -26,6 +25,7 @@ const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const UniversalSearch = lazy(() => import('./pages/UniversalSearch'))
+const Collections = lazy(() => import('./pages/Collections'))
 
 // Anime pages
 const AnimeHome = lazy(() => import('./pages/anime/AnimeHome'))
@@ -51,6 +51,7 @@ const TVDiscover = lazy(() => import('./pages/tv/TVDiscover'))
 const TVLibrary = lazy(() => import('./pages/tv/TVLibrary'))
 const TVDetail = lazy(() => import('./pages/tv/TVDetail'))
 const RankingList = lazy(() => import('./pages/RankingList'))
+const Attributions = lazy(() => import('./pages/Attributions'))
 
 
 
@@ -171,7 +172,6 @@ function App() {
                         <Route element={<><NavbarSectionAdapter /><main className="flex-1 flex flex-col w-full min-h-[90vh] bg-[#0a0a0f]"><Suspense fallback={<MinimalLoader />}><Outlet /></Suspense></main><Footer /></>}>
                             <Route path="/" element={<Home />} />
                             <Route path="/library" element={<Library />} />
-                            <Route path="/lists" element={<Lists />} />
                             <Route path="/activity" element={<Activity />} />
                             <Route path="/stats" element={<Stats />} />
                             <Route path="/user/:username" element={<Profile />} />
@@ -179,6 +179,7 @@ function App() {
                             <Route path="/friends" element={<Friends />} />
                             <Route path="/search" element={<Friends />} />
                             <Route path="/universal-search" element={<UniversalSearch />} />
+                            <Route path="/collections" element={<Collections />} />
                              <Route path="/game/:igdbId" element={<GameDetail />} />
                             <Route path="/anime/:id" element={<AnimeDetail />} />
                             <Route path="/manga/:id" element={<MangaDetail />} />
@@ -191,30 +192,27 @@ function App() {
                             <Route path="/leaderboard" element={<Leaderboard />} />
                             <Route path="/privacy" element={<PrivacyPolicy />} />
                             <Route path="/terms" element={<TermsOfService />} />
+                            <Route path="/attributions" element={<Attributions />} />
 
                             {/* Anime Routes */}
                             <Route path="/anime" element={<AnimeHome />} />
                             <Route path="/anime/discover" element={<AnimeDiscover />} />
                             <Route path="/anime/library" element={<AnimeLibrary />} />
-                            <Route path="/anime/lists" element={<Lists />} />
 
                              {/* Movies Routes */}
                             <Route path="/movies" element={<MoviesHome />} />
                             <Route path="/movies/discover" element={<MoviesDiscover />} />
                             <Route path="/movies/library" element={<MoviesLibrary />} />
-                            <Route path="/movies/lists" element={<Lists />} />
 
                             {/* Manga Routes */}
                             <Route path="/manga" element={<MangaHome />} />
                             <Route path="/manga/discover" element={<MangaDiscover />} />
                             <Route path="/manga/library" element={<MangaLibrary />} />
-                            <Route path="/manga/lists" element={<Lists />} />
 
                             {/* TV Routes */}
                             <Route path="/tv" element={<TVHome />} />
                             <Route path="/tv/discover" element={<TVDiscover />} />
                             <Route path="/tv/library" element={<TVLibrary />} />
-                            <Route path="/tv/lists" element={<Lists />} />
 
                             {/* Ranking Exploration */}
                             <Route path="/explore/:contentType/:rankType" element={<RankingList />} />

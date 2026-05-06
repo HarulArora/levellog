@@ -14,12 +14,14 @@ function AnimeLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
         rating: existingEntry?.rating || 0,
         episodesWatched: existingEntry?.episodesWatched ?? '',
         chaptersRead: existingEntry?.chaptersRead ?? '',
+        volumesRead: existingEntry?.volumesRead ?? '',
         type: existingEntry?.type || existingEntry?.mediaType || preselectedItem?.type || '',
         cover: existingEntry?.cover || existingEntry?.coverImage || preselectedItem?.cover || '',
         summary: existingEntry?.summary || preselectedItem?.summary || '',
         externalId: existingEntry?.externalId || preselectedItem?.externalId || '',
         totalEpisodes: existingEntry?.totalEpisodes || preselectedItem?.episodes || 0,
         totalChapters: existingEntry?.totalChapters || preselectedItem?.chapters || 0,
+        totalVolumes: existingEntry?.totalVolumes || preselectedItem?.volumes || 0,
     })
     const [itemSelected, setItemSelected] = useState(!!(preselectedItem || existingEntry))
     const [submitting, setSubmitting] = useState(false)
@@ -33,13 +35,27 @@ function AnimeLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                     if (res.data.anime) {
                         const totalEp = res.data.anime.episodes || 0;
                         const totalCh = res.data.anime.chapters || 0;
-                        setFormData(prev => ({
-                            ...prev,
-                            totalEpisodes: totalEp,
-                            totalChapters: totalCh,
-                            episodesWatched: totalEp > 0 && prev.episodesWatched > totalEp ? totalEp : prev.episodesWatched,
-                            chaptersRead: totalCh > 0 && prev.chaptersRead > totalCh ? totalCh : prev.chaptersRead
-                        }));
+                        const totalVol = res.data.anime.volumes || 0;
+                        setFormData(prev => {
+                            const updated = {
+                                ...prev,
+                                totalEpisodes: totalEp,
+                                totalChapters: totalCh,
+                                totalVolumes: totalVol,
+                                episodesWatched: totalEp > 0 && prev.episodesWatched > totalEp ? totalEp : prev.episodesWatched,
+                                chaptersRead: totalCh > 0 && prev.chaptersRead > totalCh ? totalCh : prev.chaptersRead,
+                                volumesRead: totalVol > 0 && prev.volumesRead > totalVol ? totalVol : prev.volumesRead
+                            };
+
+                            // Auto-complete if revealed total is reached/exceeded
+                            if ((totalEp > 0 && prev.episodesWatched >= totalEp) || 
+                                (totalCh > 0 && prev.chaptersRead >= totalCh) || 
+                                (totalVol > 0 && prev.volumesRead >= totalVol)) {
+                                updated.status = 'completed';
+                            }
+
+                            return updated;
+                        });
                     }
                 } catch (err) { console.error('Failed to fetch totals:', err); }
             };
@@ -53,20 +69,46 @@ function AnimeLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
     const ratings = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     const handleChange = (field, value) => {
-        let val = value;
-        if (value !== '') {
-            const num = parseInt(value);
-            const total = animeSubSection === 'manga' ? formData.totalChapters : formData.totalEpisodes;
-            if ((field === 'episodesWatched' || field === 'chaptersRead') && total > 0) {
-                val = Math.min(Math.max(0, num || 0), total);
+        setFormData(prev => {
+            const updated = { ...prev, [field]: value };
+
+            // Only auto-trigger completion and clamping for progress fields
+            if (field === 'episodesWatched' || field === 'chaptersRead' || field === 'volumesRead') {
+                const num = value === '' ? 0 : parseInt(value) || 0;
+                let total = 0;
+                if (field === 'episodesWatched') total = prev.totalEpisodes;
+                if (field === 'chaptersRead') total = prev.totalChapters;
+                if (field === 'volumesRead') total = prev.totalVolumes;
+
+                if (total > 0) {
+                    const clampedVal = Math.min(Math.max(0, num), total);
+                    updated[field] = clampedVal;
+
+                    if (clampedVal === total) {
+                        updated.status = 'completed';
+                        
+                        // Sync chapters/volumes for manga
+                        if (field === 'chaptersRead' && prev.totalVolumes > 0) {
+                            updated.volumesRead = prev.totalVolumes;
+                        }
+                        if (field === 'volumesRead' && prev.totalChapters > 0) {
+                            updated.chaptersRead = prev.totalChapters;
+                        }
+                    }
+                } else {
+                    // Even if no total, ensure we store a number
+                    updated[field] = num;
+                }
             }
-        }
-        setFormData(prev => ({ ...prev, [field]: val }))
+
+            return updated;
+        })
     }
 
     const handleItemSelect = (item) => {
         const alreadyLogged = items.find(i => String(i.externalId) === String(item.externalId))
 
+        // 1. Immediately set basic info and library data
         setFormData(prev => ({
             ...prev,
             title: item.title,
@@ -77,10 +119,12 @@ function AnimeLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
             type: item.type || item.mediaType || '',
             status: alreadyLogged ? alreadyLogged.status : 'playing',
             rating: alreadyLogged ? alreadyLogged.rating : 0,
-            episodesWatched: alreadyLogged ? alreadyLogged.episodesWatched : '',
-            chaptersRead: alreadyLogged ? alreadyLogged.chaptersRead : '',
-            totalEpisodes: item.episodes || 0,
-            totalChapters: item.chapters || 0,
+            episodesWatched: alreadyLogged ? (alreadyLogged.episodesWatched ?? '') : '',
+            chaptersRead: alreadyLogged ? (alreadyLogged.chaptersRead ?? '') : '',
+            volumesRead: alreadyLogged ? (alreadyLogged.volumesRead ?? '') : '',
+            totalEpisodes: item.episodes || alreadyLogged?.totalEpisodes || 0,
+            totalChapters: item.chapters || alreadyLogged?.totalChapters || 0,
+            totalVolumes: item.volumes || alreadyLogged?.totalVolumes || 0,
             airingStatus: item.airingStatus || item.status || ''
         }))
         setItemSelected(true)
@@ -161,26 +205,44 @@ function AnimeLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                     </div>
 
                     {/* Progress */}
-                    <div>
-                        <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
-                            {animeSubSection === 'manga' ? 'Chapters Read' : 'Episodes Watched'}
-                        </label>
-                        <input
-                            type="number"
-                            placeholder="e.g. 12"
-                            min="0"
-                            value={animeSubSection === 'manga' ? formData.chaptersRead : formData.episodesWatched}
-                            onChange={e => handleChange(animeSubSection === 'manga' ? 'chaptersRead' : 'episodesWatched', e.target.value)}
-                            className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors"
-                        />
-                        {itemSelected && (
-                            <div className="mt-1.5 flex items-center justify-between px-1">
-                                <div className="font-mono text-[11px] font-bold text-[#c8ff57] uppercase tracking-wider">
-                                    Total: {(animeSubSection === 'manga' ? formData.totalChapters : formData.totalEpisodes) || (formData.airingStatus?.toLowerCase().includes('airing') ? 'Ongoing' : '?')}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className={animeSubSection === 'manga' ? 'col-span-1' : 'col-span-2'}>
+                            <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
+                                {animeSubSection === 'manga' ? 'Chapters' : 'Episodes'}
+                            </label>
+                            <input
+                                type="number"
+                                placeholder="e.g. 12"
+                                min="0"
+                                value={animeSubSection === 'manga' ? formData.chaptersRead : formData.episodesWatched}
+                                onChange={e => handleChange(animeSubSection === 'manga' ? 'chaptersRead' : 'episodesWatched', e.target.value)}
+                                className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors"
+                            />
+                            {itemSelected && (
+                                <div className="mt-1 font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                    Total: {(animeSubSection === 'manga' ? formData.totalChapters : formData.totalEpisodes) || '?'}
                                 </div>
-                                <div className="font-mono text-[9px] text-[#7a7a90] uppercase">
-                                    {(animeSubSection === 'manga' ? formData.totalChapters : formData.totalEpisodes) > 0 ? 'Limit Enforced' : 'Flexible Progress'}
-                                </div>
+                            )}
+                        </div>
+
+                        {animeSubSection === 'manga' && (
+                            <div className="col-span-1">
+                                <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
+                                    Volumes
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="e.g. 1"
+                                    min="0"
+                                    value={formData.volumesRead}
+                                    onChange={e => handleChange('volumesRead', e.target.value)}
+                                    className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] placeholder:text-[#7a7a90] transition-colors"
+                                />
+                                {itemSelected && (
+                                    <div className="mt-1 font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                        Total: {formData.totalVolumes || '?'}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

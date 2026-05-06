@@ -58,11 +58,20 @@ const animeEntrySchema = new mongoose.Schema(
             default: 0,
             min: 0
         },
+        volumesRead: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
         totalEpisodes: {
             type: Number,
             default: 0
         },
         totalChapters: {
+            type: Number,
+            default: 0
+        },
+        totalVolumes: {
             type: Number,
             default: 0
         },

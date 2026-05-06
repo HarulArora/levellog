@@ -81,12 +81,12 @@ function NavbarSectionAdapter() {
     // Reuse the exact same JSX as Navbar.jsx but with the dynamic links
     return (
         <nav className="relative border-b border-[#2a2a35] bg-[#0a0a0f]/90 backdrop-blur-md sticky top-0 z-50">
-            <div className="flex items-center justify-between px-5 md:px-10 h-16">
+            <div className="flex items-center justify-between px-5 md:px-10 h-20">
 
                 {/* Logo */}
                 <Link to="/" onClick={handleLinkClick}>
                     <div className="flex items-center gap-1 md:gap-1 group">
-                        <div className="font-black text-2xl md:text-3xl tracking-widest text-[#c8ff57]"
+                        <div className="font-black text-3xl md:text-4xl tracking-widest text-[#c8ff57]"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                             QUEST<span className="text-white">DUCK</span>
                         </div>
@@ -94,7 +94,7 @@ function NavbarSectionAdapter() {
                 </Link>
 
                 {/* Desktop links */}
-                <ul className="hidden md:flex gap-6 list-none">
+                <ul className="hidden md:flex gap-8 list-none">
                     {links.map(link => {
                         const isDeals = link.path === '/deals'
                         const path = location.pathname
@@ -122,7 +122,7 @@ function NavbarSectionAdapter() {
                                 <Link
                                     to={link.path}
                                     onClick={isDeals ? handleDealsClick : handleLinkClick}
-                                    className={`text-xs font-semibold tracking-widest uppercase transition-colors
+                                    className={`text-sm font-bold tracking-widest uppercase transition-colors
                                                ${isActive ? 'text-[#c8ff57]' : 'text-[#94a3b8] hover:text-[#c8ff57]'}`}
                                 >
                                     {link.name}
@@ -138,18 +138,18 @@ function NavbarSectionAdapter() {
                 </ul>
 
                 {/* Right side actions */}
-                <div className="flex gap-2 sm:gap-3 items-center min-w-[120px] justify-end">
+                <div className="flex gap-2 sm:gap-4 items-center min-w-[120px] justify-end">
                     {!loading && (
                         <>
                             {/* Global Search Button */}
                             <Link to="/universal-search" onClick={handleLinkClick} className="p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
-                                <Search size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
+                                <Search size={22} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
                             </Link>
 
                             {/* Notifications (Logged in only) */}
                             {user && (
                                 <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
-                                    <Bell size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
+                                    <Bell size={22} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
                                     {unreadCount > 0 && (
                                         <div className="absolute top-1 right-1 w-4 h-4 bg-[#ff5c5c] rounded-full flex items-center justify-center font-mono text-[9px] text-white font-bold ring-2 ring-[#0a0a0f]">
                                             {unreadCount > 9 ? '9+' : unreadCount}
@@ -164,7 +164,7 @@ function NavbarSectionAdapter() {
                                     onClick={() => setDropdownOpen(o => !o)} 
                                     className="flex items-center gap-1.5 focus:outline-none p-1 pr-2 hover:bg-[#2a2a35]/30 rounded-full transition-all border border-transparent hover:border-[#2a2a35]"
                                 >
-                                    {user ? <Avatar /> : <div className="w-10 h-10 rounded-full bg-[#1a1a25] flex items-center justify-center border border-[#2a2a35]"><User size={20} className="text-[#7a7a90]" /></div>}
+                                    {user ? <Avatar size="44" /> : <div className="w-11 h-11 rounded-full bg-[#1a1a25] flex items-center justify-center border border-[#2a2a35]"><User size={22} className="text-[#7a7a90]" /></div>}
                                     <ChevronDown size={14} className={`text-[#7a7a90] transition-transform duration-300 hidden sm:block ${dropdownOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
@@ -215,11 +215,6 @@ function NavbarSectionAdapter() {
                                                         <span>My Profile</span>
                                                     </Link>
 
-                                                    <Link to={activeSection === 'games' ? '/lists' : `/${activeSection}/lists`} onClick={handleLinkClick}
-                                                        className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
-                                                        <ListChecks size={14} className="opacity-70" strokeWidth={2.5} />
-                                                        <span>My Lists</span>
-                                                    </Link>
 
                                                     <Link to="/deals" onClick={handleDealsClick}
                                                         className="flex items-center justify-between px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider group/deals">
@@ -232,6 +227,12 @@ function NavbarSectionAdapter() {
                                                                 {newDealsCount > 9 ? '9+' : newDealsCount}
                                                             </span>
                                                         )}
+                                                    </Link>
+
+                                                    <Link to="/collections" onClick={handleLinkClick}
+                                                        className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
+                                                        <ListChecks size={14} className="opacity-70" strokeWidth={2.5} />
+                                                        <span>My Collections</span>
                                                     </Link>
 
                                                     <div className="border-t border-[#2a2a35] my-1" />

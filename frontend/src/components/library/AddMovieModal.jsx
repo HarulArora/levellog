@@ -8,6 +8,8 @@ function AddMovieModal({ onClose, onAdd, preselectedMovie = null, existingEntry 
         rating: existingEntry?.rating || 0,
         seasonsWatched: existingEntry?.seasonsWatched ?? '',
         episodesWatched: existingEntry?.episodesWatched ?? '',
+        totalEpisodes: existingEntry?.totalEpisodes || preselectedMovie?.totalEpisodes || 0,
+        totalSeasons: existingEntry?.totalSeasons || preselectedMovie?.totalSeasons || 0,
         cover: existingEntry?.cover || existingEntry?.coverImage || preselectedMovie?.cover || '',
         externalId: existingEntry?.externalId || preselectedMovie?.externalId || '',
         type: existingEntry?.type || existingEntry?.mediaType || preselectedMovie?.type || 'movie',
@@ -20,7 +22,18 @@ function AddMovieModal({ onClose, onAdd, preselectedMovie = null, existingEntry 
     const ratings = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     const handleChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
+        let val = value;
+        if (value !== '') {
+            const num = parseInt(value);
+            let total = 0;
+            if (field === 'episodesWatched') total = formData.totalEpisodes;
+            if (field === 'seasonsWatched') total = formData.totalSeasons;
+
+            if (total > 0) {
+                val = Math.min(Math.max(0, num || 0), total);
+            }
+        }
+        setFormData(prev => ({ ...prev, [field]: val }))
     }
 
     const handleSubmit = async () => {
@@ -85,6 +98,9 @@ function AddMovieModal({ onClose, onAdd, preselectedMovie = null, existingEntry 
                                     onChange={e => handleChange('seasonsWatched', e.target.value)}
                                     className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors"
                                 />
+                                <div className="mt-1 font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                    Total: {formData.totalSeasons || '?'}
+                                </div>
                             </div>
                             <div>
                                 <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">Episodes</label>
@@ -96,6 +112,9 @@ function AddMovieModal({ onClose, onAdd, preselectedMovie = null, existingEntry 
                                     onChange={e => handleChange('episodesWatched', e.target.value)}
                                     className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors"
                                 />
+                                <div className="mt-1 font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                    Total: {formData.totalEpisodes || '?'}
+                                </div>
                             </div>
                         </div>
                     )}

@@ -359,7 +359,7 @@ export default function Discover() {
             </Helmet>
 
             {/* ── Header ── */}
-            <section className="bg-[#111118] border-b border-[#2a2a35] pt-24 pb-12">
+            <section className="bg-[#111118] border-b border-[#2a2a35] pt-28 pb-12">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
                         <div className="max-w-xl">

@@ -9,7 +9,9 @@ import Follow from '../models/Follow.js'
 import Notification from '../models/Notification.js'
 import FollowRequest from '../models/FollowRequest.js'
 import protect, { protectOptional } from '../middleware/auth.js'
+import Game from '../models/Game.js'
 import { awardXP, deductXP } from '../utils/xp.js'
+import { syncUserStats } from '../utils/userStats.js'
 import { 
     sendVerificationEmail, 
     sendResetPasswordEmail, 
@@ -683,9 +685,10 @@ router.get('/profile/:username', async (req, res) => {
             .lean()
         if (!user) return res.status(404).json({ success: false, message: 'User not found' })
 
-        const [followerCount, followingCount] = await Promise.all([
+        const [followerCount, followingCount, gameCount] = await Promise.all([
             Follow.countDocuments({ followingId: user._id }),
             Follow.countDocuments({ followerId: user._id }),
+            Game.countDocuments({ userId: user._id })
         ])
 
         // check if the logged-in user follows this profile or has a pending request
@@ -714,20 +717,26 @@ router.get('/profile/:username', async (req, res) => {
         userObj.isRequestedByMe = isRequestedByMe
         userObj.followsMe = followsMe
 
-        // 🛡️ Self-Healing: If XP is lower than followerCount, it means some XP was lost (e.g. race conditions)
-        // We also sync the cached followerCount in the User document.
-        if (user.xp < followerCount || user.followerCount !== followerCount) {
-            const missingXP = Math.max(0, followerCount - user.xp)
-            if (missingXP > 0) {
-                const updatedUser = await awardXP(user._id, missingXP)
-                userObj.xp = updatedUser.xp
-                userObj.level = updatedUser.level
-                userObj.badge = updatedUser.badge
+        // 🛡️ Data Integrity Check: If cached game stats or follower counts don't match reality, trigger sync
+        if (user.gameStats?.total !== gameCount || user.followerCount !== followerCount || user.xp < followerCount) {
+            
+            // 1. Fix Game Stats
+            if (user.gameStats?.total !== gameCount) {
+                await syncUserStats(user._id)
             }
-            if (user.followerCount !== followerCount) {
+
+            // 2. Fix Follower Count & XP (XP should at least match followers)
+            if (user.followerCount !== followerCount || user.xp < followerCount) {
+                const missingXP = Math.max(0, followerCount - user.xp)
+                if (missingXP > 0) {
+                    await awardXP(user._id, missingXP)
+                }
                 await User.findByIdAndUpdate(user._id, { $set: { followerCount } })
-                userObj.followerCount = followerCount
             }
+
+            // Reload user data to reflect all fixes
+            const fixedUser = await User.findById(user._id).select('-password -email -emailVerifyToken -resetPasswordToken').lean()
+            Object.assign(userObj, fixedUser)
         }
 
         res.json({ success: true, user: userObj })

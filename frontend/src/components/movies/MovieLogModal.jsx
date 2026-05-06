@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import api from '../../api/axios'
 import MovieSearch from './MovieSearch'
 import { useSection } from '../../context/SectionState'
 import { invalidatePrefix } from '../../utils/cache'
@@ -14,6 +15,8 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
         rating: existingEntry?.rating || 0,
         episodesWatched: existingEntry?.episodesWatched ?? '',
         seasonsWatched: existingEntry?.seasonsWatched ?? '',
+        totalEpisodes: existingEntry?.totalEpisodes || preselectedItem?.totalEpisodes || 0,
+        totalSeasons: existingEntry?.totalSeasons || preselectedItem?.totalSeasons || 0,
         cover: existingEntry?.cover || existingEntry?.coverImage || preselectedItem?.cover || '',
         summary: existingEntry?.summary || preselectedItem?.summary || '',
         externalId: existingEntry?.externalId || preselectedItem?.externalId || '',
@@ -22,29 +25,117 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
     const [itemSelected, setItemSelected] = useState(!!(preselectedItem || existingEntry))
     const [submitting, setSubmitting] = useState(false)
 
+    // Auto-fetch totals if missing from existing/preselected entry
+    useEffect(() => {
+        if (itemSelected && formData.externalId && activeType === 'tv' && !formData.totalEpisodes && !formData.totalSeasons) {
+            const fetchTotals = async () => {
+                try {
+                    const res = await api.get(`/movies/detail/${formData.externalId}?type=${activeType}`);
+                    const fullData = res.data.movie;
+                    setFormData(prev => {
+                        const totalEp = fullData.totalEpisodes || prev.totalEpisodes;
+                        const totalSea = fullData.totalSeasons || prev.totalSeasons;
+                        
+                        const updated = {
+                            ...prev,
+                            totalEpisodes: totalEp,
+                            totalSeasons: totalSea,
+                            genre: prev.genre || fullData.genres?.[0] || fullData.genre || '',
+                            summary: prev.summary || fullData.summary || ''
+                        };
+
+                        // Auto-clamp progress if revealed total is less than current progress
+                        if (totalEp > 0 && prev.episodesWatched > totalEp) {
+                            updated.episodesWatched = totalEp;
+                            updated.status = 'completed';
+                        }
+                        if (totalSea > 0 && prev.seasonsWatched > totalSea) {
+                            updated.seasonsWatched = totalSea;
+                            updated.status = 'completed';
+                        }
+
+                        return updated;
+                    });
+                } catch (err) { console.error('Failed to fetch totals:', err); }
+            };
+            fetchTotals();
+        }
+    }, [itemSelected, formData.externalId, activeType, formData.totalEpisodes, formData.totalSeasons]);
+
     const statuses = ['playing', 'completed', 'planned', 'paused', 'dropped']
     const ratings = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     const handleChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
+        setFormData(prev => {
+            const updated = { ...prev, [field]: value };
+
+            // Only auto-trigger completion and clamping for progress fields
+            if (field === 'episodesWatched' || field === 'seasonsWatched') {
+                const num = value === '' ? 0 : parseInt(value) || 0;
+                const total = field === 'episodesWatched' ? prev.totalEpisodes : (field === 'seasonsWatched' ? prev.totalSeasons : 0);
+
+                if (total > 0) {
+                    const clampedVal = Math.min(Math.max(0, num), total);
+                    updated[field] = clampedVal;
+                    
+                    if (clampedVal === total) {
+                        updated.status = 'completed';
+                        // Bi-directional sync
+                        if (field === 'episodesWatched' && prev.totalSeasons > 0) {
+                            updated.seasonsWatched = prev.totalSeasons;
+                        }
+                        if (field === 'seasonsWatched' && prev.totalEpisodes > 0) {
+                            updated.episodesWatched = prev.totalEpisodes;
+                        }
+                    }
+                } else {
+                    // Even if no total, ensure we store a number
+                    updated[field] = num;
+                }
+            }
+
+            return updated;
+        });
     }
 
-    const handleItemSelect = (item) => {
+    const handleItemSelect = async (item) => {
         const alreadyLogged = items.find(i => String(i.externalId) === String(item.externalId))
-
+        
+        // 1. Immediately set basic info and library data
         setFormData(prev => ({
             ...prev,
             title: item.title,
-            genre: item.genres?.[0] || '',
-            cover: item.cover || item.coverImage || '',
-            summary: item.summary || '',
+            cover: item.cover || '',
             externalId: item.externalId || '',
             status: alreadyLogged ? alreadyLogged.status : 'playing',
             rating: alreadyLogged ? alreadyLogged.rating : 0,
-            episodesWatched: alreadyLogged ? alreadyLogged.episodesWatched : '',
-            seasonsWatched: alreadyLogged ? alreadyLogged.seasonsWatched : (item.seasonsCount || ''),
+            episodesWatched: alreadyLogged ? (alreadyLogged.episodesWatched ?? '') : '',
+            seasonsWatched: alreadyLogged ? (alreadyLogged.seasonsWatched ?? '') : '',
+            totalEpisodes: alreadyLogged?.totalEpisodes || 0,
+            totalSeasons: alreadyLogged?.totalSeasons || 0
         }))
         setItemSelected(true)
+        
+        setSubmitting(true)
+        try {
+            // 2. Supplement with full details (genres, summary, accurate totals)
+            const res = await api.get(`/movies/detail/${item.externalId}?type=${activeType}`)
+            const fullData = res.data.movie
+            
+            setFormData(prev => ({
+                ...prev,
+                title: fullData.title,
+                genre: fullData.genres?.[0] || fullData.genre || prev.genre,
+                cover: fullData.cover || prev.cover,
+                summary: fullData.summary || prev.summary,
+                totalEpisodes: fullData.totalEpisodes || prev.totalEpisodes,
+                totalSeasons: fullData.totalSeasons || prev.totalSeasons
+            }))
+        } catch (err) {
+            console.error('Failed to fetch details:', err)
+        } finally {
+            setSubmitting(false)
+        }
     }
 
     const handleSubmit = async () => {
@@ -136,6 +227,11 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                                     onChange={e => handleChange('seasonsWatched', e.target.value)}
                                     className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors"
                                 />
+                                {itemSelected && (
+                                    <div className="mt-1 font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                        Total: {formData.totalSeasons || '?'}
+                                    </div>
+                                )}
                             </div>
                             <div className="flex-1">
                                 <label className="block font-mono text-xs uppercase tracking-wider text-[#7a7a90] mb-2">
@@ -149,6 +245,11 @@ function MovieLogModal({ onClose, onAdd, preselectedItem = null, existingEntry =
                                     onChange={e => handleChange('episodesWatched', e.target.value)}
                                     className="w-full bg-[#18181f] border border-[#2a2a35] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-colors"
                                 />
+                                {itemSelected && (
+                                    <div className="mt-1 font-mono text-[9px] text-[#c8ff57] uppercase tracking-wider">
+                                        Total: {formData.totalEpisodes || '?'}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ) : null}

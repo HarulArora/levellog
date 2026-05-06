@@ -108,18 +108,37 @@ const MangaCard = memo(({ manga, onDelete, onEdit, showAvgRating = true }) => {
                     </span>
                 </div>
 
-                <div className="mt-auto flex justify-between items-end">
-                    <div className="flex flex-col gap-0.5">
-                        <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[100px]">
-                            {manga.genres?.[0] || manga.genre}
-                        </span>
-                        {manga.chaptersRead > 0 && (
-                            <span className="text-[#c8ff57] font-mono text-[9px] uppercase tracking-widest">
-                                📖 {manga.chaptersRead} ch tracked
-                            </span>
-                        )}
-                    </div>
+                <div className="mt-auto flex justify-between items-end pb-2">
+                    <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[1200px]">
+                        {manga.genres?.[0] || manga.genre}
+                    </span>
+                </div>
 
+                <div className="pt-2 border-t border-[#2a2a35] flex flex-col gap-1.5">
+                    {/* Volumes Progress */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#5c9fff] transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (manga.volumesRead / (manga.totalVolumes || 1)) * 100)}%` }} 
+                            />
+                        </div>
+                        <span className="text-[#5c9fff] font-mono text-[8px] min-w-[32px] text-right">
+                            V{manga.volumesRead || 0}/{manga.totalVolumes || '?'}
+                        </span>
+                    </div>
+                    {/* Chapters Progress */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#c8ff57] transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (manga.chaptersRead / (manga.totalChapters || 1)) * 100)}%` }} 
+                            />
+                        </div>
+                        <span className="text-[#7a7a90] font-mono text-[8px] min-w-[32px] text-right">
+                            C{manga.chaptersRead || 0}/{manga.totalChapters || '?'}
+                        </span>
+                    </div>
                 </div>
 
                 {(onEdit || onDelete) && (

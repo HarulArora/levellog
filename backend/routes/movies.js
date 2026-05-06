@@ -85,7 +85,13 @@ const TMDB_GENRES = {
 };
 
 const formatMovieItem = (item, type) => {
-    const genreName = item.genre_ids?.[0] ? TMDB_GENRES[item.genre_ids[0]] : null;
+    // Try genre_ids first (search results), then genres array (details), then genres string if it exists
+    const genreName = 
+        (item.genre_ids?.[0] ? TMDB_GENRES[item.genre_ids[0]] : null) || 
+        (item.genres?.[0]?.name) || 
+        (typeof item.genres?.[0] === 'string' ? item.genres[0] : null) ||
+        item.genre;
+
     const fallbackType = type === 'movie' ? 'Movie' : 'TV Show';
 
     return {
@@ -101,7 +107,9 @@ const formatMovieItem = (item, type) => {
         production: item.production_companies?.map(c => c.name).join(', '),
         language: item.original_language?.toUpperCase(),
         status: item.status,
-        type: type
+        type: type,
+        totalEpisodes: item.number_of_episodes || 0,
+        totalSeasons: item.number_of_seasons || 0
     };
 };
 
@@ -316,7 +324,9 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
             movie.watchProviders = response.data['watch/providers']?.results || {};
             movie.genres = response.data.genres?.map(g => g.name) || [];
             movie.runtime = response.data.runtime;
-            movie.seasonsCount = response.data.number_of_seasons;
+            movie.totalSeasons = response.data.number_of_seasons || 0;
+            movie.totalEpisodes = response.data.number_of_episodes || 0;
+            movie.seasonsCount = movie.totalSeasons;
             movie.trailer = response.data.videos?.results?.find(v => v.type === 'Trailer')?.key || 
                             response.data.videos?.results?.find(v => v.type === 'Teaser')?.key ||
                             response.data.videos?.results?.[0]?.key;
@@ -597,12 +607,30 @@ router.get('/user/:userId', async (req, res) => {
         const library = await MovieEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 });
         
         // Populate legacy fields for frontend compatibility
-        const sanitizedLibrary = library.map(entry => {
+        const sanitizedLibrary = await Promise.all(library.map(async (entry) => {
             const obj = entry.toObject();
             if (!obj.cover && obj.coverImage) obj.cover = obj.coverImage;
             if (!obj.type && obj.mediaType) obj.type = obj.mediaType;
+
+            // Heal generic genres if possible
+            const isGeneric = !obj.genre || ['movie', 'tv show', 'series'].includes(obj.genre.toLowerCase());
+            if (isGeneric && obj.externalId) {
+                try {
+                    const endpoint = obj.type === 'movie' ? `movie/${obj.externalId}` : `tv/${obj.externalId}`;
+                    const tmdbRes = await apiClient.get(`${TMDB_BASE_URL}/${endpoint}`, {
+                        params: { api_key: process.env.TMDB_API_KEY },
+                        retry: 1
+                    });
+                    const fresh = formatMovieItem(tmdbRes.data, obj.type);
+                    if (fresh.genre && !['movie', 'tv show', 'series'].includes(fresh.genre.toLowerCase())) {
+                        obj.genre = fresh.genre;
+                        // Save back to DB asynchronously to fix it permanently
+                        MovieEntry.updateOne({ _id: obj._id }, { genre: fresh.genre }).catch(e => console.error('Genre heal save error:', e));
+                    }
+                } catch (e) { /* ignore */ }
+            }
             return obj;
-        });
+        }));
 
         res.json({ success: true, games: sanitizedLibrary }); // Named "games" for profile component compatibility
     } catch (error) {
@@ -615,12 +643,30 @@ router.get('/library', protect, async (req, res) => {
         const library = await MovieEntry.find({ userId: req.user._id }).sort({ updatedAt: -1 });
         
         // Populate legacy fields for frontend compatibility
-        const sanitizedLibrary = library.map(entry => {
+        const sanitizedLibrary = await Promise.all(library.map(async (entry) => {
             const obj = entry.toObject();
             if (!obj.cover && obj.coverImage) obj.cover = obj.coverImage;
             if (!obj.type && obj.mediaType) obj.type = obj.mediaType;
+
+            // Heal generic genres if possible
+            const isGeneric = !obj.genre || ['movie', 'tv show', 'series'].includes(obj.genre.toLowerCase());
+            if (isGeneric && obj.externalId) {
+                try {
+                    const endpoint = obj.type === 'movie' ? `movie/${obj.externalId}` : `tv/${obj.externalId}`;
+                    const tmdbRes = await apiClient.get(`${TMDB_BASE_URL}/${endpoint}`, {
+                        params: { api_key: process.env.TMDB_API_KEY },
+                        retry: 1
+                    });
+                    const fresh = formatMovieItem(tmdbRes.data, obj.type);
+                    if (fresh.genre && !['movie', 'tv show', 'series'].includes(fresh.genre.toLowerCase())) {
+                        obj.genre = fresh.genre;
+                        // Save back to DB asynchronously to fix it permanently
+                        MovieEntry.updateOne({ _id: obj._id }, { genre: fresh.genre }).catch(e => console.error('Genre heal save error:', e));
+                    }
+                } catch (e) { /* ignore */ }
+            }
             return obj;
-        });
+        }));
 
         res.json({ success: true, library: sanitizedLibrary });
     } catch (error) {

@@ -153,7 +153,7 @@ function Library() {
                 <title>My Game Library | QuestDuck</title>
             </Helmet>
 
-            <div className="bg-[#0a0a0f] border-b border-[#1a1a25] pt-24 pb-16">
+            <div className="bg-[#0a0a0f] border-b border-[#1a1a25] pt-28 pb-16">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
                         <div className="relative group">
@@ -403,7 +403,7 @@ function GameRow({ game, index, onDelete, onEdit }) {
         paused: { color: 'bg-[#c45cff]', label: 'Paused' },
     }
     const sc = statusConfig[game.status] || statusConfig.planned
-    const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.THUMB)
+    const imageUrl = getIGDBImage(game.cover || (game.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamId}/header.jpg` : null), SIZES.COVER_SMALL)
 
     return (
         <tr className="border-b border-[#2a2a35] hover:bg-white/[0.02] transition-colors group">
@@ -416,7 +416,7 @@ function GameRow({ game, index, onDelete, onEdit }) {
             <td className="px-6 py-4">
                 <div 
                     onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
-                    className="w-12 h-16 bg-[#1a1a25] rounded-lg overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all"
+                    className="w-14 h-[76px] bg-[#1a1a25] rounded-xl overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all flex-shrink-0 shadow-lg group-hover:scale-105"
                 >
                     {imageUrl ? (
                         <img src={imageUrl} alt="" className="w-full h-full object-cover" />

@@ -115,8 +115,31 @@ const TVCard = memo(({ movie: tvShow, onDelete, onEdit, showAvgRating = true }) 
                     </span>
                 </div>
 
-                <div className="pt-2 border-t border-[#2a2a35] text-[#94a3b8] font-mono text-[10px]">
-                    {tvShow.episodesWatched > 0 ? `📺 ${tvShow.episodesWatched} ep tracked` : String.fromCharCode(160)}
+                <div className="pt-2 border-t border-[#2a2a35] flex flex-col gap-1.5">
+                    {/* Seasons Progress */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#5c9fff] transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (tvShow.seasonsWatched / (tvShow.totalSeasons || 1)) * 100)}%` }} 
+                            />
+                        </div>
+                        <span className="text-[#5c9fff] font-mono text-[8px] min-w-[32px] text-right">
+                            S{tvShow.seasonsWatched || 0}/{tvShow.totalSeasons || '?'}
+                        </span>
+                    </div>
+                    {/* Episodes Progress */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#c8ff57] transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (tvShow.episodesWatched / (tvShow.totalEpisodes || 1)) * 100)}%` }} 
+                            />
+                        </div>
+                        <span className="text-[#7a7a90] font-mono text-[8px] min-w-[32px] text-right">
+                            E{tvShow.episodesWatched || 0}/{tvShow.totalEpisodes || '?'}
+                        </span>
+                    </div>
                 </div>
 
                 <div className="mt-2 flex gap-1">

@@ -345,14 +345,14 @@ function TVHome() {
                 <title>QuestDuck | Track TV Shows</title>
             </Helmet>
 
-            <div className="md:hidden sticky top-[64px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center gap-2">
+            <div className="md:hidden sticky top-[80px] z-40 bg-[#0d0d14]/95 backdrop-blur-sm border-b border-[#2a2a35] px-4 py-3 flex items-center gap-2">
                 <div className="flex-1">
                     <TVSearchBar id="tv-search-mobile" />
                 </div>
             </div>
 
             {/* Hero */}
-            <section className="relative pt-20 pb-16 md:pt-24 md:pb-24 overflow-hidden min-h-[600px] flex items-center">
+            <section className="relative pt-24 pb-16 md:pt-28 md:pb-24 overflow-hidden min-h-[600px] flex items-center">
                 {(allMovies.length > 0 || !loading) && <HeroBanner movies={allMovies} />}
 
                 <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10 w-full">

@@ -69,12 +69,12 @@ function Navbar() {
 
     return (
         <nav className="relative border-b border-[#2a2a35] bg-[#0a0a0f]/90 backdrop-blur-md sticky top-0 z-50">
-            <div className="flex items-center justify-between px-5 md:px-10 h-16">
+            <div className="flex items-center justify-between px-5 md:px-10 h-20">
 
                 {/* Logo */}
                 <Link to="/" onClick={handleLinkClick}>
                     <div className="flex items-center gap-1 md:gap-1 group">
-                        <div className="font-black text-2xl md:text-3xl tracking-widest text-[#c8ff57]"
+                        <div className="font-black text-3xl md:text-4xl tracking-widest text-[#c8ff57]"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                             QUEST<span className="text-white">DUCK</span>
                         </div>
@@ -82,21 +82,21 @@ function Navbar() {
                 </Link>
 
                 {/* Desktop links */}
-                <ul className="hidden md:flex gap-6 list-none">
+                <ul className="hidden md:flex gap-8 list-none">
                     {links.map(link => {
                         const isDeals = link.path === '/deals'
                         const path = location.pathname
-                        
+
                         let isActive = false
                         if (link.name === 'HOME') {
                             isActive = path === '/' || path === '/anime' || path === '/movies' || path === '/manga' || path === '/tv'
                         } else if (link.name === 'DISCOVER') {
-                            isActive = path.includes('/discover') || 
-                                       path.includes('/game/') || 
-                                       (path.includes('/movies/') && !path.includes('/library')) || 
-                                       (path.includes('/tv/') && !path.includes('/library')) || 
-                                       (path.includes('/anime/') && !path.includes('/library')) || 
-                                       (path.includes('/manga/') && !path.includes('/library'))
+                            isActive = path.includes('/discover') ||
+                                path.includes('/game/') ||
+                                (path.includes('/movies/') && !path.includes('/library')) ||
+                                (path.includes('/tv/') && !path.includes('/library')) ||
+                                (path.includes('/anime/') && !path.includes('/library')) ||
+                                (path.includes('/manga/') && !path.includes('/library'))
                         } else if (link.name === 'LIBRARY') {
                             isActive = path.includes('/library')
                         } else if (link.name === 'FRIENDS') {
@@ -104,13 +104,13 @@ function Navbar() {
                         } else {
                             isActive = path.includes(link.path)
                         }
-                        
+
                         return (
                             <li key={link.path} className="relative">
                                 <Link
                                     to={link.path}
                                     onClick={isDeals ? handleDealsClick : handleLinkClick}
-                                    className={`text-xs font-semibold tracking-widest uppercase transition-colors
+                                    className={`text-sm font-bold tracking-widest uppercase transition-colors
                                                ${isActive ? 'text-[#c8ff57]' : 'text-[#94a3b8] hover:text-[#c8ff57]'}`}
                                 >
                                     {link.name}
@@ -128,7 +128,7 @@ function Navbar() {
 
                 {/* Global Search Bar */}
                 <div className="hidden lg:flex flex-1 max-w-md mx-8 relative">
-                    <form 
+                    <form
                         onSubmit={(e) => {
                             e.preventDefault();
                             const q = e.target.search.value;
@@ -136,29 +136,29 @@ function Navbar() {
                         }}
                         className="w-full relative group"
                     >
-                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors" />
-                        <input 
+                        <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors" />
+                        <input
                             name="search"
                             type="text"
                             placeholder="Quick Search..."
-                            className="w-full bg-[#111118] border border-[#2a2a35] rounded-full pl-12 pr-4 py-2 text-xs text-white focus:outline-none focus:border-[#c8ff57]/50 focus:bg-[#1a1a25] transition-all placeholder:text-[#505060]"
+                            className="w-full bg-[#111118] border border-[#2a2a35] rounded-full pl-12 pr-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#c8ff57]/50 focus:bg-[#1a1a25] transition-all placeholder:text-[#505060]"
                         />
                     </form>
                 </div>
 
                 {/* Right side actions */}
-                <div className="flex gap-2 sm:gap-3 items-center min-w-[120px] justify-end">
+                <div className="flex gap-2 sm:gap-4 items-center min-w-[120px] justify-end">
                     {!loading && (
                         <>
                             {/* Global Search Button */}
                             <Link to="/search" onClick={handleLinkClick} className="p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
-                                <Search size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
+                                <Search size={22} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
                             </Link>
 
                             {/* Notifications (Logged in only) */}
                             {user && (
                                 <Link to="/notifications" onClick={handleNotificationClick} className="relative p-2 hover:bg-[#c8ff57]/10 rounded-full transition-all group">
-                                    <Bell size={20} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
+                                    <Bell size={22} className="text-[#7a7a90] group-hover:text-[#c8ff57] transition-colors" />
                                     {unreadCount > 0 && (
                                         <div className="absolute top-1 right-1 w-4 h-4 bg-[#ff5c5c] rounded-full flex items-center justify-center font-mono text-[9px] text-white font-bold ring-2 ring-[#0a0a0f]">
                                             {unreadCount > 9 ? '9+' : unreadCount}
@@ -169,11 +169,11 @@ function Navbar() {
 
                             {/* Profile Avatar & Dropdown */}
                             <div className="relative" ref={dropdownRef}>
-                                <button 
-                                    onClick={() => setDropdownOpen(o => !o)} 
+                                <button
+                                    onClick={() => setDropdownOpen(o => !o)}
                                     className="flex items-center gap-1.5 focus:outline-none p-1 pr-2 hover:bg-[#2a2a35]/30 rounded-full transition-all border border-transparent hover:border-[#2a2a35]"
                                 >
-                                    {user ? <Avatar /> : <div className="w-10 h-10 rounded-full bg-[#1a1a25] flex items-center justify-center border border-[#2a2a35]"><User size={20} className="text-[#7a7a90]" /></div>}
+                                    {user ? <Avatar size="44" /> : <div className="w-11 h-11 rounded-full bg-[#1a1a25] flex items-center justify-center border border-[#2a2a35]"><User size={22} className="text-[#7a7a90]" /></div>}
                                     <ChevronDown size={14} className={`text-[#7a7a90] transition-transform duration-300 hidden sm:block ${dropdownOpen ? 'rotate-180' : ''}`} />
                                 </button>
 
@@ -214,7 +214,6 @@ function Navbar() {
                                             })}
                                         </div>
 
-                                        {/* Dropdown Actions */}
                                         <div className="py-1">
                                             {user ? (
                                                 <>
@@ -224,10 +223,10 @@ function Navbar() {
                                                         <span>My Profile</span>
                                                     </Link>
 
-                                                    <Link to="/lists" onClick={handleLinkClick}
+                                                    <Link to="/collections" onClick={handleLinkClick}
                                                         className="flex items-center gap-3 px-4 py-2.5 text-[#a0a0b8] hover:text-white hover:bg-[#1a1a25] transition-all text-[11px] font-bold uppercase tracking-wider">
                                                         <ListChecks size={14} className="opacity-70" strokeWidth={2.5} />
-                                                        <span>My Lists</span>
+                                                        <span>My Collections</span>
                                                     </Link>
 
                                                     <Link to="/deals" onClick={handleDealsClick}

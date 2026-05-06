@@ -15,14 +15,14 @@ const MovieLogModal = lazy(() => import('../../components/movies/MovieLogModal')
 function TVLibrary() {
     const { user, updateSettings, updateUser } = useAuth()
     const navigate = useNavigate()
-    
+
     const [library, setLibrary] = useState([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
-    
+
     const [viewMode, setViewMode] = useState(user?.settings?.libraryViewMode || 'grid')
-    
+
     const [showAddModal, setShowAddModal] = useState(false)
     const [editingMovie, setEditingMovie] = useState(null)
     const [confirmDelete, setConfirmDelete] = useState(null)
@@ -87,12 +87,12 @@ function TVLibrary() {
             const res = await api.delete(`/movies/log/${id}`)
             if (res.data.success) {
                 showToast(`"${title}" removed from library`)
-                
+
                 // Update local user XP/Stats
                 if (res.data.xp !== undefined) {
                     updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
                 }
-                
+
                 fetchLibrary()
             }
         } catch {
@@ -147,7 +147,7 @@ function TVLibrary() {
 
             <div className="bg-[#0a0a0f] border-b border-[#1a1a25] pt-24 pb-16">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
-                    <SubSectionToggle 
+                    <SubSectionToggle
                         current="tv"
                         type="cinema"
                         options={[
@@ -182,7 +182,7 @@ function TVLibrary() {
                             </div>
                         </div>
 
-                        <button 
+                        <button
                             onClick={() => {
                                 if (!user) { navigate('/login'); return }
                                 setShowAddModal(true)
@@ -190,7 +190,7 @@ function TVLibrary() {
                             className="group relative bg-[#c8ff57] text-black px-8 py-4 rounded-2xl font-black uppercase text-sm tracking-widest flex items-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_40px_rgba(200,255,87,0.25)]"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                         >
-                            <Plus size={22} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" /> 
+                            <Plus size={22} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" />
                             Log New Show
                         </button>
                     </div>
@@ -203,11 +203,11 @@ function TVLibrary() {
                     <div className="flex-1 overflow-x-auto no-scrollbar pr-10">
                         <MovieFilterBar activeFilter={filter} onFilter={setFilter} counts={counts} />
                     </div>
-                    
+
                     <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto lg:border-l lg:border-[#2a2a35] lg:pl-6 lg:ml-2">
                         <div className="relative w-full sm:flex-1 lg:w-72 group">
-                            <input 
-                                type="text" 
+                            <input
+                                type="text"
                                 placeholder="Search your TV shows..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -215,15 +215,15 @@ function TVLibrary() {
                             />
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
                         </div>
-                        
+
                         <div className="flex bg-[#0d0d14] rounded-2xl border border-[#2a2a35] p-1.5 shadow-inner shrink-0">
-                            <button 
+                            <button
                                 onClick={() => handleViewModeChange('grid')}
                                 className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-[#c8ff57] text-black shadow-lg' : 'text-[#7a7a90] hover:text-white hover:bg-[#1a1a25]'}`}
                             >
                                 <LayoutGrid size={20} />
                             </button>
-                            <button 
+                            <button
                                 onClick={() => handleViewModeChange('list')}
                                 className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-[#c8ff57] text-black shadow-lg' : 'text-[#7a7a90] hover:text-white hover:bg-[#1a1a25]'}`}
                             >
@@ -238,9 +238,9 @@ function TVLibrary() {
                     viewMode === 'grid' ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-10">
                             {filteredShows.map(item => (
-                                <TVCard 
-                                    key={item._id} 
-                                    movie={item} 
+                                <TVCard
+                                    key={item._id}
+                                    movie={item}
                                     showAvgRating={false}
                                     onDelete={() => handleDeleteRequest(item._id, item.title)}
                                     onEdit={() => setEditingMovie(item)}
@@ -258,15 +258,15 @@ function TVLibrary() {
                                         <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Score</th>
                                         <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Status</th>
                                         <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Genre</th>
-                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Progress</th>
+                                        <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Progress (S/E)</th>
                                         <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center align-middle">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredShows.map((show, idx) => (
-                                        <TVRow 
-                                            key={show._id} 
-                                            show={show} 
+                                        <TVRow
+                                            key={show._id}
+                                            show={show}
                                             index={idx + 1}
                                             onDelete={() => handleDeleteRequest(show._id, show.title)}
                                             onEdit={() => setEditingMovie(show)}
@@ -290,7 +290,7 @@ function TVLibrary() {
                                 {searchQuery ? `No results for "${searchQuery}". Maybe try a different keyword?` : 'Your television journey begins with a single log.'}
                             </p>
                             {!searchQuery && (
-                                <button 
+                                <button
                                     onClick={() => setShowAddModal(true)}
                                     className="mt-10 text-[#c8ff57] font-black uppercase text-sm tracking-[3px] hover:tracking-[5px] transition-all"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
@@ -305,7 +305,7 @@ function TVLibrary() {
 
             <Suspense fallback={null}>
                 {showAddModal && (
-                    <MovieLogModal 
+                    <MovieLogModal
                         onClose={() => setShowAddModal(false)}
                         onAdd={async (formData) => {
                             try {
@@ -325,11 +325,12 @@ function TVLibrary() {
                                 return { success: true }
                             } catch { return { success: false } }
                         }}
+                        items={library}
                         mediaType="tv"
                     />
                 )}
                 {editingMovie && (
-                    <MovieLogModal 
+                    <MovieLogModal
                         onClose={() => setEditingMovie(null)}
                         onAdd={async (formData) => {
                             try {
@@ -351,6 +352,7 @@ function TVLibrary() {
                         }}
                         preselectedItem={editingMovie}
                         existingEntry={editingMovie}
+                        items={library}
                         mediaType="tv"
                     />
                 )}
@@ -429,9 +431,9 @@ function TVRow({ show, index, onDelete, onEdit }) {
                 </div>
             </td>
             <td className="px-6 py-4 align-middle">
-                <div 
+                <div
                     onClick={() => show.externalId && navigate(`/tv/${show.externalId}`)}
-                    className="w-12 h-16 bg-[#1a1a25] rounded-lg overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all mx-auto"
+                    className="w-14 h-[76px] bg-[#1a1a25] rounded-xl overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all flex-shrink-0 shadow-lg group-hover:scale-105"
                 >
                     {imageUrl ? (
                         <img src={imageUrl} alt="" className="w-full h-full object-cover" />
@@ -442,7 +444,7 @@ function TVRow({ show, index, onDelete, onEdit }) {
             </td>
             <td className="px-6 py-4 align-middle text-center">
                 <div>
-                    <h4 
+                    <h4
                         onClick={() => show.externalId && navigate(`/tv/${show.externalId}`)}
                         className="text-white font-bold text-sm hover:text-[#c8ff57] cursor-pointer transition-colors"
                     >
@@ -468,61 +470,46 @@ function TVRow({ show, index, onDelete, onEdit }) {
             </td>
             <td className="px-6 py-4 align-middle text-center">
                 <span className="text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest truncate max-w-[100px] inline-block">
-                    {show.genre || 'Series'}
+                    {show.genre || 'TV Show'}
                 </span>
             </td>
-            <td className="px-6 py-4 align-middle text-center">
-                <div className="flex flex-col gap-2.5 items-center justify-center min-w-[160px]">
-                    {/* Season Progress */}
-                    {(show.totalSeasons > 0 || show.seasonsWatched > 0) && (
-                        <div className="flex items-center w-full gap-3">
-                            <div className="flex-1 h-1 bg-[#1a1a25] rounded-full overflow-hidden">
-                                <div 
-                                    className="h-full bg-[#5c9fff] transition-all duration-500" 
-                                    style={{ width: `${Math.min(100, (show.seasonsWatched / (show.totalSeasons || 1)) * 100)}%` }} 
-                                />
-                            </div>
-                            <div className="flex items-center gap-1 w-[65px] font-mono text-[9px]">
-                                <span className="text-[#5c9fff] opacity-50">SEA:</span>
-                                <span className="text-[#5c9fff] tabular-nums">
-                                    {show.seasonsWatched || 0}/{show.totalSeasons || '?'}
-                                </span>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Episode Progress (Per Season) */}
-                    <div className="flex items-center w-full gap-3">
-                        <div className="flex-1 h-1 bg-[#1a1a25] rounded-full overflow-hidden">
+            <td className="px-6 py-4 align-middle">
+                <div className="flex flex-col gap-2 min-w-[140px]">
+                    {/* Seasons Progress */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
                             <div 
-                                className="h-full bg-[#c8ff57] transition-all duration-500" 
-                                style={{ 
-                                    width: `${Math.min(100, (show.episodesWatched / (
-                                        show.seasonLimit || 
-                                        show.seasons?.find(s => s.seasonNumber === parseInt(show.seasonsWatched))?.episodeCount || 
-                                        (show.totalSeasons === 1 ? show.totalEpisodes : 0) || 1
-                                    )) * 100)}%` 
-                                }} 
+                                className="h-full bg-[#5c9fff] transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (show.seasonsWatched / (show.totalSeasons || 1)) * 100)}%` }} 
                             />
                         </div>
-                        <div className="flex items-center gap-1 w-[65px] font-mono text-[9px]">
-                            <span className="text-[#7a7a90] opacity-50">EPS:</span>
-                            <span className="text-[#7a7a90] tabular-nums">
-                                {show.episodesWatched || 0}/{show.seasonLimit || show.seasons?.find(s => s.seasonNumber === parseInt(show.seasonsWatched))?.episodeCount || (show.totalSeasons === 1 ? show.totalEpisodes : '?')}
-                            </span>
+                        <span className="text-[#5c9fff] font-mono text-[9px] w-14 text-right">
+                            S{show.seasonsWatched || 0}/{show.totalSeasons || '?'}
+                        </span>
+                    </div>
+                    {/* Episodes Progress */}
+                    <div className="flex items-center gap-2">
+                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-[#c8ff57] transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (show.episodesWatched / (show.totalEpisodes || 1)) * 100)}%` }} 
+                            />
                         </div>
+                        <span className="text-[#7a7a90] font-mono text-[9px] w-14 text-right">
+                            E{show.episodesWatched || 0}/{show.totalEpisodes || '?'}
+                        </span>
                     </div>
                 </div>
             </td>
             <td className="px-6 py-4 align-middle text-center">
                 <div className="flex justify-center gap-2">
-                    <button 
+                    <button
                         onClick={() => onEdit()}
                         className="p-2 bg-[#1a1a25] border border-[#2a2a35] rounded-lg text-[#7a7a90] hover:text-[#c8ff57] hover:border-[#c8ff57] transition-all"
                     >
                         <Edit3 size={14} />
                     </button>
-                    <button 
+                    <button
                         onClick={() => onDelete()}
                         className="p-2 bg-[#1a1a25] border border-[#2a2a35] rounded-lg text-[#7a7a90] hover:text-[#ff5c5c] hover:border-[#ff5c5c] transition-all"
                     >
