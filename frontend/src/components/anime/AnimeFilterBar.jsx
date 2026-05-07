@@ -13,12 +13,12 @@ function AnimeFilterBar({ activeFilter, onFilter, counts }) {
     ]
 
     return (
-        <div className="flex gap-3 items-center min-w-max py-1">
+        <div className="flex gap-4 items-center min-w-max py-1 px-2">
             {filters.map(f => (
                 <button
                     key={f.key}
                     onClick={() => onFilter(f.key)}
-                    className={`group relative px-5 py-2.5 rounded-xl font-mono text-[10px] uppercase tracking-[2px] transition-all duration-300 overflow-hidden
+                    className={`group relative px-6 py-3 rounded-xl font-mono text-[10px] uppercase tracking-[2px] transition-all duration-300 overflow-hidden
                      ${activeFilter === f.key
                             ? 'text-black font-bold'
                             : 'text-[#9a9ab0] hover:text-white'

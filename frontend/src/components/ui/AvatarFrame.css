@@ -3,6 +3,8 @@
     border-radius: 50%;
     flex-shrink: 0;
     margin-top: 5px; /* Reduced buffer */
+    aspect-ratio: 1 / 1;
+    overflow: visible; /* To allow crowns to float outside */
 }
 
 .avatar-image {
@@ -10,6 +12,7 @@
     height: 100%;
     border-radius: 50%;
     object-fit: cover;
+    display: block;
     border: 2px solid #2a2a35;
     position: relative;
     z-index: 2;
@@ -51,6 +54,7 @@
 }
 
 /* Extra clearance for mini-avatars (Navbar/Search) */
+.avatar-frame-container[style*="width: 32px"] .rank-crown,
 .avatar-frame-container[style*="width: 28px"] .rank-crown,
 .avatar-frame-container[style*="width: 24px"] .rank-crown {
     top: -60%;

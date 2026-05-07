@@ -266,7 +266,7 @@ router.post('/stats/batch', async (req, res) => {
     try {
         const { igdbIds } = req.body
         if (!igdbIds?.length) return res.json({ success: true, stats: {} })
-        const ids = igdbIds.map(Number)
+        const ids = igdbIds.map(Number).filter(id => !isNaN(id))
         
         const allStats = await GlobalStats.find({ igdbId: { $in: ids } })
         

@@ -178,6 +178,7 @@ export const calculateTrending = async (type) => {
         const item = ranked[i];
         let metadata = null;
         const extId = parseInt(item.contentId);
+        if (isNaN(extId)) continue;
         
         if (type === 'game') {
             const [g, l, w] = await Promise.all([

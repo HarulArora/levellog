@@ -110,7 +110,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     const replyCount = comment.replies?.length || 0
 
     const handleLike = async () => {
-        if (!currentUser) { navigate('/login'); return }
+        if (!currentUser) { navigate('/login', { state: { from: location } }); return }
         hasInteracted.current = true
 
         const prevLiked = liked
@@ -147,7 +147,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     }
 
     const handleDislike = async () => {
-        if (!currentUser) { navigate('/login'); return }
+        if (!currentUser) { navigate('/login', { state: { from: location } }); return }
         hasInteracted.current = true
 
         const prevLiked = liked
@@ -199,6 +199,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
     }
 
     const handleReply = async () => {
+        if (!currentUser) { navigate('/login', { state: { from: location } }); return }
         if (!replyText.trim() || submittingReply) return
         
         const text = replyText.trim()
@@ -353,7 +354,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-2">
                         <Link to={profilePath || '#'} className={`flex-shrink-0 ${!profilePath && 'pointer-events-none'}`}>
-                            <AvatarFrame userId={comment.userId?._id || comment.userId?.id} src={comment.userId?.avatar} size={28} className="comment-avatar" />
+                            <AvatarFrame userId={comment.userId?._id || comment.userId?.id} src={comment.userId?.avatar} size={32} className="comment-avatar" />
                         </Link>
                         <Link to={profilePath || '#'} className={`font-bold text-xs hover:underline 
                             ${rank === 1 ? 'text-yellow-400' : 
@@ -639,7 +640,7 @@ function GameDetail() {
     }
 
     const handleLike = async () => {
-        if (!user) { navigate('/login'); return }
+        if (!user) { navigate('/login', { state: { from: location } }); return }
         if (liking) return
         
         // Optimistic Update
@@ -684,7 +685,7 @@ function GameDetail() {
     }
 
     const handleWishlist = async () => {
-        if (!user) { navigate('/login'); return }
+        if (!user) { navigate('/login', { state: { from: location } }); return }
         if (wishing) return
  
         // Optimistic Update
@@ -726,6 +727,7 @@ function GameDetail() {
 
 
     const handlePostComment = async () => {
+        if (!user) { navigate('/login', { state: { from: location } }); return }
         if (!commentText.trim() || submittingComment) return
         const text = commentText.trim()
         
@@ -929,60 +931,60 @@ function GameDetail() {
                             </div>
 
                             {/* Apple-style Stats Grid */}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-10">
+                            <div className="grid grid-cols-5 gap-1.5 md:gap-4 mb-10 overflow-hidden">
                                 {/* Avg Rating */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
-                                        <Star size={16} fill="currentColor" />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
+                                        <Star size={10} className="md:w-4 md:h-4" fill="currentColor" />
                                     </div>
                                     <div className="flex items-baseline gap-0.5">
-                                        <span className="text-2xl font-bold text-white tracking-tight">
+                                        <span className="text-xs md:text-2xl font-bold text-white tracking-tight">
                                             {stats?.avgRating > 0 ? stats.avgRating : '—'}
                                         </span>
-                                        {stats?.avgRating > 0 && <span className="text-[10px] text-[#7a7a90] font-medium">/10</span>}
+                                        {stats?.avgRating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
                                     </div>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Avg Rating</div>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Avg</div>
                                 </div>
 
                                 {/* My Rating */}
-                                {user && myGame?.rating > 0 && (
-                                    <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#c8ff57]/30 transition-all duration-300 shadow-lg">
-                                        <div className="w-8 h-8 rounded-full bg-[#c8ff57]/10 flex items-center justify-center text-[#c8ff57] mb-2 group-hover:scale-110 transition-transform">
-                                            <Star size={16} fill="currentColor" />
-                                        </div>
-                                        <div className="flex items-baseline gap-0.5">
-                                            <span className="text-2xl font-bold text-[#c8ff57] tracking-tight">{myGame.rating}</span>
-                                            <span className="text-[10px] text-[#7a7a90] font-medium">/10</span>
-                                        </div>
-                                        <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">My Rating</div>
+                                <div className={`bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#c8ff57]/30 transition-all duration-300 shadow-lg ${(!user || !(myGame?.rating > 0)) ? 'opacity-30 grayscale' : ''}`}>
+                                    <div className={`w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#c8ff57]/10 flex items-center justify-center text-[#c8ff57] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform`}>
+                                        <Star size={10} className="md:w-4 md:h-4" fill="currentColor" />
                                     </div>
-                                )}
+                                    <div className="flex items-baseline gap-0.5">
+                                        <span className={`text-xs md:text-2xl font-bold tracking-tight ${myGame?.rating > 0 ? 'text-[#c8ff57]' : 'text-white/40'}`}>
+                                            {myGame?.rating > 0 ? myGame.rating : '—'}
+                                        </span>
+                                        {myGame?.rating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
+                                    </div>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Mine</div>
+                                </div>
 
                                 {/* In Pond */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff9f5c]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-8 h-8 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-2 group-hover:scale-110 transition-transform">
-                                        <Gamepad2 size={16} />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff9f5c]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
+                                        <Gamepad2 size={10} className="md:w-4 md:h-4" />
                                     </div>
-                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.loggedCount ?? '—'}</span>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">In Pond</div>
+                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.loggedCount ?? '0'}</span>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Pond</div>
                                 </div>
 
                                 {/* Likes */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff5c5c]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-8 h-8 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center text-[#ff5c5c] mb-2 group-hover:scale-110 transition-transform">
-                                        <Heart size={16} fill="currentColor" />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff5c5c]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center text-[#ff5c5c] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
+                                        <Heart size={10} className="md:w-4 md:h-4" fill="currentColor" />
                                     </div>
-                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.likeCount ?? '—'}</span>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Likes</div>
+                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.likeCount ?? '0'}</span>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Likes</div>
                                 </div>
 
                                 {/* Wishlists */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
-                                        <Target size={16} />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
+                                        <Target size={10} className="md:w-4 md:h-4" />
                                     </div>
-                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.wishlistCount ?? '—'}</span>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Wishlists</div>
+                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.wishlistCount ?? '0'}</span>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Wish</div>
                                 </div>
                             </div>
 
@@ -1145,7 +1147,7 @@ function GameDetail() {
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-3">Leave a Comment</div>
                                         <div className="flex gap-3 items-start">
-                                            <Avatar user={user} size="32" className="mt-0.5" />
+                                            <AvatarFrame userId={user.id || user._id} src={user.avatar} size={32} className="flex-shrink-0 mt-0.5" />
                                             <div className="flex-1">
                                                 <textarea 
                                                     value={commentText} 
@@ -1297,7 +1299,7 @@ function GameDetail() {
                             <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                 <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-4">Platforms</div>
                                 <div className="flex flex-wrap gap-2">
-                                    {game.platforms.map(p => (
+                                    {[...new Set((game.platforms || []).map(p => String(p)))].map(p => (
                                         <span key={p} className="font-mono text-[10px] uppercase tracking-wider px-2.5 py-1 bg-[#2a2a35] text-[#7a7a90] rounded">
                                             {p}
                                         </span>
@@ -1320,16 +1322,16 @@ function GameDetail() {
                                             )}
                                             <div className="flex-1 min-w-0">
                                                 <div className="text-white text-xs font-semibold truncate group-hover:text-[#c8ff57] transition-colors">{sg.title}</div>
-                                                <div className="font-mono text-[9px] text-[#7a7a90] mt-1">View details</div>
+                                                {similarStats?.[sg.id]?.avgRating ? (
+                                                    <div className="flex items-center gap-1 font-black text-lg text-[#5c9fff]"
+                                                        style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                                        <span>{similarStats[sg.id].avgRating}</span>
+                                                        <span className="text-[10px] text-[#4a4a5e]">/10</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-[10px] font-mono text-[#3a3a4a]">UNRATED</div>
+                                                )}
                                             </div>
-                                            {similarStats[sg.id]?.avgRating ? (
-                                                <div className="flex items-center gap-1 font-black text-lg text-[#5c9fff] flex-shrink-0"
-                                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-
-                                                    <span>{similarStats[sg.id].avgRating}</span>
-                                                    <small className="font-mono text-[9px] text-[#7a7a90] font-normal">/10</small>
-                                                </div>
-                                            ) : null}
                                         </Link>
                                     ))}
                                 </div>

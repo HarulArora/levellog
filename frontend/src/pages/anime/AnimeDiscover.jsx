@@ -255,6 +255,7 @@ function AnimeDiscover() {
                         <AnimeCard 
                             key={item.externalId} 
                             anime={searchPerformed ? { ...item, ...libraryMap[item.externalId] } : { ...item, ...libraryMap[item.externalId], avgRating: discoverData?.stats?.[item.externalId]?.avgRating }} 
+                            showProgress={false}
                         />
                     ))}
                 </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGoogleLogin } from '@react-oauth/google'
 
@@ -11,6 +11,9 @@ function isValidEmail(email) {
 function Login() {
     const { login, loginWithGoogle } = useAuth()
     const navigate = useNavigate()
+    const location = useLocation()
+    const from = location.state?.from || '/'
+    
     const [formData, setFormData] = useState({ identifier: '', password: '' })
     const [error, setError] = useState('')
     const [fieldError, setFieldError] = useState({})
@@ -40,7 +43,7 @@ function Login() {
         const result = await login(formData.identifier, formData.password)
         setLoading(false)
         if (result.success) {
-            navigate('/')
+            navigate(from, { replace: true })
         } else {
             if (result.requiresVerification) {
                 navigate(`/verify-email?email=${encodeURIComponent(result.email)}`)
@@ -57,7 +60,7 @@ function Login() {
             try {
                 const result = await loginWithGoogle(tokenResponse.access_token)
                 if (result.success) {
-                    navigate('/')
+                    navigate(from, { replace: true })
                 } else {
                     setError(result.message)
                 }

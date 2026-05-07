@@ -187,7 +187,7 @@ const GameCard = memo(({ game, entry, onClick }) => {
                 </div>
                 {/* Platform Tags - Small and subtle */}
                 <div className="flex gap-1 mt-2 overflow-hidden">
-                    {(game.platforms || []).slice(0, 3).map(p => (
+                    {[...new Set(game.platforms || [])].slice(0, 3).map(p => (
                         <span key={p} className="font-mono text-[7px] text-[#505060] uppercase border border-white/5 px-1 rounded">
                             {p === 'Xbox Series' ? 'X|S' : p === 'Xbox One' ? 'XOne' : p}
                         </span>

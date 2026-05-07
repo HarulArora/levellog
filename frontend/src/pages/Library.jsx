@@ -155,17 +155,17 @@ function Library() {
 
             <div className="bg-[#0a0a0f] border-b border-[#1a1a25] pt-28 pb-16">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
-                        <div className="relative group">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-10">
+                        <div className="relative group w-full md:w-auto">
                             <div className="absolute -left-4 -top-4 w-12 h-12 bg-[#c8ff57]/10 rounded-full blur-2xl group-hover:bg-[#c8ff57]/20 transition-all duration-500" />
                             <div className="flex items-center gap-3 mb-2">
                                 <Gamepad2 size={16} className="text-[#c8ff57]" />
                                 <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[3px]">Multiverse Vault</span>
                             </div>
-                            <h1 className="font-black text-5xl md:text-6xl text-white uppercase leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            <h1 className="font-black text-4xl md:text-6xl text-white uppercase leading-tight" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                 My <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-[#c8ff57] to-white bg-[length:200%_auto] animate-gradient">Game Library</span>
                             </h1>
-                            <div className="flex items-center gap-4 mt-4">
+                            <div className="flex flex-wrap items-center gap-3 md:gap-4 mt-4">
                                 <div className="px-3 py-1 bg-[#111118] border border-[#2a2a35] rounded-full flex items-center gap-2">
                                     <Sparkles size={10} className="text-[#c8ff57]" />
                                     <span className="text-[#7a7a90] font-mono text-[9px] uppercase tracking-widest">
@@ -186,10 +186,10 @@ function Library() {
                                 if (!user) { navigate('/login'); return }
                                 setShowModal(true)
                             }}
-                            className="group relative bg-[#c8ff57] text-black px-8 py-4 rounded-2xl font-black uppercase text-sm tracking-widest flex items-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_40px_rgba(200,255,87,0.25)]"
+                            className="group relative w-full md:w-auto bg-[#c8ff57] text-black px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_40px_rgba(200,255,87,0.25)]"
                             style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                         >
-                            <Plus size={22} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" /> 
+                            <Plus size={20} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" /> 
                             Log New Game
                         </button>
                     </div>
@@ -198,35 +198,35 @@ function Library() {
 
             <div className="max-w-[1200px] mx-auto px-5 md:px-10 mt-12">
                 {/* Control Panel */}
-                <div className="flex flex-col lg:flex-row gap-6 mb-12 bg-[#111118]/50 backdrop-blur-xl border border-[#2a2a35] p-5 rounded-3xl shadow-2xl">
-                    <div className="flex-1 overflow-x-auto no-scrollbar">
+                <div className="flex flex-col lg:flex-row gap-4 md:gap-6 mb-8 md:mb-12 bg-[#111118]/50 backdrop-blur-xl border border-[#2a2a35] p-3 md:p-5 rounded-[2rem] shadow-2xl">
+                    <div className="flex-1 overflow-x-auto no-scrollbar pb-1 lg:pb-0">
                         <FilterBar activeFilter={activeFilter} onFilter={handleFilter} counts={counts} />
                     </div>
                     
-                    <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto lg:border-l lg:border-[#2a2a35] lg:pl-6 lg:ml-2">
-                        <div className="relative w-full sm:flex-1 lg:w-72 group">
+                    <div className="flex items-center gap-3 w-full lg:w-auto lg:border-l lg:border-[#2a2a35] lg:pl-6">
+                        <div className="relative flex-1 lg:w-64 group">
                             <input 
                                 type="text" 
-                                placeholder="Search your vault..."
+                                placeholder="Search..."
                                 value={searchQuery}
                                 onChange={e => handleSearch(e.target.value)}
-                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-2xl pl-12 pr-12 py-3.5 text-sm text-white focus:outline-none focus:border-[#c8ff57] focus:ring-4 focus:ring-[#c8ff57]/5 transition-all placeholder:text-[#3a3a4a]"
+                                className="w-full bg-[#0d0d14] border border-[#2a2a35] rounded-xl md:rounded-2xl pl-10 pr-4 py-2.5 md:py-3 text-sm text-white focus:outline-none focus:border-[#c8ff57] transition-all placeholder:text-[#3a3a4a]"
                             />
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors z-10 pointer-events-none" size={18} />
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7a7a90] group-focus-within:text-[#c8ff57] transition-colors" size={16} />
                         </div>
 
-                        <div className="flex bg-[#0d0d14] rounded-2xl border border-[#2a2a35] p-1.5 shadow-inner shrink-0">
+                        <div className="flex bg-[#0d0d14] rounded-xl border border-[#2a2a35] p-1 shadow-inner shrink-0">
                             <button 
                                 onClick={() => handleViewModeChange('grid')}
-                                className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-[#c8ff57] text-black shadow-lg' : 'text-[#7a7a90] hover:text-white hover:bg-[#1a1a25]'}`}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-[#c8ff57] text-black shadow-lg' : 'text-[#7a7a90] hover:text-white hover:bg-[#1a1a25]'}`}
                             >
-                                <LayoutGrid size={20} />
+                                <LayoutGrid size={18} />
                             </button>
                             <button 
                                 onClick={() => handleViewModeChange('list')}
-                                className={`p-2 rounded-xl transition-all ${viewMode === 'list' ? 'bg-[#c8ff57] text-black shadow-lg' : 'text-[#7a7a90] hover:text-white hover:bg-[#1a1a25]'}`}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-[#c8ff57] text-black shadow-lg' : 'text-[#7a7a90] hover:text-white hover:bg-[#1a1a25]'}`}
                             >
-                                <ListIcon size={20} />
+                                <ListIcon size={18} />
                             </button>
                         </div>
                     </div>
@@ -258,14 +258,14 @@ function Library() {
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-[#2a2a35] bg-[#0d0d14]">
-                                            <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-16">#</th>
-                                            <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-24">Image</th>
-                                            <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Title</th>
-                                            <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Score</th>
-                                            <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Status</th>
-                                            <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Platform</th>
-                                            <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Playtime</th>
-                                            <th className="px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Action</th>
+                                            <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-16 hidden md:table-cell">#</th>
+                                            <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-20 md:w-24">Image</th>
+                                            <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Title & Info</th>
+                                            <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Score</th>
+                                            <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden lg:table-cell">Status</th>
+                                            <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden lg:table-cell">Platform</th>
+                                            <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden md:table-cell">Playtime</th>
+                                            <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -308,7 +308,10 @@ function Library() {
                             </p>
                             {!debouncedQ && (
                                 <button 
-                                    onClick={() => setShowModal(true)}
+                                    onClick={() => {
+                                        if (!user) { navigate('/login'); return }
+                                        setShowModal(true)
+                                    }}
                                     className="mt-10 text-[#c8ff57] font-black uppercase text-sm tracking-[3px] hover:tracking-[5px] transition-all"
                                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                                 >
@@ -407,82 +410,90 @@ function GameRow({ game, index, onDelete, onEdit }) {
 
     return (
         <tr className="border-b border-[#2a2a35] hover:bg-white/[0.02] transition-colors group">
-            <td className="px-6 py-4">
+            <td className="px-2 md:px-6 py-3 hidden md:table-cell">
                 <div className="flex items-center gap-3">
                     <div className={`w-1 h-8 rounded-full ${sc.color}`} />
                     <span className="font-mono text-xs text-[#4a4a5e]">{index}</span>
                 </div>
             </td>
-            <td className="px-6 py-4">
+            <td className="px-2 md:px-6 py-3">
                 <div 
                     onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
-                    className="w-14 h-[76px] bg-[#1a1a25] rounded-xl overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all flex-shrink-0 shadow-lg group-hover:scale-105"
+                    className="w-10 h-[56px] md:w-14 md:h-[76px] bg-[#1a1a25] rounded-lg md:rounded-xl overflow-hidden border border-[#2a2a35] cursor-pointer hover:border-[#c8ff57] transition-all flex-shrink-0 shadow-lg group-hover:scale-105"
                 >
                     {imageUrl ? (
                         <img src={imageUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xl">🎮</div>
+                        <div className="w-full h-full flex items-center justify-center text-lg">🎮</div>
                     )}
                 </div>
             </td>
-            <td className="px-6 py-4">
-                <div>
-                    <h4 
-                        onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
-                        className="text-white font-bold text-sm hover:text-[#c8ff57] cursor-pointer transition-colors"
-                    >
-                        {game.title}
-                    </h4>
-                    <p className="text-[#4a4a5e] font-mono text-[10px] uppercase tracking-wider mt-0.5">{game.genre}</p>
+            <td className="px-2 md:px-6 py-3">
+                <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                        <div className={`w-1 h-3 rounded-full ${sc.color} md:hidden`} />
+                        <h4 
+                            onClick={() => game.igdbId && navigate(`/game/${game.igdbId}`)}
+                            className="text-white font-bold text-[11px] md:text-sm hover:text-[#c8ff57] cursor-pointer transition-colors truncate max-w-[80px] sm:max-w-[150px] md:max-w-none"
+                        >
+                            {game.title}
+                        </h4>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                        <span className={`lg:hidden px-1.5 py-0.5 rounded-[4px] text-[7px] font-mono uppercase tracking-widest ${sc.color.replace('bg-', 'text-')} bg-white/5 border border-white/5`}>
+                            {sc.label}
+                        </span>
+                        {game.hours > 0 && (
+                            <div className="md:hidden flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-[#c8ff57]/5 border border-[#c8ff57]/10">
+                                <span className="text-[#c8ff57] font-mono text-[7px] font-bold uppercase">{game.hours}H</span>
+                            </div>
+                        )}
+                        <p className="text-[#4a4a5e] font-mono text-[8px] md:text-[10px] uppercase tracking-wider truncate max-w-[60px] md:max-w-none">{game.genre || 'Game'}</p>
+                    </div>
                 </div>
             </td>
-            <td className="px-6 py-4 text-center">
-                <div className="flex flex-col items-center">
-                    {game.rating > 0 ? (
-                        <span className="text-[#c8ff57] font-black text-xl leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.rating}</span>
-                    ) : (
-                        <span className="text-[#3a3a4a] font-mono text-[9px] uppercase tracking-tighter">NOT RATED</span>
-                    )}
-                </div>
-            </td>
-            <td className="px-6 py-4">
-                <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest ${sc.color.replace('bg-', 'text-')} bg-white/5 border border-white/5`}>
-                    {sc.label}
-                </span>
-            </td>
-            <td className="px-6 py-4">
-                <div className="flex flex-wrap gap-1 max-w-[120px]">
-                    {game.platforms && game.platforms.length > 0 ? (
-                        game.platforms.map(p => (
-                            <span key={p} className="px-1.5 py-0.5 rounded-[4px] bg-[#1a1a25] border border-[#2a2a35] text-[#7a7a90] font-mono text-[8px] uppercase">
-                                {p}
-                            </span>
-                        ))
-                    ) : (
-                        <span className="text-[#3a3a4a] font-mono text-[10px]">—</span>
-                    )}
-                </div>
-            </td>
-            <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                    <span className={`font-mono text-xs font-bold ${game.hours > 0 ? 'text-[#c8ff57]' : 'text-[#4a4a5e]'}`}>
-                        {game.hours > 0 ? `${game.hours}h` : '—'}
-                    </span>
-                </div>
-            </td>
-            <td className="px-6 py-4 text-center">
-                <div className="flex justify-center gap-2">
+                            <td className="px-4 md:px-6 py-4 text-center">
+                                {game.rating > 0 ? (
+                                    <span className="text-[#c8ff57] font-black text-xl md:text-2xl leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{game.rating}</span>
+                                ) : (
+                                    <span className="text-[#3a3a4a] font-mono text-[10px]">—</span>
+                                )}
+                            </td>
+                            <td className="px-4 md:px-6 py-4 hidden lg:table-cell">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest ${sc.color.replace('bg-', 'text-')} bg-white/5 border border-white/5`}>
+                                    {sc.label}
+                                </span>
+                            </td>
+                            <td className="px-4 md:px-6 py-4 hidden lg:table-cell">
+                                <div className="flex flex-wrap gap-1 max-w-[120px]">
+                                    {game.platforms && game.platforms.length > 0 ? [...new Set(game.platforms || [])].map(p => (
+                                            <span key={p} className="px-1.5 py-0.5 rounded-[4px] bg-[#1a1a25] border border-[#2a2a35] text-[#7a7a90] font-mono text-[8px] uppercase">
+                                                {p}
+                                            </span>
+                                        ))
+                                     : (
+                                        <span className="text-[#3a3a4a] font-mono text-[10px]">—</span>
+                                    )}
+                                </div>
+                            </td>
+                            <td className="px-4 md:px-6 py-4 hidden md:table-cell">
+                                <span className={`font-mono text-[10px] md:text-xs font-bold ${game.hours > 0 ? 'text-[#c8ff57]' : 'text-[#4a4a5e]'}`}>
+                                    {game.hours > 0 ? `${game.hours}h` : '—'}
+                                </span>
+                            </td>
+            <td className="px-4 md:px-6 py-4 text-center">
+                <div className="flex justify-center gap-1 md:gap-2">
                     <button 
                         onClick={() => onEdit()}
-                        className="p-2 bg-[#1a1a25] border border-[#2a2a35] rounded-lg text-[#7a7a90] hover:text-[#c8ff57] hover:border-[#c8ff57] transition-all shadow-sm"
+                        className="p-1.5 md:p-2 bg-[#1a1a25] border border-[#2a2a35] rounded-lg text-[#7a7a90] hover:text-[#c8ff57] hover:border-[#c8ff57] transition-all shadow-sm"
                     >
-                        <Edit3 size={14} />
+                        <Edit3 size={12} className="md:w-3.5 md:h-3.5" />
                     </button>
                     <button 
                         onClick={() => onDelete()}
-                        className="p-2 bg-[#1a1a25] border border-[#2a2a35] rounded-lg text-[#7a7a90] hover:text-[#ff5c5c] hover:border-[#ff5c5c] transition-all shadow-sm"
+                        className="p-1.5 md:p-2 bg-[#1a1a25] border border-[#2a2a35] rounded-lg text-[#7a7a90] hover:text-[#ff5c5c] hover:border-[#ff5c5c] transition-all shadow-sm"
                     >
-                        <Trash2 size={14} />
+                        <Trash2 size={12} className="md:w-3.5 md:h-3.5" />
                     </button>
                 </div>
             </td>
@@ -505,7 +516,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
     const btnDisabled = `text-[#3a3a50] border-[#1e1e28] bg-transparent cursor-not-allowed opacity-50`
 
     return (
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-3 md:gap-2 flex-wrap">
             <button
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
@@ -515,7 +526,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
             </button>
             {pageNumbers.map((page, idx) =>
                 page === '...' ? (
-                    <span key={`dots-${idx}`} className="font-mono text-[#3a3a50] w-10 text-center select-none">…</span>
+                    <span key={`dots-${idx}`} className="font-mono text-[#3a3a50] w-8 text-center select-none">…</span>
                 ) : (
                     <button
                         key={page}

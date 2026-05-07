@@ -250,6 +250,7 @@ function MangaDiscover() {
                         <MangaCard 
                             key={item.externalId} 
                             manga={searchPerformed ? { ...item, ...libraryMap[item.externalId] } : { ...item, ...libraryMap[item.externalId], avgRating: discoverData?.stats?.[item.externalId]?.avgRating }} 
+                            showProgress={false}
                         />
                     ))}
                 </div>

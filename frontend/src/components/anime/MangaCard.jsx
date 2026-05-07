@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 // import { useSection } from '../../context/SectionState'
 
-const MangaCard = memo(({ manga, onDelete, onEdit, showAvgRating = true }) => {
+const MangaCard = memo(({ manga, onDelete, onEdit, showAvgRating = true, showProgress = true }) => {
     const navigate = useNavigate()
 
     const statusConfig = {
@@ -114,32 +114,34 @@ const MangaCard = memo(({ manga, onDelete, onEdit, showAvgRating = true }) => {
                     </span>
                 </div>
 
-                <div className="pt-2 border-t border-[#2a2a35] flex flex-col gap-1.5">
-                    {/* Volumes Progress */}
-                    <div className="flex items-center gap-2">
-                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
-                            <div 
-                                className="h-full bg-[#5c9fff] transition-all duration-500" 
-                                style={{ width: `${Math.min(100, (manga.volumesRead / (manga.totalVolumes || 1)) * 100)}%` }} 
-                            />
+                {showProgress && (manga.chaptersRead > 0 || manga.volumesRead > 0) && (
+                    <div className="pt-2 border-t border-[#2a2a35] flex flex-col gap-1.5">
+                        {/* Volumes Progress */}
+                        <div className="flex items-center gap-2">
+                            <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-[#5c9fff] transition-all duration-500" 
+                                    style={{ width: `${Math.min(100, (manga.volumesRead / (manga.totalVolumes || 1)) * 100)}%` }} 
+                                />
+                            </div>
+                            <span className="text-[#5c9fff] font-mono text-[8px] min-w-[32px] text-right">
+                                V{manga.volumesRead || 0}/{manga.totalVolumes || '?'}
+                            </span>
                         </div>
-                        <span className="text-[#5c9fff] font-mono text-[8px] min-w-[32px] text-right">
-                            V{manga.volumesRead || 0}/{manga.totalVolumes || '?'}
-                        </span>
-                    </div>
-                    {/* Chapters Progress */}
-                    <div className="flex items-center gap-2">
-                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
-                            <div 
-                                className="h-full bg-[#c8ff57] transition-all duration-500" 
-                                style={{ width: `${Math.min(100, (manga.chaptersRead / (manga.totalChapters || 1)) * 100)}%` }} 
-                            />
+                        {/* Chapters Progress */}
+                        <div className="flex items-center gap-2">
+                            <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-[#c8ff57] transition-all duration-500" 
+                                    style={{ width: `${Math.min(100, (manga.chaptersRead / (manga.totalChapters || 1)) * 100)}%` }} 
+                                />
+                            </div>
+                            <span className="text-[#7a7a90] font-mono text-[8px] min-w-[32px] text-right">
+                                C{manga.chaptersRead || 0}/{manga.totalChapters || '?'}
+                            </span>
                         </div>
-                        <span className="text-[#7a7a90] font-mono text-[8px] min-w-[32px] text-right">
-                            C{manga.chaptersRead || 0}/{manga.totalChapters || '?'}
-                        </span>
                     </div>
-                </div>
+                )}
 
                 {(onEdit || onDelete) && (
                     <div className="mt-2 flex gap-1">

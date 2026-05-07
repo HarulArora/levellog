@@ -631,7 +631,7 @@ function Home() {
                                                     <div className="text-white font-semibold text-sm truncate">{game.title}</div>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <span className={`font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm ${sc.bg} ${sc.color}`}>{sc.label}</span>
-                                                        {game.platforms?.slice(0, 2).map(p => (
+                                                        {[...new Set(game.platforms || [])].slice(0, 2).map(p => (
                                                             <span key={p} className="font-mono text-[9px] uppercase tracking-wider px-2 py-1 rounded-sm bg-[#2a2a35] text-[#94999c]">{p}</span>
                                                         ))}
                                                     </div>

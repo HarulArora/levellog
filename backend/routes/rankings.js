@@ -17,7 +17,7 @@ const mergeUnique = async (existing, fetched, type) => {
     const merged = [...existing];
 
     // Bulk fetch website stats for the new items
-    const externalIds = fetched.map(item => parseInt(item.contentId || item.id || item.externalId || item.mal_id));
+    const externalIds = fetched.map(item => parseInt(item.contentId || item.id || item.externalId || item.mal_id)).filter(id => !isNaN(id));
     let statsMap = {};
 
     if (type === 'game') {
@@ -65,13 +65,13 @@ router.get('/top_rated', async (req, res) => {
         });
 
         // Refresh stats and year from website/external for existing rankings
-        const ids = rankings.map(r => parseInt(r.contentId));
+        const ids = rankings.map(r => parseInt(r.contentId)).filter(id => !isNaN(id));
         if (ids.length > 0) {
             if (type === 'game') {
                 const stats = await GlobalStats.find({ igdbId: { $in: ids } }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.igdbId] = s.avgRating);
                 
-                const missingYearIds = rankings.filter(r => !r.year || r.year === 0).map(r => parseInt(r.contentId));
+                const missingYearIds = rankings.filter(r => !r.year || r.year === 0).map(r => parseInt(r.contentId)).filter(id => !isNaN(id));
                 let yearMap = {};
                 if (missingYearIds.length > 0) {
                     try {
@@ -183,13 +183,13 @@ router.get('/trending', async (req, res) => {
         });
 
         // Refresh stats from website
-        const ids = rankings.map(r => parseInt(r.contentId));
+        const ids = rankings.map(r => parseInt(r.contentId)).filter(id => !isNaN(id));
         if (ids.length > 0) {
             if (type === 'game') {
                 const stats = await GlobalStats.find({ igdbId: { $in: ids } }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.igdbId] = s.avgRating);
                 
-                const missingYearIds = rankings.filter(r => !r.year || r.year === 0).map(r => parseInt(r.contentId));
+                const missingYearIds = rankings.filter(r => !r.year || r.year === 0).map(r => parseInt(r.contentId)).filter(id => !isNaN(id));
                 let yearMap = {};
                 if (missingYearIds.length > 0) {
                     try {
@@ -299,7 +299,7 @@ router.get('/coming_soon', async (req, res) => {
         });
 
         // Refresh stats from website
-        const ids = rankings.map(r => parseInt(r.contentId));
+        const ids = rankings.map(r => parseInt(r.contentId)).filter(id => !isNaN(id));
         if (ids.length > 0) {
             if (type === 'game') {
                 const stats = await GlobalStats.find({ igdbId: { $in: ids } }).lean();

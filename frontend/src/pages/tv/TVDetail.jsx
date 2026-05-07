@@ -202,7 +202,7 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
                     ${rank === 4 ? 'bg-[#94999c]/8 border-[#94999c]/40 border-l-[4px]' : ''}
                 `}>
                     <div className="flex items-center gap-2 mb-2">
-                        <Link to={profilePath || '#'}><AvatarFrame userId={comment.userId?._id || comment.userId?.id} src={comment.userId?.avatar} size={28} /></Link>
+                        <Link to={profilePath || '#'} className="flex-shrink-0"><AvatarFrame userId={comment.userId?._id || comment.userId?.id} src={comment.userId?.avatar} size={32} className="comment-avatar" /></Link>
                         <Link to={profilePath || '#'} className={`font-bold text-xs hover:underline 
                             ${rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-[#B9F2FF]' : rank === 3 ? 'text-[#cd7f32]' : rank === 4 ? 'text-[#94999c]' : isOwn ? 'text-[#c8ff57]' : 'text-white'}`}
                         >
@@ -522,60 +522,60 @@ function TVDetail() {
                             </div>
 
                             {/* Apple-style Stats Grid */}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-10">
+                            <div className="grid grid-cols-5 gap-1.5 md:gap-4 mb-10 overflow-hidden">
                                 {/* Avg Rating */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
-                                        <Star size={16} fill="currentColor" />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
+                                        <Star size={10} className="md:w-4 md:h-4" fill="currentColor" />
                                     </div>
                                     <div className="flex items-baseline gap-0.5">
-                                        <span className="text-2xl font-bold text-white tracking-tight">
+                                        <span className="text-xs md:text-2xl font-bold text-white tracking-tight">
                                             {stats?.avgRating > 0 ? stats.avgRating : '—'}
                                         </span>
-                                        {stats?.avgRating > 0 && <span className="text-[10px] text-[#7a7a90] font-medium">/10</span>}
+                                        {stats?.avgRating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
                                     </div>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Avg Rating</div>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Avg</div>
                                 </div>
 
                                 {/* My Rating */}
-                                {myEntry?.rating > 0 && (
-                                    <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#c8ff57]/30 transition-all duration-300 shadow-lg">
-                                        <div className="w-8 h-8 rounded-full bg-[#c8ff57]/10 flex items-center justify-center text-[#c8ff57] mb-2 group-hover:scale-110 transition-transform">
-                                            <Star size={16} fill="currentColor" />
-                                        </div>
-                                        <div className="flex items-baseline gap-0.5">
-                                            <span className="text-2xl font-bold text-[#c8ff57] tracking-tight">{myEntry.rating}</span>
-                                            <span className="text-[10px] text-[#7a7a90] font-medium">/10</span>
-                                        </div>
-                                        <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">My Rating</div>
+                                <div className={`bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#c8ff57]/30 transition-all duration-300 shadow-lg ${(!user || !(myEntry?.rating > 0)) ? 'opacity-30 grayscale' : ''}`}>
+                                    <div className={`w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#c8ff57]/10 flex items-center justify-center text-[#c8ff57] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform`}>
+                                        <Star size={10} className="md:w-4 md:h-4" fill="currentColor" />
                                     </div>
-                                )}
+                                    <div className="flex items-baseline gap-0.5">
+                                        <span className={`text-xs md:text-2xl font-bold tracking-tight ${myEntry?.rating > 0 ? 'text-[#c8ff57]' : 'text-white/40'}`}>
+                                            {myEntry?.rating > 0 ? myEntry.rating : '—'}
+                                        </span>
+                                        {myEntry?.rating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
+                                    </div>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Mine</div>
+                                </div>
 
-                                {/* In Pond */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff9f5c]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-8 h-8 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-2 group-hover:scale-110 transition-transform">
-                                        <Tv size={16} />
+                                {/* Logged */}
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff9f5c]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
+                                        <Tv size={10} className="md:w-4 md:h-4" />
                                     </div>
-                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.loggedCount ?? '—'}</span>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">In Pond</div>
+                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.loggedCount ?? '0'}</span>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Pond</div>
                                 </div>
 
                                 {/* Likes */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff5c5c]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-8 h-8 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center text-[#ff5c5c] mb-2 group-hover:scale-110 transition-transform">
-                                        <Heart size={16} fill="currentColor" />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff5c5c]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center text-[#ff5c5c] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
+                                        <Heart size={10} className="md:w-4 md:h-4" fill="currentColor" />
                                     </div>
-                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.likeCount ?? '—'}</span>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Likes</div>
+                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.likeCount ?? '0'}</span>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Likes</div>
                                 </div>
 
-                                {/* Watchlist */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
-                                        <Target size={16} />
+                                {/* Wishlists */}
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
+                                        <Target size={10} className="md:w-4 md:h-4" />
                                     </div>
-                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.wishlistCount ?? '—'}</span>
-                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Watchlists</div>
+                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.wishlistCount ?? '0'}</span>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Wish</div>
                                 </div>
                             </div>
 
@@ -876,17 +876,8 @@ function TVDetail() {
                                 {user ? (
                                     <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-5">
                                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-3">Leave a Comment</div>
-                                        <div className="flex gap-3">
-                                            {user.avatar ? (
-                                                <img src={user.avatar} alt={user.username}
-                                                    className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-1 ring-[#2a2a35] mt-0.5" />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#c8ff57] to-[#5c9fff]
-                                                                flex items-center justify-center text-sm font-black text-black flex-shrink-0 mt-0.5"
-                                                    style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                                    {user.username.charAt(0).toUpperCase()}
-                                                </div>
-                                            )}
+                                        <div className="flex gap-3 items-start">
+                                            <AvatarFrame userId={user.id || user._id} src={user.avatar} size={32} className="flex-shrink-0 mt-0.5" />
                                             <div className="flex-1">
                                                 <textarea 
                                                     value={commentText} 

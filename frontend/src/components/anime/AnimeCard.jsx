@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 
 
-const AnimeCard = memo(({ anime, onDelete, onEdit, showAvgRating = true }) => {
+const AnimeCard = memo(({ anime, onDelete, onEdit, showAvgRating = true, showProgress = true }) => {
     const navigate = useNavigate()
     const isManga = anime.type === 'manga' || anime.mediaType === 'manga'
 
@@ -117,20 +117,48 @@ const AnimeCard = memo(({ anime, onDelete, onEdit, showAvgRating = true }) => {
                     </span>
                 </div>
 
-                <div className="pt-2 border-t border-[#2a2a35] flex flex-col gap-1.5">
-                    {/* Episodes Progress */}
-                    <div className="flex items-center gap-2">
-                        <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
-                            <div 
-                                className="h-full bg-[#c8ff57] transition-all duration-500" 
-                                style={{ width: `${Math.min(100, (anime.episodesWatched / (anime.totalEpisodes || 1)) * 100)}%` }} 
-                            />
+                {showProgress && !isManga && (anime.episodesWatched > 0 || anime.totalEpisodes > 0) && (
+                    <div className="pt-2 border-t border-[#2a2a35] flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                            <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-[#c8ff57] transition-all duration-500" 
+                                    style={{ width: `${Math.min(100, (anime.episodesWatched / (anime.totalEpisodes || 1)) * 100)}%` }} 
+                                />
+                            </div>
+                            <span className="text-[#7a7a90] font-mono text-[8px] min-w-[32px] text-right">
+                                E{anime.episodesWatched || 0}/{anime.totalEpisodes || '?'}
+                            </span>
                         </div>
-                        <span className="text-[#7a7a90] font-mono text-[8px] min-w-[32px] text-right">
-                            E{anime.episodesWatched || 0}/{anime.totalEpisodes || '?'}
-                        </span>
                     </div>
-                </div>
+                )}
+
+                {showProgress && isManga && (anime.chaptersRead > 0 || anime.volumesRead > 0) && (
+                    <div className="pt-2 border-t border-[#2a2a35] flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                            <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-[#5c9fff] transition-all duration-500" 
+                                    style={{ width: `${Math.min(100, (anime.volumesRead / (anime.totalVolumes || 1)) * 100)}%` }} 
+                                />
+                            </div>
+                            <span className="text-[#5c9fff] font-mono text-[8px] min-w-[32px] text-right">
+                                V{anime.volumesRead || 0}/{anime.totalVolumes || '?'}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="h-1 flex-1 bg-[#1a1a25] rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-[#c8ff57] transition-all duration-500" 
+                                    style={{ width: `${Math.min(100, (anime.chaptersRead / (anime.totalChapters || 1)) * 100)}%` }} 
+                                />
+                            </div>
+                            <span className="text-[#7a7a90] font-mono text-[8px] min-w-[32px] text-right">
+                                C{anime.chaptersRead || 0}/{anime.totalChapters || '?'}
+                            </span>
+                        </div>
+                    </div>
+                )}
 
                 {(onEdit || onDelete) && (
                     <div className="mt-2 flex gap-1">

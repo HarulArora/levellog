@@ -21,7 +21,7 @@ export default function AvatarFrame({ userId, src, size = 40, className = '' }) 
     return (
         <div 
             className={`avatar-frame-container ${hasSpecialIcon ? 'has-crown' : ''} ${isTop10 ? 'is-top-10' : ''} ${className}`}
-            style={{ width: size, height: size }}
+            style={{ width: `${size}px`, height: `${size}px`, minWidth: `${size}px`, minHeight: `${size}px` }}
         >
             {/* The Actual Avatar */}
             <img 
