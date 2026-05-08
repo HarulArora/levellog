@@ -61,7 +61,7 @@ function Collections() {
             </Helmet>
 
             {/* Header Section */}
-            <div className="bg-[#0d0d14] border-b border-[#1a1a25] pt-28 pb-16 relative overflow-hidden">
+            <div className="bg-[#0d0d14] border-b border-[#1a1a25] pt-10 pb-16 relative overflow-hidden">
                 <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#c8ff57]/5 blur-[120px] pointer-events-none" />
                 
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">

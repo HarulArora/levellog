@@ -16,7 +16,7 @@ import { logEngagement } from '../utils/engagement.js';
 import { withRetryTransaction } from '../utils/transaction.js';
 
 const router = express.Router();
-const TMDB_BASE_URL = 'http://api.themoviedb.org/3';
+const TMDB_BASE_URL = 'https://api.tmdb.org/3';
 
 const movieCache = new LRUCache({
     max: 200,
@@ -472,7 +472,7 @@ router.post('/comments/:id', protect, async (req, res) => {
                 .session(session);
 
             const updatedUser = await awardXP(req.user._id, 1, session);
-            await logEngagement(id, type || 'movie', 'comment', req.user._id, { session });
+            await logEngagement(id, type || 'movie', 'comment', req.user._id, session);
 
             return { comment: populated, updatedUser };
         });

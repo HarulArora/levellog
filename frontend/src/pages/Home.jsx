@@ -501,7 +501,7 @@ function Home() {
             {/* ══════════════════════════
                 HERO
             ══════════════════════════ */}
-            <section className="relative pt-24 pb-16 md:pt-28 md:pb-24 min-h-[600px] flex items-center">
+            <section className="relative pt-10 pb-16 md:pt-12 md:pb-24 min-h-[600px] flex items-center">
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     {(allGames.length > 0 || !loading) && (
                         <HeroBanner games={allGames} />

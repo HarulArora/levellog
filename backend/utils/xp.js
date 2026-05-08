@@ -23,8 +23,13 @@ export const getLevelInfo = (xp) => {
     return { current, next }
 }
 
+/**
+ * ⚡ Atomic XP Award
+ * Uses $inc to prevent race conditions during high-frequency engagement.
+ */
 export const awardXP = async (userId, amount = 1, session = null) => {
-    // Atomic increment to prevent race conditions
+    if (amount === 0) return await User.findById(userId).session(session);
+
     const user = await User.findByIdAndUpdate(
         userId,
         { $inc: { xp: amount } },
@@ -32,10 +37,9 @@ export const awardXP = async (userId, amount = 1, session = null) => {
     )
     if (!user) return
 
-    // Ensure level and badge are in sync
+    // Recalculate levels/badges if threshold crossed
     const { current } = getLevelInfo(user.xp)
     if (user.level !== current.level || user.badge !== current.badge) {
-        // Use updateOne to bypass full document validation (avoids legacy data validation errors)
         await User.updateOne(
             { _id: userId },
             { $set: { level: current.level, badge: current.badge } },
@@ -47,30 +51,40 @@ export const awardXP = async (userId, amount = 1, session = null) => {
     return user
 }
 
-// XP never goes below 0. Level recalculates automatically.
-// Unlocked content is preserved in DB but locked in route-level checks.
+/**
+ * ⚡ Atomic XP Deduction
+ * Uses $inc with negative value and prevents XP from dropping below 0.
+ */
 export const deductXP = async (userId, amount = 1, session = null) => {
-    // We fetch first to ensure we don't go below 0
-    const user = await User.findById(userId).session(session)
+    if (amount === 0) return await User.findById(userId).session(session);
+
+    // 1. Atomically decrement
+    let user = await User.findByIdAndUpdate(
+        userId,
+        { $inc: { xp: -amount } },
+        { returnDocument: 'after', session }
+    )
     if (!user) return
 
-    const newXP = Math.max(0, (user.xp || 0) - amount)
-    
-    // Update atomically
-    await User.updateOne({ _id: userId }, { $set: { xp: newXP } }, { session })
-    
-    const { current } = getLevelInfo(newXP)
+    // 2. Safety Check: Never go below 0
+    if (user.xp < 0) {
+        user = await User.findByIdAndUpdate(
+            userId,
+            { $set: { xp: 0 } },
+            { returnDocument: 'after', session }
+        )
+    }
+
+    // 3. Recalculate levels/badges
+    const { current } = getLevelInfo(user.xp)
     if (user.level !== current.level || user.badge !== current.badge) {
         await User.updateOne(
             { _id: userId },
             { $set: { level: current.level, badge: current.badge } },
             { session }
         )
+        user.level = current.level
+        user.badge = current.badge
     }
-    
-    // Return updated user (minimal)
-    user.xp = newXP
-    user.level = current.level
-    user.badge = current.badge
     return user
 }

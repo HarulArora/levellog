@@ -222,7 +222,7 @@ function Notifications() {
     }
 
     return (
-        <div className="w-full max-w-[700px] mx-auto px-5 md:px-10 py-8 md:py-10">
+        <div className="w-full max-w-[700px] mx-auto px-5 md:px-10 pt-4 pb-10">
 
             {/* ── Header ── */}
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#2a2a35]">

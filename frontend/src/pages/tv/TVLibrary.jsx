@@ -146,7 +146,7 @@ function TVLibrary() {
                 <title>My TV Library | QuestDuck</title>
             </Helmet>
 
-            <div className="bg-[#0a0a0f] border-b border-[#1a1a25] pt-24 pb-16">
+            <div className="bg-[#0a0a0f] border-b border-[#1a1a25] pt-10 pb-16">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <SubSectionToggle
                         current="tv"

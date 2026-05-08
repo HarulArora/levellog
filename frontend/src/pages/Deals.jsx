@@ -218,8 +218,8 @@ export default function Deals() {
         <div style={{ color: '#e8e8f0', minHeight: '100vh' }}>
             <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-        .deals-wrap { max-width: 1200px; margin: 0 auto; padding: 40px 40px 60px; }
-        @media (max-width: 768px) { .deals-wrap { padding: 20px 16px 40px; } }
+        .deals-wrap { max-width: 1200px; margin: 0 auto; padding: 16px 40px 60px; }
+        @media (max-width: 768px) { .deals-wrap { padding: 12px 16px 40px; } }
         .deals-grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
         @media (min-width: 640px)  { .deals-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
         @media (min-width: 1024px) { .deals-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }

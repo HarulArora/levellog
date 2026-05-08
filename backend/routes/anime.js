@@ -17,7 +17,7 @@ import { withRetryTransaction } from '../utils/transaction.js';
 
 const router = express.Router();
 const JIKAN_BASE_URL = 'https://api.jikan.moe/v4';
-const TMDB_BASE_URL = 'http://api.themoviedb.org/3';
+const TMDB_BASE_URL = 'https://api.tmdb.org/3';
 
 const jikanCache = new LRUCache({
     max: 200,
@@ -746,7 +746,7 @@ router.post('/comments/:id', protect, async (req, res) => {
                 .session(session);
 
             const updatedUser = await awardXP(req.user._id, 1, session);
-            await logEngagement(id, type || 'anime', 'comment', req.user._id, { session });
+            await logEngagement(id, type || 'anime', 'comment', req.user._id, session);
             
             return { comment: populated, updatedUser };
         });

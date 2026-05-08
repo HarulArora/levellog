@@ -8,7 +8,7 @@ import MediaStats from '../models/MediaStats.js';
 
 const router = express.Router();
 
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_BASE_URL = 'https://api.tmdb.org/3';
 const JIKAN_BASE_URL = 'https://api.jikan.moe/v4';
 
 // Helper to merge and unique with Website Stats Priority

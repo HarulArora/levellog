@@ -411,7 +411,7 @@ function MangaHome() {
             </div>
 
             {/* Hero */}
-            <section className="relative pt-24 pb-16 md:pt-28 md:pb-24 overflow-hidden min-h-[600px] flex items-center">
+            <section className="relative pt-10 pb-16 md:pt-12 md:pb-24 overflow-hidden min-h-[600px] flex items-center">
                 {(allManga.length > 0 || !loading) && <HeroBanner animes={allManga} />}
 
                 <div className="relative z-10 max-w-[1200px] mx-auto px-5 md:px-10 w-full">

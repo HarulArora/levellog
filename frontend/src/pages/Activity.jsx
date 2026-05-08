@@ -238,7 +238,7 @@ function Activity() {
     }
 
     return (
-        <div className="w-full max-w-[800px] mx-auto px-3 sm:px-6 md:px-10 py-6 md:py-10 overflow-x-hidden">
+        <div className="w-full max-w-[800px] mx-auto px-3 sm:px-6 md:px-10 pt-4 pb-10 overflow-x-hidden">
 
             {/* Header */}
             <div className="flex items-baseline gap-4 mb-6 pb-4 border-b border-[#2a2a35]">

@@ -141,7 +141,7 @@ export default function RankingList() {
     const pageTitle = `${titleMap[rankType]} ${typeLabelMap[contentType]}`
 
     return (
-        <div className="min-h-screen bg-[#0a0a0f] pt-24 pb-20 px-5 md:px-10">
+        <div className="min-h-screen bg-[#0a0a0f] pt-10 pb-20 px-5 md:px-10">
             <Helmet>
                 <title>QuestDuck | {pageTitle}</title>
             </Helmet>

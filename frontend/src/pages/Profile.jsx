@@ -83,7 +83,11 @@ function Profile() {
     }
 
     const statusConfig = {
-        playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
+        playing: { 
+            color: 'text-[#c8ff57]', 
+            bg: 'bg-[#c8ff57]/15', 
+            label: profileMediaType === 'manga' ? 'Reading' : (profileMediaType === 'game' ? 'Playing' : 'Watching') 
+        },
         completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
         planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
         dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
@@ -304,7 +308,7 @@ function Profile() {
 
             {/* XP Toast */}
             {xpToast && (
-                <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
+                <div className={`fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
                                 ${xpToast.type === 'loss'
                         ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]'
                         : xpToast.type === 'pending'
@@ -486,7 +490,7 @@ function Profile() {
                                 color: 'text-[#5c9fff]'
                             },
                             {
-                                label: profileMediaType === 'game' ? 'Playing' : 'Playing', // Keep label but dynamic if needed
+                                label: profileMediaType === 'manga' ? 'Reading' : (profileMediaType === 'game' ? 'Playing' : 'Watching'),
                                 value: stats.playing,
                                 color: 'text-[#c8ff57]'
                             },
@@ -722,7 +726,7 @@ function Profile() {
                         <div className="font-mono text-xs text-[#7a7a90] uppercase tracking-widest mb-5">By Status</div>
                         <div className="flex flex-col gap-3">
                             {[
-                                { label: 'Playing', value: stats.playing, color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]' },
+                                { label: profileMediaType === 'manga' ? 'Reading' : (profileMediaType === 'game' ? 'Playing' : 'Watching'), value: stats.playing, color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]' },
                                 { label: 'Completed', value: stats.completed, color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]' },
                                 { label: 'Planned', value: stats.planned, color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]' },
                                 { label: 'Paused', value: stats.paused, color: 'text-[#c45cff]', bg: 'bg-[#c45cff]' },

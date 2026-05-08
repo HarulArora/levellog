@@ -77,7 +77,7 @@ router.post('/:igdbId', protect, async (req, res) => {
             const comment = commentArray[0]
 
             // Log engagement
-            await logEngagement(req.params.igdbId, 'game', 'comment', req.user._id, { session })
+            await logEngagement(req.params.igdbId, 'game', 'comment', req.user._id, session)
 
             const updatedUser = await awardXP(req.user._id, 1, session)
 

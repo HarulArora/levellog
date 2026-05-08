@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, memo } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
@@ -79,6 +79,7 @@ const RANK_TITLES = {
 
 const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, onXpToast, setAllComments, depth = 0, title = '' }) => {
     const navigate = useNavigate()
+    const location = useLocation()
     const { topUsers } = useLeaderboard()
     
     const userRankInfo = topUsers.find(u => u._id === comment.userId?._id || u._id === comment.userId?.id)
@@ -112,19 +113,64 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
     const replyCount = comment.replies?.length || 0
 
     const handleLike = async () => {
-        if (!currentUser) { navigate('/login'); return }
-        setLiked(!liked)
-        setLikes(prev => liked ? prev - 1 : prev + 1)
-        if (!liked) {
+        if (!currentUser) { navigate('/login', { state: { from: location } }); return }
+        
+        const prevLiked = liked
+        const prevDisliked = disliked
+        const prevLikes = likes
+        const prevDislikes = dislikes
+
+        // Optimistic Update
+        const nowLiked = !prevLiked
+        setLiked(nowLiked)
+        setLikes(prev => nowLiked ? prev + 1 : prev - 1)
+
+        if (nowLiked && prevDisliked) {
+            setDisliked(false)
+            setDislikes(prev => prev - 1)
+        }
+
+        if (nowLiked) {
             setShowBurst(true)
             setTimeout(() => setShowBurst(false), 800)
+        }
+
+        try {
+            await api.post(`/movies/comments/${comment._id}/like`, { type: 'like' })
+            // Rely on optimistic update
+        } catch (err) { 
+            setLiked(prevLiked); setDisliked(prevDisliked)
+            setLikes(prevLikes); setDislikes(prevDislikes)
+            console.error('Like error:', err) 
         }
     }
 
     const handleDislike = async () => {
-        if (!currentUser) { navigate('/login'); return }
-        setDisliked(!disliked)
-        setDislikes(prev => disliked ? prev - 1 : prev + 1)
+        if (!currentUser) { navigate('/login', { state: { from: location } }); return }
+        
+        const prevLiked = liked
+        const prevDisliked = disliked
+        const prevLikes = likes
+        const prevDislikes = dislikes
+
+        // Optimistic Update
+        const nowDisliked = !prevDisliked
+        setDisliked(nowDisliked)
+        setDislikes(prev => nowDisliked ? prev + 1 : prev - 1)
+
+        if (nowDisliked && prevLiked) {
+            setLiked(false)
+            setLikes(prev => prev - 1)
+        }
+
+        try {
+            await api.post(`/movies/comments/${comment._id}/like`, { type: 'dislike' })
+            // Rely on optimistic update
+        } catch (err) { 
+            setLiked(prevLiked); setDisliked(prevDisliked)
+            setLikes(prevLikes); setDislikes(prevDislikes)
+            console.error('Dislike error:', err) 
+        }
     }
 
     const handleDelete = async () => {
@@ -141,6 +187,7 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
         try {
             await api.put(`/movies/comments/${comment._id}`, { text: editingText })
             setIsEditing(false); setIsEdited(true)
+            onXpToast('✏️ Comment updated', 'gain')
             onRefresh(true)
         } catch (err) { console.error('Edit error:', err) }
     }
@@ -232,7 +279,7 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
                         <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm relative">
                             {showBurst && (
                                 <div className="rank-like-burst">
-                                    {currentUserRank === 1 ? '👑' : currentUserRank === 2 ? '🪽' : currentUserRank === 3 ? '🎖️' : currentUserRank === 4 ? '⚔️' : '🍿'}
+                                    {rank === 1 ? '👑' : rank === 2 ? '🪽' : rank === 3 ? '🎖️' : rank === 4 ? '⚔️' : '🎬'}
                                 </div>
                             )}
                             <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg ${liked ? 'bg-[#c8ff57]/20 text-[#c8ff57]' : 'text-[#7a7a90] hover:text-white'}`}><ThumbsUp size={12} /> {likes > 0 && <span>{likes}</span>}</button>
@@ -378,7 +425,7 @@ function TVDetail() {
     }, [])
 
     const handleLike = async () => {
-        if (!user) { navigate('/login'); return }
+        if (!user) { navigate('/login', { state: { from: location } }); return }
         if (liking) return
         const wasLiked = liked
         const oldData = contextData
@@ -412,7 +459,7 @@ function TVDetail() {
     }
 
     const handleWatchlist = async () => {
-        if (!user) { navigate('/login'); return }
+        if (!user) { navigate('/login', { state: { from: location } }); return }
         if (watching) return
         const wasWatchlisted = watchlisted
         const oldData = contextData
@@ -443,6 +490,7 @@ function TVDetail() {
 
 
     const handlePostComment = async () => {
+        if (!user) { navigate('/login', { state: { from: location } }); return }
         if (!commentText.trim() || submittingComment) return
         const text = commentText.trim()
         setCommentText('')
@@ -499,7 +547,7 @@ function TVDetail() {
             </Helmet>
 
             {xpToast && (
-                <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 
+                <div className={`fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 
                                 ${xpToast.type === 'loss' ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]' : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
                     {xpToast.msg}
                 </div>
@@ -509,7 +557,7 @@ function TVDetail() {
             <div className="relative overflow-hidden min-h-[420px]">
                 <div className="absolute inset-0 bg-cover bg-center scale-110" style={{ backgroundImage: `url(${movie.cover || movie.coverImage})`, filter: 'blur(60px) brightness(0.35)' }} />
                 <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f]/40 via-[#0a0a0f]/55 to-[#0a0a0f]" />
-                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-24 pb-10">
+                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-10 pb-10">
                     <button onClick={() => navigate(-1)} className="flex items-center gap-2 font-mono text-xs text-[#7a7a90] hover:text-[#c8ff57] mb-8 transition-colors">← BACK</button>
                     <div className="flex flex-col md:flex-row gap-8 items-start">
                         <img src={movie.cover || movie.coverImage} alt={movie.title} className="w-36 md:w-48 rounded-lg shadow-2xl ring-1 ring-white/10" />
@@ -548,7 +596,7 @@ function TVDetail() {
                                         </span>
                                         {myEntry?.rating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
                                     </div>
-                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Mine</div>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">My Rating</div>
                                 </div>
 
                                 {/* Logged */}

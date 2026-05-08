@@ -470,14 +470,17 @@ router.put('/:id', protect, async (req, res) => {
 
 router.delete('/:id', protect, async (req, res) => {
     try {
-        const game = await Game.findOne({ _id: req.params.id, userId: req.user._id })
-        if (!game) return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
-        let xpToDeduct = 1
-        if (game.rating > 0) xpToDeduct += 1
-        const session = await mongoose.startSession()
-        session.startTransaction()
-        try {
+        const result = await withRetryTransaction(async (session) => {
+            const game = await Game.findOne({ _id: req.params.id, userId: req.user._id }).session(session)
+            if (!game) throw new Error('Game not found or not authorized')
+
+            let xpToDeduct = 1
+            if (game.rating > 0) xpToDeduct += 1
+
+            // 1. Delete the game
             await game.deleteOne({ session })
+
+            // 2. Update Media Stats
             if (game.igdbId) {
                 await updateGlobalStats(game.igdbId, {
                     loggedCount: -1,
@@ -485,6 +488,8 @@ router.delete('/:id', protect, async (req, res) => {
                     totalRatingSum: game.rating > 0 ? -game.rating : 0
                 }, session)
             }
+
+            // 3. Update User Stats
             const userStatsDelete = {
                 'gameStats.total': -1,
                 [`gameStats.${game.status}`]: -1,
@@ -495,23 +500,23 @@ router.delete('/:id', protect, async (req, res) => {
                 userStatsDelete['gameStats.totalRatingSum'] = -game.rating
             }
             await updateUserStats(req.user._id, userStatsDelete, session)
+
+            // 4. Deduct XP
             const updatedUser = await deductXP(req.user._id, xpToDeduct, session)
-            await session.commitTransaction()
-            session.endSession()
-            res.json({
-                success: true,
-                message: 'Game deleted',
-                xpDeducted: xpToDeduct,
-                xp: updatedUser.xp,
-                level: updatedUser.level,
-                badge: updatedUser.badge
-            })
-        } catch (innerErr) {
-            await session.abortTransaction()
-            session.endSession()
-            throw innerErr
-        }
+            
+            return { updatedUser, xpToDeduct }
+        })
+
+        res.json({
+            success: true,
+            message: 'Game deleted',
+            xpDeducted: result.xpToDeduct,
+            xp: result.updatedUser.xp,
+            level: result.updatedUser.level,
+            badge: result.updatedUser.badge
+        })
     } catch (error) {
+        console.error('Delete Game Error:', error)
         res.status(500).json({ success: false, message: 'Failed to delete game', error: error.message })
     }
 })

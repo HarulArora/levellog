@@ -4,7 +4,7 @@ dotenv.config();
 
 async function testSearch() {
     try {
-        const res = await apiClient.get('http://api.themoviedb.org/3/search/tv', {
+        const res = await apiClient.get('https://api.tmdb.org/3/search/tv', {
             params: {
                 api_key: process.env.TMDB_API_KEY,
                 query: 'Dark'

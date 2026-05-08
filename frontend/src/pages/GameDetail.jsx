@@ -44,6 +44,7 @@ const GifIcon = ({ size = 16, className = "" }) => (
 
 const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, setAllComments, depth = 0, gameTitle = '' }) => {
     const navigate = useNavigate()
+    const location = useLocation()
     const { topUsers } = useLeaderboard()
     
     // Find rank dynamically
@@ -118,27 +119,24 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         const prevLikes = likes
         const prevDislikes = dislikes
 
-        // Truly instant optimistic update
-        setLiked(prev => {
-            const nowLiked = !prev
-            setLikes(l => nowLiked ? l + 1 : l - 1)
-            if (nowLiked && prevDisliked) {
-                setDisliked(false)
-                setDislikes(d => d - 1)
-            }
-            if (nowLiked) {
-                setShowBurst(true)
-                setTimeout(() => setShowBurst(false), 800)
-            }
-            return nowLiked
-        })
+        // Optimistic update
+        const nowLiked = !prevLiked
+        setLiked(nowLiked)
+        setLikes(prev => nowLiked ? prev + 1 : prev - 1)
+
+        if (nowLiked && prevDisliked) {
+            setDisliked(false)
+            setDislikes(prev => prev - 1)
+        }
+
+        if (nowLiked) {
+            setShowBurst(true)
+            setTimeout(() => setShowBurst(false), 800)
+        }
 
         try {
-            const res = await api.post(`/comments/${comment._id}/like`)
-            setLikes(res.data.likes)
-            setDislikes(res.data.dislikes)
-            setLiked(res.data.liked)
-            setDisliked(res.data.disliked)
+            await api.post(`/comments/${comment._id}/like`)
+            // Rely on optimistic update
         } catch (err) {
             setLiked(prevLiked); setDisliked(prevDisliked)
             setLikes(prevLikes); setDislikes(prevDislikes)
@@ -155,22 +153,19 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         const prevLikes = likes
         const prevDislikes = dislikes
 
-        setDisliked(prev => {
-            const nowDisliked = !prev
-            setDislikes(d => nowDisliked ? d + 1 : d - 1)
-            if (nowDisliked && prevLiked) {
-                setLiked(false)
-                setLikes(l => l - 1)
-            }
-            return nowDisliked
-        })
+        // Optimistic update
+        const nowDisliked = !prevDisliked
+        setDisliked(nowDisliked)
+        setDislikes(prev => nowDisliked ? prev + 1 : prev - 1)
+
+        if (nowDisliked && prevLiked) {
+            setLiked(false)
+            setLikes(prev => prev - 1)
+        }
 
         try {
-            const res = await api.post(`/comments/${comment._id}/dislike`)
-            setLikes(res.data.likes)
-            setDislikes(res.data.dislikes)
-            setLiked(res.data.liked)
-            setDisliked(res.data.disliked)
+            await api.post(`/comments/${comment._id}/dislike`)
+            // Rely on optimistic update
         } catch (err) {
             setLiked(prevLiked); setDisliked(prevDisliked)
             setLikes(prevLikes); setDislikes(prevDislikes)
@@ -193,6 +188,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
         try {
             await api.put(`/comments/${comment._id}`, { text: editingText })
             setIsEditing(false); setIsEdited(true)
+            onXpToast('✏️ Comment updated', 'gain')
             onRefresh(true)
         } catch (err) { console.error('Edit error:', err) }
         finally { setSubmittingEdit(false) }
@@ -404,7 +400,7 @@ const CommentItem = memo(({ comment, currentUser, igdbId, onRefresh, onXpToast, 
                             <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm relative">
                                 {showBurst && (
                                     <div className="rank-like-burst">
-                                        {currentUserRank === 1 ? '👑' : currentUserRank === 2 ? '🪽' : currentUserRank === 3 ? '🎖️' : currentUserRank === 4 ? '⚔️' : '🍿'}
+                                        {rank === 1 ? '👑' : rank === 2 ? '🪽' : rank === 3 ? '🎖️' : rank === 4 ? '⚔️' : '🎮'}
                                     </div>
                                 )}
                                 <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg transition-all active:scale-95
@@ -874,7 +870,7 @@ function GameDetail() {
 
             {/* XP Toast */}
             {xpToast && (
-                <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
+                <div className={`fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
                                 ${xpToast.type === 'loss'
                         ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]'
                         : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
@@ -893,7 +889,7 @@ function GameDetail() {
                 <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f]/40 via-[#0a0a0f]/55 to-[#0a0a0f]" />
                 <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0a0a0f] to-transparent" />
 
-                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-24 pb-10">
+                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-10 pb-10">
                     <button onClick={() => navigate(-1)}
                         className="flex items-center gap-2 font-mono text-xs text-[#7a7a90] hover:text-[#c8ff57] transition-colors mb-8">
                         ← BACK
@@ -957,7 +953,7 @@ function GameDetail() {
                                         </span>
                                         {myGame?.rating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
                                     </div>
-                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Mine</div>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">My Rating</div>
                                 </div>
 
                                 {/* In Pond */}

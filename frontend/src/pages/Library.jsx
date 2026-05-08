@@ -153,7 +153,7 @@ function Library() {
                 <title>My Game Library | QuestDuck</title>
             </Helmet>
 
-            <div className="bg-[#0a0a0f] border-b border-[#1a1a25] pt-28 pb-16">
+            <div className="bg-[#0a0a0f] border-b border-[#1a1a25] pt-10 pb-16">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-10">
                         <div className="relative group w-full md:w-auto">

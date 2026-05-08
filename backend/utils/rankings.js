@@ -318,7 +318,7 @@ export const calculateComingSoon = async (type) => {
     } else {
         try {
             const endpoint = type === 'movie' ? 'movie/upcoming' : 'tv/on_the_air';
-            const res = await apiClient.get(`http://api.themoviedb.org/3/${endpoint}`, { params: { api_key: process.env.TMDB_API_KEY } });
+            const res = await apiClient.get(`https://api.tmdb.org/3/${endpoint}`, { params: { api_key: process.env.TMDB_API_KEY } });
             items = (res.data?.results || []).map(item => ({
                 contentId: String(item.id),
                 title: item.title || item.name,

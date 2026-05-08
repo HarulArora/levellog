@@ -7,7 +7,11 @@ import rateLimit from 'express-rate-limit'
 import mongoSanitize from 'express-mongo-sanitize'
 import cookieParser from 'cookie-parser'
 import compression from 'compression'
+import dns from 'node:dns'
 import * as Sentry from "@sentry/node"
+
+// 🛡️ Global DNS Override to prevent intermittent ETIMEDOUT/ENOTFOUND errors from unreliable local ISPs
+dns.setServers(['8.8.8.8', '1.1.1.1'])
 
 import logger from './utils/logger.js'
 import gamesRouter from './routes/games.js'

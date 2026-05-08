@@ -146,7 +146,7 @@ function MangaDiscover() {
             </Helmet>
 
             {/* Header */}
-            <section className="bg-[#111118] border-b border-[#2a2a35] pt-24 pb-12">
+            <section className="bg-[#111118] border-b border-[#2a2a35] pt-10 pb-12">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <SubSectionToggle 
                         current="manga"

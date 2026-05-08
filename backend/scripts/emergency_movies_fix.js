@@ -21,7 +21,7 @@ async function backfillMovies() {
 
         for (const target of targets) {
             console.log(`Processing ${target.type} ${target.rank}...`);
-            const res = await apiClient.get(`http://api.themoviedb.org/3/${target.endpoint}`, {
+            const res = await apiClient.get(`https://api.tmdb.org/3/${target.endpoint}`, {
                 params: { api_key: TMDB_API_KEY }
             });
 

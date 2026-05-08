@@ -307,7 +307,7 @@ function EditProfile() {
     }
 
     return (
-        <div className="min-h-screen flex items-start justify-center pt-16 px-4">
+        <div className="min-h-screen flex items-start justify-center pt-4 px-4">
             <div className="w-full max-w-md">
 
                 <div className="mb-8">

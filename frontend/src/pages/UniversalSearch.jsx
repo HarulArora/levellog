@@ -102,7 +102,7 @@ function UniversalSearch() {
             }))
 
     return (
-        <div className="w-full max-w-[1200px] mx-auto px-5 md:px-10 pt-28 pb-10 md:pt-32 md:pb-12 min-h-[70vh]">
+        <div className="w-full max-w-[1200px] mx-auto px-5 md:px-10 pt-10 pb-10 md:pt-12 md:pb-12 min-h-[70vh]">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-[#2a2a35] pb-6">
                 <div>
                     <h2 className="font-black text-3xl md:text-4xl tracking-widest uppercase text-white mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>

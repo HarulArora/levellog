@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
-import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, Heart, Share, Play, Layers, ListChecks, ShoppingBag, BookOpen, ExternalLink, ChevronRight, Star, Users, Target, Gamepad2 } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, Heart, Share, Play, Layers, ListChecks, ShoppingBag, ExternalLink, ChevronRight, Star, Users, Target, Gamepad2 } from 'lucide-react'
 import AddAnimeModal from '../../components/library/AddAnimeModal'
 import Skeleton from '../../components/ui/Skeleton'
 import Avatar from '../../components/ui/Avatar'
@@ -89,6 +89,7 @@ const RelationItem = memo(({ item, label, colorClass, icon }) => {
 
 const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, onXpToast, setAllComments, depth = 0, title = '' }) => {
     const navigate = useNavigate()
+    const location = useLocation()
     const { topUsers } = useLeaderboard()
     
     const userRankInfo = topUsers.find(u => u._id === comment.userId?._id || u._id === comment.userId?.id)
@@ -120,22 +121,67 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
 
     const indentClass = depth > 0 ? 'ml-4 md:ml-8 mt-2' : ''
     const replyCount = comment.replies?.length || 0
-
     const handleLike = async () => {
         if (!currentUser) { navigate('/login', { state: { from: location } }); return }
-        setLiked(!liked)
-        setLikes(prev => liked ? prev - 1 : prev + 1)
-        if (!liked) {
+        
+        const prevLiked = liked
+        const prevDisliked = disliked
+        const prevLikes = likes
+        const prevDislikes = dislikes
+
+        // Optimistic Update
+        const nowLiked = !prevLiked
+        setLiked(nowLiked)
+        setLikes(prev => nowLiked ? prev + 1 : prev - 1)
+
+        if (nowLiked && prevDisliked) {
+            setDisliked(false)
+            setDislikes(prev => prev - 1)
+        }
+
+        if (nowLiked) {
             setShowBurst(true)
             setTimeout(() => setShowBurst(false), 800)
+        }
+
+        try {
+            await api.post(`/anime/comments/${comment._id}/like`, { type: 'like' })
+            // We rely on the optimistic update; only revert on failure
+        } catch (err) { 
+            setLiked(prevLiked); setDisliked(prevDisliked)
+            setLikes(prevLikes); setDislikes(prevDislikes)
+            console.error('Like error:', err) 
         }
     }
 
     const handleDislike = async () => {
         if (!currentUser) { navigate('/login', { state: { from: location } }); return }
-        setDisliked(!disliked)
-        setDislikes(prev => disliked ? prev - 1 : prev + 1)
+        
+        const prevLiked = liked
+        const prevDisliked = disliked
+        const prevLikes = likes
+        const prevDislikes = dislikes
+
+        // Optimistic Update
+        const nowDisliked = !prevDisliked
+        setDisliked(nowDisliked)
+        setDislikes(prev => nowDisliked ? prev + 1 : prev - 1)
+
+        if (nowDisliked && prevLiked) {
+            setLiked(false)
+            setLikes(prev => prev - 1)
+        }
+
+        try {
+            await api.post(`/anime/comments/${comment._id}/like`, { type: 'dislike' })
+            // We rely on the optimistic update; only revert on failure
+        } catch (err) {
+            setLiked(prevLiked); setDisliked(prevDisliked)
+            setLikes(prevLikes); setDislikes(prevDislikes)
+            console.error('Dislike error:', err)
+        }
     }
+
 
     const handleDelete = async () => {
         try {
@@ -151,6 +197,7 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
         try {
             await api.put(`/anime/comments/${comment._id}`, { text: editingText })
             setIsEditing(false); setIsEdited(true)
+            onXpToast('✏️ Comment updated', 'gain')
             onRefresh(true)
         } catch (err) { console.error(err) }
     }
@@ -243,7 +290,7 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
                         <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm relative">
                             {showBurst && (
                                 <div className="rank-like-burst">
-                                    {currentUserRank === 1 ? '👑' : currentUserRank === 2 ? '🪽' : currentUserRank === 3 ? '🎖️' : currentUserRank === 4 ? '⚔️' : '🍿'}
+                                    {rank === 1 ? '👑' : rank === 2 ? '🪽' : rank === 3 ? '🎖️' : rank === 4 ? '⚔️' : '📖'}
                                 </div>
                             )}
                             <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg ${liked ? 'bg-[#c8ff57]/20 text-[#c8ff57]' : 'text-[#7a7a90] hover:text-white'}`}><ThumbsUp size={12} /> {likes > 0 && <span>{likes}</span>}</button>
@@ -520,7 +567,7 @@ function MangaDetail() {
             </Helmet>
 
             {xpToast && (
-                <div className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 
+                <div className={`fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 
                                 ${xpToast.type === 'loss' ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]' : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
                     {xpToast.msg}
                 </div>
@@ -530,7 +577,7 @@ function MangaDetail() {
             <div className="relative overflow-hidden min-h-[420px]">
                 <div className="absolute inset-0 bg-cover bg-center scale-110" style={{ backgroundImage: `url(${anime.cover || anime.coverImage})`, filter: 'blur(60px) brightness(0.35)' }} />
                 <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f]/40 via-[#0a0a0f]/55 to-[#0a0a0f]" />
-                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-24 pb-10">
+                <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-10 pb-10">
                     <button onClick={() => navigate(-1)} className="flex items-center gap-2 font-mono text-xs text-[#7a7a90] hover:text-[#c8ff57] mb-8 transition-colors">← BACK</button>
                     <div className="flex flex-col md:flex-row gap-8 items-start">
                         <img src={anime.cover || anime.coverImage} alt={anime.title} className="w-36 md:w-48 rounded-lg shadow-2xl ring-1 ring-white/10" />
@@ -569,7 +616,7 @@ function MangaDetail() {
                                         </span>
                                         {myEntry?.rating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
                                     </div>
-                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Mine</div>
+                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">My Rating</div>
                                 </div>
 
                                 {/* Logged */}
@@ -640,11 +687,11 @@ function MangaDetail() {
             <div className="border-b border-[#2a2a35] bg-[#0a0a0f] sticky top-[80px] z-40">
                 <div className="max-w-[1200px] mx-auto px-5 md:px-10">
                     <div className="flex gap-6">
-                        {['overview', 'buy', 'comments', 'cast'].map(tab => (
+                        {['overview', 'comments', 'cast'].map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} 
                                 className={`font-mono text-xs uppercase tracking-widest py-4 border-b-2 transition-all 
                                            ${activeTab === tab ? 'border-[#c8ff57] text-[#c8ff57]' : 'border-transparent text-[#7a7a90] hover:text-white'}`}>
-                                {tab === 'buy' ? 'Read / Buy' : tab.charAt(0).toUpperCase() + tab.slice(1)} {tab === 'comments' && allComments.length > 0 && <span className="opacity-60 ml-1.5 font-mono text-[10px]">({allComments.length})</span>}
+                                {tab.charAt(0).toUpperCase() + tab.slice(1)} {tab === 'comments' && allComments.length > 0 && <span className="opacity-60 ml-1.5 font-mono text-[10px]">({allComments.length})</span>}
                             </button>
                         ))}
                     </div>
@@ -655,44 +702,6 @@ function MangaDetail() {
             <div className="max-w-[1200px] mx-auto px-5 md:px-10 py-8">
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8">
                     <div className="flex flex-col gap-6">
-                        {activeTab === 'buy' && (
-                            <div className="flex flex-col gap-6">
-                                <div className="bg-[#111118] border border-[#2a2a35] rounded-xl p-8 text-center shadow-xl">
-                                    <div className="text-[#c8ff57] mb-4"><BookOpen size={40} className="mx-auto opacity-20" /></div>
-                                    <div className="text-[#7a7a90] font-mono text-xs uppercase tracking-widest mb-6">Official Reading & Buying Sources</div>
-                                    
-                                    {anime.externalLinks?.length > 0 ? (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {anime.externalLinks.map((link, i) => (
-                                                <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" 
-                                                   className="flex items-center justify-between p-5 rounded-2xl bg-[#18181f]/40 border border-white/5 hover:border-[#c8ff57]/40 hover:bg-[#18181f]/60 transition-all group shadow-xl text-left">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center text-[#c8ff57] shadow-inner group-hover:scale-105 transition-transform duration-500">
-                                                            <ShoppingBag size={20} />
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-white font-black text-sm uppercase tracking-wider group-hover:text-[#c8ff57] transition-colors">{link.name}</div>
-                                                            <div className="text-[#7a7a90] text-[10px] font-mono uppercase tracking-[0.2em] mt-0.5">Official Source</div>
-                                                        </div>
-                                                    </div>
-                                                    <ChevronRight size={16} className="text-[#5c5c6c] group-hover:text-white transition-colors" />
-                                                </a>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="py-10">
-                                            <p className="text-[#5c5c6c] font-mono text-sm uppercase tracking-widest">No official links found in the multiverse</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="mt-8 p-5 rounded-2xl bg-black/20 border border-white/5">
-                                    <p className="text-[10px] text-[#5c5c6c] font-mono leading-relaxed uppercase tracking-widest text-center">
-                                        Note: We only provide official links to support the creators. Always read responsibly.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
                         {activeTab === 'overview' && (
                             <>
                                 {summaryText && (

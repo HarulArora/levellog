@@ -15,7 +15,7 @@ export default function Leaderboard() {
     const { topUsers, loading } = useLeaderboard()
 
     return (
-        <div className="w-full max-w-[1000px] mx-auto px-5 md:px-10 py-12">
+        <div className="w-full max-w-[1000px] mx-auto px-5 md:px-10 pt-10 pb-12">
             <Helmet>
                 <title>Leaderboard | QuestDuck</title>
                 <meta name="description" content="Check out the top contributors and best gamers of the week on QuestDuck." />
