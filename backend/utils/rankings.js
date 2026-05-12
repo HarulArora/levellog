@@ -121,15 +121,79 @@ export const calculateTopRated = async (type) => {
         }
     }
 
-    const finalRanked = ranked.map((item, index) => ({ ...item, rankPosition: index + 1 }));
+    // ── YEAR RECOVERY FOR ANIME/MANGA ──
+    if (type === 'anime' || type === 'manga') {
+        const missingYearItems = ranked.filter(r => (!r.year || r.year > 2026) && r.contentId);
+        if (missingYearItems.length > 0) {
+            logger.info(`[Rankings Year Recovery] Fixing ${missingYearItems.length} ${type} titles...`);
+            for (const item of missingYearItems) {
+                try {
+                    // Small delay to respect Jikan rate limits
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    const res = await apiClient.get(`https://api.jikan.moe/v4/${type}/${item.contentId}`, { retry: 1, timeout: 10000 });
+                    const data = res.data?.data;
+                    if (data) {
+                        const correctYear = data.aired?.prop?.from?.year || data.published?.prop?.from?.year || data.year || (data.aired?.from ? new Date(data.aired.from).getFullYear() : null);
+                        if (correctYear) {
+                            item.year = correctYear;
+                            logger.info(`[Rankings Year Recovery] Fixed ${item.title}: ${correctYear}`);
+                        }
+                    }
+                } catch (err) {
+                    logger.warn(`[Rankings Year Recovery] Failed for ${item.title}: ${err.message}`);
+                }
+            }
+        }
+    }
+
+    let finalRanked = ranked.map((item, index) => ({ ...item, rankPosition: index + 1 }));
+
+    // ── FALLBACK FOR COLD START (ANIM/MANGA) ──
+    if (finalRanked.length < 100 && (type === 'anime' || type === 'manga')) {
+        try {
+            // Fetch up to 4 pages (100 items) to ensure we reach the goal
+            // Using a longer timeout (60s) for background tasks to ensure data is fetched
+            for (let page = 1; page <= 4; page++) {
+                const res = await apiClient.get(`https://api.jikan.moe/v4/top/${type}`, { 
+                    params: { page, limit: 25, filter: 'bypopularity', sfw: true },
+                    retry: 2,
+                    timeout: 60000 
+                });
+                
+                const fallbackItems = (res.data?.data || []).map((item, index) => ({
+                    contentId: String(item.mal_id),
+                    contentType: type,
+                    rankType: 'top_rated',
+                    score: item.score || 0,
+                    title: item.title,
+                    cover: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
+                    year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year || item.year || (item.aired?.from ? new Date(item.aired.from).getFullYear() : null),
+                    genres: item.genres?.map(g => g.name) || [],
+                    avgRating: 0,
+                    rankPosition: finalRanked.length + index + 1
+                }));
+
+                const existingIds = new Set(finalRanked.map(r => r.contentId));
+                for (const item of fallbackItems) {
+                    if (!existingIds.has(item.contentId) && finalRanked.length < 100) {
+                        finalRanked.push({ ...item, rankPosition: finalRanked.length + 1 });
+                        existingIds.add(item.contentId);
+                    }
+                }
+                if (finalRanked.length >= 100) break;
+                if (page < 4) await new Promise(r => setTimeout(r, 500)); // Rate limit safety
+            }
+        } catch (err) { logger.error(`[Rankings] Jikan Top Rated fallback failed: ${err.message}`); }
+    }
 
     // 4. Atomic Update: Clear and Insert
-    await Ranking.deleteMany({ contentType: type, rankType: 'top_rated' });
     if (finalRanked.length > 0) {
+        await Ranking.deleteMany({ contentType: type, rankType: 'top_rated' });
         await Ranking.insertMany(finalRanked);
+        logger.info(`[Rankings] Top Rated updated for ${type} (${finalRanked.length} items)`);
+    } else {
+        logger.warn(`[Rankings] Top Rated sync for ${type} resulted in 0 items. Keeping existing data.`);
     }
-    
-    logger.info(`[Rankings] Top Rated updated for ${type} (${ranked.length} items)`);
 };
 
 /**
@@ -260,12 +324,52 @@ export const calculateTrending = async (type) => {
         }
     }
 
-    await Ranking.deleteMany({ contentType: type, rankType: 'trending' });
-    if (finalItems.length > 0) {
-        await Ranking.insertMany(finalItems);
+    // ── FALLBACK FOR COLD START (ANIM/MANGA) ──
+    if (finalItems.length < 100 && (type === 'anime' || type === 'manga')) {
+        try {
+            // Fetch up to 4 pages (100 items) to ensure we reach the goal
+            // Using a longer timeout (60s) for background tasks
+            for (let page = 1; page <= 4; page++) {
+                const res = await apiClient.get(`https://api.jikan.moe/v4/top/${type}`, { 
+                    params: { page, limit: 25, filter: type === 'manga' ? 'publishing' : 'airing', sfw: true },
+                    retry: 2,
+                    timeout: 60000
+                });
+                
+                const fallbackItems = (res.data?.data || []).map((item, index) => ({
+                    contentId: String(item.mal_id),
+                    contentType: type,
+                    rankType: 'trending',
+                    score: item.score || 0,
+                    title: item.title,
+                    cover: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
+                    year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year || item.year || (item.aired?.from ? new Date(item.aired.from).getFullYear() : null),
+                    genres: item.genres?.map(g => g.name) || [],
+                    avgRating: 0,
+                    rankPosition: finalItems.length + index + 1
+                }));
+
+                const existingIds = new Set(finalItems.map(r => r.contentId));
+                for (const item of fallbackItems) {
+                    if (!existingIds.has(item.contentId) && finalItems.length < 100) {
+                        finalItems.push({ ...item, rankPosition: finalItems.length + 1 });
+                        existingIds.add(item.contentId);
+                    }
+                }
+                if (finalItems.length >= 100) break;
+                if (page < 4) await new Promise(r => setTimeout(r, 500)); // Rate limit safety
+            }
+        } catch (err) { logger.error(`[Rankings] Jikan Trending fallback failed: ${err.message}`); }
     }
-    
-    logger.info(`[Rankings] Trending updated for ${type} (${finalRanked.length} items)`);
+
+    // 4. Atomic Update
+    if (finalItems.length > 0) {
+        await Ranking.deleteMany({ contentType: type, rankType: 'trending' });
+        await Ranking.insertMany(finalItems);
+        logger.info(`[Rankings] Trending updated for ${type} (${finalItems.length} items)`);
+    } else {
+        logger.warn(`[Rankings] Trending sync for ${type} resulted in 0 items. Keeping existing data.`);
+    }
 };
 
 /**
@@ -298,23 +402,31 @@ export const calculateComingSoon = async (type) => {
         } catch (err) { logger.error(`[Rankings] IGDB Coming Soon error:`, err.message); }
     } else if (type === 'anime' || type === 'manga') {
         try {
-            // For manga, Jikan supports 'upcoming' filter as well
-            const res = await apiClient.get(`https://api.jikan.moe/v4/top/${type}`, { 
-                params: { 
-                    limit: 25, 
-                    filter: 'upcoming', 
-                    sfw: true 
-                },
-                retry: 2
-            });
-            items = (res.data?.data || []).map(item => ({
-                contentId: String(item.mal_id),
-                title: item.title,
-                cover: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
-                year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year || item.year,
-                genres: item.genres?.map(g => g.name) || []
-            }));
-        } catch (err) { logger.error(`[Rankings] Jikan Coming Soon error for ${type}:`, err.message); }
+            // Use seasons/upcoming for anime as it's more reliable, top/manga for manga
+            const endpoint = type === 'anime' ? 'seasons/upcoming' : `top/${type}`;
+            const filterParams = type === 'anime' ? {} : { filter: 'upcoming' };
+
+            // Fetch up to 4 pages (100 items) to ensure we reach the goal
+            for (let page = 1; page <= 4; page++) {
+                const res = await apiClient.get(`https://api.jikan.moe/v4/${endpoint}`, { 
+                    params: { ...filterParams, page, limit: 25, sfw: true },
+                    retry: 2,
+                    timeout: 60000
+                });
+                
+                const pageItems = (res.data?.data || []).map(item => ({
+                    contentId: String(item.mal_id),
+                    title: item.title,
+                    cover: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
+                    year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year || item.year || (item.aired?.from ? new Date(item.aired.from).getFullYear() : null),
+                    genres: item.genres?.map(g => g.name) || []
+                }));
+                items = [...items, ...pageItems];
+                if (pageItems.length < 25) break;
+                if (items.length >= 100) break;
+                if (page < 4) await new Promise(r => setTimeout(r, 1000)); // Be gentle
+            }
+        } catch (err) { logger.error(`[Rankings] Jikan Coming Soon error for ${type}: ${err.message}`); }
     } else {
         try {
             const endpoint = type === 'movie' ? 'movie/upcoming' : 'tv/on_the_air';
@@ -330,7 +442,15 @@ export const calculateComingSoon = async (type) => {
     }
 
     if (items.length > 0) {
-        const ranked = items.map((item, index) => ({
+        // Deduplicate by contentId to prevent E11000 errors
+        const seen = new Set();
+        const uniqueItems = items.filter(item => {
+            if (seen.has(item.contentId)) return false;
+            seen.add(item.contentId);
+            return true;
+        });
+
+        const ranked = uniqueItems.map((item, index) => ({
             ...item,
             contentType: type,
             rankType: 'coming_soon',
@@ -338,9 +458,12 @@ export const calculateComingSoon = async (type) => {
             rankPosition: index + 1
         }));
 
-        await Ranking.deleteMany({ contentType: type, rankType: 'coming_soon' });
-        await Ranking.insertMany(ranked);
+        if (ranked.length > 0) {
+            await Ranking.deleteMany({ contentType: type, rankType: 'coming_soon' });
+            await Ranking.insertMany(ranked);
+            logger.info(`[Rankings] Coming Soon updated for ${type} (${ranked.length} items)`);
+        }
+    } else {
+        logger.warn(`[Rankings] Coming Soon sync for ${type} resulted in 0 items. Keeping existing data.`);
     }
-    
-    logger.info(`[Rankings] Coming Soon updated for ${type} (${items.length} items)`);
 };

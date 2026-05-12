@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, memo } from 'react'
+import DeleteConfirmModal from '../../components/ui/DeleteConfirmModal'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
-import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play, Film, Tv, Flame, ChevronRight, CreditCard, ShoppingBag, Layers, Star, Users, Target, Gamepad2 } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play, Film, Tv, Flame, ChevronRight, CreditCard, ShoppingBag, Layers, Star, Users, Target, Gamepad2, Trash2, Edit2 } from 'lucide-react'
 import AddAnimeModal from '../../components/library/AddAnimeModal'
 import Skeleton from '../../components/ui/Skeleton'
 import Avatar from '../../components/ui/Avatar'
@@ -118,9 +119,6 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
     const userRankInfo = topUsers.find(u => u._id === comment.userId?._id || u._id === comment.userId?.id)
     const rank = userRankInfo?.rank
 
-    const currentUserRankInfo = topUsers.find(u => u._id === currentUser?.id || u._id === currentUser?._id)
-    const currentUserRank = currentUserRankInfo?.rank
-
     const [showReplyBox, setShowReplyBox] = useState(false)
     const [showGifPicker, setShowGifPicker] = useState(false)
     const [replyText, setReplyText] = useState('')
@@ -208,11 +206,18 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
 
     const handleDelete = async () => {
         try {
+            setSubmittingReply(true) // Reuse submitting state for loading
             const res = await api.delete(`/anime/comments/${comment._id}`)
             onXpToast(res.data.message || '🗑 Comment deleted', 'loss')
             onRefresh(true)
-        } catch (err) { console.error('Delete error:', err) }
-        finally { setShowDeleteConfirm(false) }
+        } catch (err) { 
+            console.error('Delete error:', err)
+            onXpToast('Failed to delete comment', 'error')
+        }
+        finally { 
+            setSubmittingReply(false)
+            setShowDeleteConfirm(false) 
+        }
     }
 
     const handleEdit = async () => {
@@ -309,31 +314,56 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
                     ) : (
                         <div className="text-[#c8c8d8] text-sm leading-relaxed break-words whitespace-pre-wrap">{renderText(comment.text)}</div>
                     )}
-                    <div className="flex items-center gap-2 mt-3">
-                        <div className="flex bg-[#18181f] rounded-xl border border-[#2a2a35] p-0.5 shadow-sm relative">
+                    <div className="flex items-center gap-3 mt-4">
+                        <div className="flex items-center bg-[#18181f] rounded-lg border border-[#2a2a35] p-0.5 shadow-sm relative">
                             {showBurst && (
                                 <div className="rank-like-burst">
                                     {rank === 1 ? '👑' : rank === 2 ? '🪽' : rank === 3 ? '🎖️' : rank === 4 ? '⚔️' : '🍥'}
                                 </div>
                             )}
-                            <button onClick={handleLike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg ${liked ? 'bg-[#c8ff57]/20 text-[#c8ff57]' : 'text-[#7a7a90] hover:text-white'}`}><ThumbsUp size={12} /> {likes > 0 && <span>{likes}</span>}</button>
-                            <div className="w-[1px] bg-[#2a2a35] my-1 mx-0.5" />
-                            <button onClick={handleDislike} className={`px-2 py-1 flex items-center gap-1.5 font-bold text-[10px] rounded-lg ${disliked ? 'bg-[#ff5c5c]/20 text-[#ff5c5c]' : 'text-[#7a7a90] hover:text-white'}`}><ThumbsDown size={12} /> {dislikes > 0 && <span>{dislikes}</span>}</button>
+                            <button onClick={handleLike} className={`px-2.5 py-1.5 flex items-center gap-2 font-bold text-[10px] rounded-md transition-all ${liked ? 'bg-[#c8ff57]/20 text-[#c8ff57]' : 'text-[#7a7a90] hover:text-white hover:bg-white/5'}`}><ThumbsUp size={14} /> {likes > 0 && <span>{likes}</span>}</button>
+                            <div className="w-[1px] h-3 bg-[#2a2a35] mx-0.5" />
+                            <button onClick={handleDislike} className={`px-2.5 py-1.5 flex items-center gap-2 font-bold text-[10px] rounded-md transition-all ${disliked ? 'bg-[#ff5c5c]/20 text-[#ff5c5c]' : 'text-[#7a7a90] hover:text-white hover:bg-white/5'}`}><ThumbsDown size={14} /> {dislikes > 0 && <span>{dislikes}</span>}</button>
                         </div>
-                        {currentUser && <button onClick={() => { setReplyText(`@${username} `); setShowReplyBox(true) }} className="px-2 py-1 flex items-center gap-1 font-bold text-[10px] text-[#7a7a90] hover:text-white bg-[#18181f]/50 rounded-lg border border-transparent hover:border-[#2a2a35]"><MessageSquare size={12} /> Reply</button>}
-                        {isOwn && !showDeleteConfirm && (
-                            <div className="ml-auto flex gap-1.5">
-                                <button onClick={() => { setIsEditing(true); setEditingText(comment.text) }} className="px-2.5 py-1 text-[#7a7a90] hover:text-black hover:bg-[#c8ff57] transition-all rounded-lg font-bold text-[10px]">Edit</button>
-                                <button onClick={() => setShowDeleteConfirm(true)} className="px-2.5 py-1 text-[#7a7a90] hover:text-white hover:bg-[#ff5c5c] transition-all rounded-lg font-bold text-[10px]">Delete</button>
-                            </div>
+                        
+                        {currentUser && (
+                            <button 
+                                onClick={() => { setReplyText(`@${username} `); setShowReplyBox(true) }} 
+                                className="px-3 py-1.5 flex items-center gap-2 font-bold text-[10px] text-[#7a7a90] hover:text-white bg-[#18181f]/50 rounded-lg border border-[#2a2a35]/50 hover:border-[#2a2a35] transition-all"
+                            >
+                                <MessageSquare size={14} /> 
+                                Reply
+                            </button>
                         )}
-                        {showDeleteConfirm && (
-                            <div className="ml-auto flex items-center gap-2 bg-[#ff5c5c]/10 border border-[#ff5c5c]/30 rounded-md px-2 py-1">
-                                <button onClick={handleDelete} className="px-2 py-0.5 bg-[#ff5c5c] text-white font-bold text-[9px] rounded uppercase">YES</button>
-                                <button onClick={() => setShowDeleteConfirm(false)} className="px-2 py-0.5 border border-[#ff5c5c]/30 text-[#ff5c5c] font-mono text-[9px] rounded">NO</button>
+
+                        {isOwn && (
+                            <div className="ml-auto flex items-center gap-1">
+                                <button 
+                                    onClick={() => { setIsEditing(true); setEditingText(comment.text) }} 
+                                    className="p-2 text-[#7a7a90] hover:text-[#c8ff57] transition-all rounded-lg"
+                                    title="Edit"
+                                >
+                                    <Edit2 size={14} />
+                                </button>
+                                <button 
+                                    onClick={() => setShowDeleteConfirm(true)} 
+                                    className="p-2 text-[#7a7a90] hover:text-[#ff5c5c] transition-all rounded-lg"
+                                    title="Delete"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
                             </div>
                         )}
                     </div>
+
+                    <DeleteConfirmModal 
+                        isOpen={showDeleteConfirm}
+                        onClose={() => setShowDeleteConfirm(false)}
+                        onConfirm={handleDelete}
+                        isLoading={submittingReply}
+                        title="Delete Comment"
+                        message="Are you sure you want to delete this comment? This action will also remove all associated XP and cannot be undone."
+                    />
                 </div>
                 {showReplyBox && (
                     <div className="mt-2 ml-2 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -399,7 +429,6 @@ function AnimeDetail() {
     const [activeTab, setActiveTab] = useState('overview')
     const [expanded, setExpanded] = useState(false)
     const [showAddModal, setShowAddModal] = useState(false)
-    const [listToast, setListToast] = useState(null)
     const [userLibrary, setUserLibrary] = useState([])
     const [liked, setLiked] = useState(false)
     const [watchlisted, setWatchlisted] = useState(false)
@@ -593,7 +622,7 @@ function AnimeDetail() {
             </Helmet>
 
             {xpToast && (
-                <div className={`fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 
+                <div className={`fixed bottom-22 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 
                                 ${xpToast.type === 'loss' ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]' : 'bg-[#c8ff57]/20 border-[#c8ff57]/40 text-[#c8ff57]'}`}>
                     {xpToast.msg}
                 </div>
@@ -606,7 +635,74 @@ function AnimeDetail() {
                 <div className="relative max-w-[1200px] mx-auto px-5 md:px-10 pt-10 pb-10">
                     <button onClick={() => navigate(-1)} className="flex items-center gap-2 font-mono text-xs text-[#7a7a90] hover:text-[#c8ff57] mb-8 transition-colors">← BACK</button>
                     <div className="flex flex-col md:flex-row gap-8 items-start">
-                        <img src={anime.cover || anime.coverImage} alt={anime.title} className="w-36 md:w-48 rounded-lg shadow-2xl ring-1 ring-white/10" />
+                        <div className="flex gap-4 md:gap-8 items-stretch md:items-start w-full md:w-auto">
+                            <div className="relative flex-shrink-0">
+                                <img 
+                                    src={anime.cover || anime.coverImage} 
+                                    alt={anime.title} 
+                                    className="w-40 md:w-64 aspect-[3/4] object-cover rounded-lg shadow-2xl ring-1 ring-white/10 transition-transform duration-500 hover:scale-[1.02]" 
+                                />
+                            </div>
+
+                            {/* Mobile Stats (Right of thumbnail) */}
+                            <div className="flex md:hidden flex-col gap-1.5 flex-1 min-w-0">
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    {/* Avg Rating */}
+                                    <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-lg p-1.5 flex flex-col items-center justify-center text-center">
+                                        <div className="w-5 h-5 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-1">
+                                            <Star size={11} fill="currentColor" />
+                                        </div>
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className="text-[11px] font-bold text-white">{stats?.avgRating > 0 ? stats.avgRating : '—'}</span>
+                                            {stats?.avgRating > 0 && <span className="text-[7px] text-[#7a7a90]">/10</span>}
+                                        </div>
+                                        <div className="text-[7px] text-[#7a7a90] uppercase font-bold tracking-wider">Avg</div>
+                                    </div>
+
+                                    {/* Logged (Pond) */}
+                                    <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-lg p-1.5 flex flex-col items-center justify-center text-center">
+                                        <div className="w-5 h-5 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-1">
+                                            <Tv size={11} />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-white">{stats?.loggedCount ?? '0'}</span>
+                                        <div className="text-[7px] text-[#7a7a90] uppercase font-bold tracking-wider">Pond</div>
+                                    </div>
+
+                                    {/* Likes */}
+                                    <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-lg p-1.5 flex flex-col items-center justify-center text-center">
+                                        <div className="w-5 h-5 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center text-[#ff5c5c] mb-1">
+                                            <Heart size={11} fill="currentColor" />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-white">{stats?.likeCount ?? '0'}</span>
+                                        <div className="text-[7px] text-[#7a7a90] uppercase font-bold tracking-wider">Likes</div>
+                                    </div>
+
+                                    {/* Watchlisted */}
+                                    <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-lg p-1.5 flex flex-col items-center justify-center text-center">
+                                        <div className="w-5 h-5 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-1">
+                                            <Target size={11} />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-white">{stats?.wishlistCount ?? '0'}</span>
+                                        <div className="text-[7px] text-[#7a7a90] uppercase font-bold tracking-wider">Watchlisted</div>
+                                    </div>
+                                </div>
+
+                                {/* My Rating (Inside Stats Column) */}
+                                <div className={`bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-lg p-1.5 flex flex-col items-center justify-center gap-1 mt-1.5 flex-1 ${(!user || !(myEntry?.rating > 0)) ? 'opacity-30' : ''}`}>
+                                    <div className="w-5 h-5 rounded-full bg-[#c8ff57]/10 flex items-center justify-center text-[#c8ff57]">
+                                        <Star size={11} fill="currentColor" />
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className={`text-[11px] font-bold ${myEntry?.rating > 0 ? 'text-[#c8ff57]' : 'text-white'}`}>{myEntry?.rating > 0 ? myEntry.rating : '—'}</span>
+                                            {myEntry?.rating > 0 && <span className="text-[7px] text-[#7a7a90]">/10</span>}
+                                        </div>
+                                        <div className="text-[7px] text-[#7a7a90] uppercase font-bold tracking-wider">My Rating</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="flex-1 min-w-0 w-full">
                             <h1 className="font-black text-4xl md:text-6xl text-white uppercase tracking-wide leading-none mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{anime.title}</h1>
                             <div className="flex flex-wrap gap-2 mb-6">
@@ -615,61 +711,61 @@ function AnimeDetail() {
                                 ))}
                             </div>
 
-                            {/* Apple-style Stats Grid */}
-                            <div className="grid grid-cols-5 gap-1.5 md:gap-4 mb-10 overflow-hidden">
+                            {/* Desktop Stats Grid */}
+                            <div className="hidden md:grid grid-cols-5 gap-4 mb-10 overflow-hidden">
                                 {/* Avg Rating */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
-                                        <Star size={10} className="md:w-4 md:h-4" fill="currentColor" />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
+                                        <Star size={16} fill="currentColor" />
                                     </div>
                                     <div className="flex items-baseline gap-0.5">
-                                        <span className="text-xs md:text-2xl font-bold text-white tracking-tight">
+                                        <span className="text-2xl font-bold text-white tracking-tight">
                                             {stats?.avgRating > 0 ? stats.avgRating : '—'}
                                         </span>
-                                        {stats?.avgRating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
+                                        {stats?.avgRating > 0 && <span className="text-[10px] text-[#7a7a90] font-medium">/10</span>}
                                     </div>
-                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Avg</div>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Avg</div>
                                 </div>
 
                                 {/* My Rating */}
-                                <div className={`bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#c8ff57]/30 transition-all duration-300 shadow-lg ${(!user || !(myEntry?.rating > 0)) ? 'opacity-30 grayscale' : ''}`}>
-                                    <div className={`w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#c8ff57]/10 flex items-center justify-center text-[#c8ff57] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform`}>
-                                        <Star size={10} className="md:w-4 md:h-4" fill="currentColor" />
+                                <div className={`bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#c8ff57]/30 transition-all duration-300 shadow-lg ${(!user || !(myEntry?.rating > 0)) ? 'opacity-30 grayscale' : ''}`}>
+                                    <div className={`w-8 h-8 rounded-full bg-[#c8ff57]/10 flex items-center justify-center text-[#c8ff57] mb-2 group-hover:scale-110 transition-transform`}>
+                                        <Star size={16} fill="currentColor" />
                                     </div>
                                     <div className="flex items-baseline gap-0.5">
-                                        <span className={`text-xs md:text-2xl font-bold tracking-tight ${myEntry?.rating > 0 ? 'text-[#c8ff57]' : 'text-white/40'}`}>
+                                        <span className={`text-2xl font-bold tracking-tight ${myEntry?.rating > 0 ? 'text-[#c8ff57]' : 'text-white/40'}`}>
                                             {myEntry?.rating > 0 ? myEntry.rating : '—'}
                                         </span>
-                                        {myEntry?.rating > 0 && <span className="text-[7px] md:text-[10px] text-[#7a7a90] font-medium">/10</span>}
+                                        {myEntry?.rating > 0 && <span className="text-[10px] text-[#7a7a90] font-medium">/10</span>}
                                     </div>
-                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">My Rating</div>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">My Rating</div>
                                 </div>
 
                                 {/* Logged */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff9f5c]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
-                                        <Tv size={10} className="md:w-4 md:h-4" />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff9f5c]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-8 h-8 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-2 group-hover:scale-110 transition-transform">
+                                        <Tv size={16} />
                                     </div>
-                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.loggedCount ?? '0'}</span>
-                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Pond</div>
+                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.loggedCount ?? '0'}</span>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Pond</div>
                                 </div>
 
                                 {/* Likes */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff5c5c]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center text-[#ff5c5c] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
-                                        <Heart size={10} className="md:w-4 md:h-4" fill="currentColor" />
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff5c5c]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-8 h-8 rounded-full bg-[#ff5c5c]/10 flex items-center justify-center text-[#ff5c5c] mb-2 group-hover:scale-110 transition-transform">
+                                        <Heart size={16} fill="currentColor" />
                                     </div>
-                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.likeCount ?? '0'}</span>
-                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Likes</div>
+                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.likeCount ?? '0'}</span>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Likes</div>
                                 </div>
 
-                                {/* Wishlists */}
-                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-xl md:rounded-2xl p-1.5 md:p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
-                                    <div className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-0.5 md:mb-2 group-hover:scale-110 transition-transform">
-                                        <Target size={10} className="md:w-4 md:h-4" />
+                                {/* Watchlisted */}
+                                <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#5c9fff]/30 transition-all duration-300 shadow-lg">
+                                    <div className="w-8 h-8 rounded-full bg-[#5c9fff]/10 flex items-center justify-center text-[#5c9fff] mb-2 group-hover:scale-110 transition-transform">
+                                        <Target size={16} />
                                     </div>
-                                    <span className="text-xs md:text-2xl font-bold text-white tracking-tight">{stats?.wishlistCount ?? '0'}</span>
-                                    <div className="text-[6px] md:text-[10px] text-[#7a7a90] uppercase tracking-wider md:tracking-[0.1em] font-bold mt-0.5 md:mt-1">Wish</div>
+                                    <span className="text-2xl font-bold text-white tracking-tight">{stats?.wishlistCount ?? '0'}</span>
+                                    <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Watchlisted</div>
                                 </div>
                             </div>
 
@@ -749,8 +845,13 @@ function AnimeDetail() {
                                 {/* Relations & Timeline (Visual List) */}
                                 {(() => {
                                     const relations = anime.relations || [];
-                                    const prequel = relations.find(r => r.relation?.toUpperCase() === 'PREQUEL')?.items?.[0];
-                                    const sequel = relations.find(r => r.relation?.toUpperCase() === 'SEQUEL')?.items?.[0];
+                                    
+                                    const prequelItems = relations.find(r => r.relation?.toUpperCase() === 'PREQUEL')?.items || [];
+                                    const sequelItems = relations.find(r => r.relation?.toUpperCase() === 'SEQUEL')?.items || [];
+                                    
+                                    // Logic: Prefer TV series over movies/specials for the "main" timeline
+                                    const prequel = prequelItems.find(i => i.type?.toLowerCase() === 'tv') || prequelItems[0];
+                                    const sequel = sequelItems.find(i => i.type?.toLowerCase() === 'tv') || sequelItems[0];
                                     const source = relations.find(r => r.relation?.toUpperCase() === 'SOURCE')?.items?.[0];
 
                                     if (!prequel && !sequel && !source) return null;

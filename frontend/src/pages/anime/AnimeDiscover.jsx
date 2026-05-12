@@ -70,11 +70,11 @@ function AnimeDiscover() {
 
     // Discovery Data
     const genreKey = activeGenre?.mal || 'all'
-    const { data: discoverData, loading } = useCachedFetch(
-        `anime_discover_v5_anime_${genreKey}_${page}`,
-        `/anime/discover?type=anime&page=${page}&limit=24${activeGenre ? `&genre=${activeGenre.mal}` : ''}`,
+    const { data: discoverData, loading, error, refetch } = useCachedFetch(
+        `anime_discover_v6_anime_${genreKey}_${page}`,
+        `/anime/discover?type=anime&page=${page}&limit=25${activeGenre ? `&genre=${activeGenre.mal}` : ''}`,
         { ttl: 15 * 60 * 1000, deps: [genreKey, page] }
-    )
+    );
 
     const items = discoverData?.items || []
     const totalPages = discoverData?.totalPages || 1
@@ -100,7 +100,7 @@ function AnimeDiscover() {
         setActiveGenre(null) // Clear genre when searching
         
         try {
-            const res = await api.get(`/anime/search?q=${encodeURIComponent(query)}&type=${type}&limit=24&page=${page}`)
+            const res = await api.get(`/anime/search?q=${encodeURIComponent(query)}&type=${type}&limit=25&page=${page}`)
             setSearchResults(res.data.results.map(r => ({ ...r, avgRating: res.data.stats?.[r.externalId]?.avgRating })) || [])
             setSearchTotalPages(res.data.totalPages || 1)
         } catch (err) {
@@ -260,8 +260,28 @@ function AnimeDiscover() {
                     ))}
                 </div>
 
+                {/* ── Error State ── */}
+                {error && !loading && (
+                    <div className="py-20 text-center bg-red-500/5 border border-red-500/20 rounded-3xl mb-12">
+                        <div className="text-4xl mb-4">🏮</div>
+                        <h3 className="text-white font-black text-xl uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                            Discovery Interrupted
+                        </h3>
+                        <p className="text-[#7a7a90] font-mono text-xs mb-6 max-w-xs mx-auto">
+                            The Jikan library is currently ripple-y. We couldn't fetch the latest results.
+                        </p>
+                        <button 
+                            onClick={() => refetch()}
+                            className="bg-[#c8ff57] text-black px-6 py-2 rounded font-black uppercase text-xs tracking-widest hover:bg-[#d4ff6e] transition-all"
+                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                        >
+                            Retry Quest
+                        </button>
+                    </div>
+                )}
+
                 {/* ── No Results ── */}
-                {!loading && !isSearching && (searchPerformed ? searchResults.length === 0 : items.length === 0) && (
+                {!loading && !isSearching && !error && (searchPerformed ? searchResults.length === 0 : items.length === 0) && (
                     <div className="py-24 text-center bg-[#111118] border border-[#2a2a35] border-dashed rounded-3xl">
                         <div className="text-5xl mb-6">🛸</div>
                         <h3 className="text-white font-black text-2xl uppercase mb-2" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>No anime found</h3>
@@ -273,7 +293,7 @@ function AnimeDiscover() {
                 {!loading && (searchPerformed ? searchTotalPages > 1 : totalPages > 1) && (
                     <div className="flex items-center justify-center gap-2 mt-16 flex-wrap">
                         <button
-                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 400); }}
                             disabled={page === 1}
                             className="px-4 py-2 rounded bg-[#111118] border border-[#2a2a35] text-[#7a7a90] font-mono text-xs uppercase tracking-widest hover:border-[#c8ff57] hover:text-[#c8ff57] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >
@@ -298,7 +318,7 @@ function AnimeDiscover() {
                                     <div key={n} className="flex items-center gap-2">
                                         {ellipsis && <span className="text-[#3a3a4a] font-mono">...</span>}
                                         <button
-                                            onClick={() => setPage(n)}
+                                            onClick={() => { setPage(n); window.scrollTo(0, 400); }}
                                             className={`w-10 h-10 rounded border font-mono text-xs transition-all ${n === page ? 'bg-[#c8ff57]/10 border-[#c8ff57] text-[#c8ff57]' : 'bg-[#111118] border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57] hover:text-white'}`}
                                         >
                                             {n}
@@ -309,7 +329,7 @@ function AnimeDiscover() {
                         })()}
 
                         <button
-                            onClick={() => setPage(p => Math.min(searchPerformed ? searchTotalPages : totalPages, p + 1))}
+                            onClick={() => { setPage(p => Math.min(searchPerformed ? searchTotalPages : totalPages, p + 1)); window.scrollTo(0, 400); }}
                             disabled={page === (searchPerformed ? searchTotalPages : totalPages)}
                             className="px-4 py-2 rounded bg-[#111118] border border-[#2a2a35] text-[#7a7a90] font-mono text-xs uppercase tracking-widest hover:border-[#c8ff57] hover:text-[#c8ff57] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >

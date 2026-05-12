@@ -308,7 +308,7 @@ function Profile() {
 
             {/* XP Toast */}
             {xpToast && (
-                <div className={`fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
+                <div className={`fixed bottom-22 left-1/2 -translate-x-1/2 z-[100] px-6 py-3.5 rounded-2xl font-mono text-sm border shadow-2xl backdrop-blur-xl transition-all animate-in slide-in-from-bottom-5 duration-300 w-[calc(100%-40px)] max-w-[320px] text-center flex items-center justify-center gap-2
                                 ${xpToast.type === 'loss'
                         ? 'bg-[#ff5c5c]/20 border-[#ff5c5c]/40 text-[#ff5c5c]'
                         : xpToast.type === 'pending'
@@ -335,11 +335,11 @@ function Profile() {
                             </div>
                         )}
                         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 mb-1">
-                            <h1 className="font-black text-3xl md:text-4xl tracking-widest text-white flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 min-w-0">
+                            <h1 className="font-black text-3xl md:text-4xl tracking-widest text-white flex flex-col sm:flex-row items-center sm:items-start gap-x-3 gap-y-2 min-w-0">
                                 <span className="break-all leading-tight">{user.username}</span>
                                 {user.followsMe && (
                                     <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-sm
-                                                     bg-[#7a7a90]/15 text-[#7a7a90] border border-[#7a7a90]/30 select-none whitespace-nowrap">
+                                                     bg-[#7a7a90]/15 text-[#7a7a90] border border-[#7a7a90]/30 select-none whitespace-nowrap sm:mt-1">
                                         Follows you
                                     </span>
                                 )}

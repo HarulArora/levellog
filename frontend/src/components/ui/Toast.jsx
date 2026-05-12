@@ -35,7 +35,7 @@ function Toast({ message, type = 'success', onClose }) {
 
     return (
         <div
-            className={`fixed bottom-28 left-1/2 -translate-x-1/2 z-[9999]
+            className={`fixed bottom-22 left-1/2 -translate-x-1/2 z-[9999]
                   px-5 py-3 rounded font-mono text-sm font-medium
                   shadow-2xl border transition-all duration-300
                   ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
