@@ -11,7 +11,7 @@ export const syncAllRankings = async () => {
         try {
             await calculateTopRated(type);
             await calculateTrending(type);
-            if (type !== 'manga') await calculateComingSoon(type);
+            await calculateComingSoon(type);
         } catch (error) {
             logger.error(`[Sync] Failed to calculate rankings for ${type}:`, error);
         }
@@ -33,15 +33,26 @@ export const initRankingCrons = () => {
         }
     });
 
-    // Top Rated & Coming Soon every 6 hours
-    cron.schedule('0 */6 * * *', async () => {
-        logger.info('[Cron] Running 6-hourly ranking update...');
+    // Top Rated every day at midnight
+    cron.schedule('0 0 * * *', async () => {
+        logger.info('[Cron] Running daily Top Rated update...');
         for (const type of CONTENT_TYPES) {
             try {
                 await calculateTopRated(type);
-                if (type !== 'manga') await calculateComingSoon(type);
             } catch (err) {
-                logger.error(`[Cron] Ranking failed for ${type}:`, err);
+                logger.error(`[Cron] Top Rated failed for ${type}:`, err);
+            }
+        }
+    });
+
+    // Coming Soon every 3 days at 1 AM
+    cron.schedule('0 1 */3 * *', async () => {
+        logger.info('[Cron] Running 3-day Coming Soon update...');
+        for (const type of CONTENT_TYPES) {
+            try {
+                await calculateComingSoon(type);
+            } catch (err) {
+                logger.error(`[Cron] Coming Soon failed for ${type}:`, err);
             }
         }
     });

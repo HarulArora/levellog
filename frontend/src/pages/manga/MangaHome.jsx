@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useSection } from '../../context/SectionState'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, BookOpen, Flame, Plus, Tv, ChevronRight } from 'lucide-react'
+import Shuriken from '../../components/ui/Shuriken'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import AvatarFrame from '../../components/ui/AvatarFrame'
@@ -419,7 +420,7 @@ function MangaHome() {
                          current="manga"
                          type="anime"
                          options={[
-                             { label: 'Anime', value: 'anime', path: '/anime', icon: Tv },
+                             { label: 'Anime', value: 'anime', path: '/anime', icon: Shuriken },
                              { label: 'Manga', value: 'manga', path: '/manga', icon: BookOpen }
                          ]}
                     />

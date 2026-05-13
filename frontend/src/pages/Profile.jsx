@@ -10,6 +10,7 @@ import { useLeaderboard } from '../context/LeaderboardContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import FollowListModal from '../components/profile/FollowListModal'
 import { Frown, Gamepad2, Lock, Globe, Pencil, BarChart2, List, Trophy, Heart, Bookmark, ChevronDown, Monitor, Film, Tv, BookOpen, Layers, Star, History } from 'lucide-react'
+import Shuriken from '../components/ui/Shuriken'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
 function Profile() {
@@ -551,7 +552,7 @@ function Profile() {
                                 { id: 'game', label: 'Games', icon: Gamepad2 },
                                 { id: 'movie', label: 'Movies', icon: Film },
                                 { id: 'tv', label: 'TV Shows', icon: Tv },
-                                { id: 'anime', label: 'Anime', icon: Monitor },
+                                { id: 'anime', label: 'Anime', icon: Shuriken },
                                 { id: 'manga', label: 'Manga', icon: BookOpen }
                             ].map(m => (
                                 <button
@@ -663,7 +664,7 @@ function Profile() {
                             { id: 'game', label: 'Games', icon: Gamepad2 },
                             { id: 'movie', label: 'Movies', icon: Film },
                             { id: 'tv', label: 'TV Shows', icon: Tv },
-                            { id: 'anime', label: 'Anime', icon: Monitor },
+                            { id: 'anime', label: 'Anime', icon: Shuriken },
                             { id: 'manga', label: 'Manga', icon: BookOpen }
                         ].map(m => (
                             <button
@@ -762,7 +763,7 @@ function Profile() {
                             { id: 'game', label: 'Games', icon: Gamepad2 },
                             { id: 'movie', label: 'Movies', icon: Film },
                             { id: 'tv', label: 'TV Shows', icon: Tv },
-                            { id: 'anime', label: 'Anime', icon: Monitor },
+                            { id: 'anime', label: 'Anime', icon: Shuriken },
                             { id: 'manga', label: 'Manga', icon: BookOpen }
                         ].map(m => (
                             <button

@@ -4,6 +4,7 @@ import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Tv, Flame, Plus, BookOpen } from 'lucide-react'
+import Shuriken from '../../components/ui/Shuriken'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import AvatarFrame from '../../components/ui/AvatarFrame'
@@ -32,7 +33,7 @@ const AnimeCard = memo(({ item, section }) => {
                     />
                 ) : (
                     <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-[#2a2a35]">
-                        {section === 'manga' ? <BookOpen size={48} strokeWidth={1} /> : <Tv size={48} strokeWidth={1} />}
+                        {section === 'manga' ? <BookOpen size={48} strokeWidth={1} /> : <Shuriken size={48} strokeWidth={1} />}
                     </div>
                 )}
                 
@@ -254,7 +255,7 @@ function AnimeSearchBar({ id = 'anime-search', section }) {
                                                     <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-[#3a3a4a]">
-                                                        {displaySection === 'manga' ? <BookOpen size={14} /> : <Tv size={14} />}
+                                                        {displaySection === 'manga' ? <BookOpen size={14} /> : <Shuriken size={14} />}
                                                     </div>
                                                 )}
                                             </div>
@@ -400,7 +401,7 @@ function AnimeHome() {
                         current="anime"
                         type="anime"
                         options={[
-                            { label: 'Anime', value: 'anime', path: '/anime', icon: Tv },
+                            { label: 'Anime', value: 'anime', path: '/anime', icon: Shuriken },
                             { label: 'Manga', value: 'manga', path: '/manga', icon: BookOpen }
                         ]}
                     />

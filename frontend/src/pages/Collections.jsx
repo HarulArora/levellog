@@ -4,11 +4,12 @@ import { useAuth } from '../context/AuthContext'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { Helmet } from 'react-helmet-async'
 import { Gamepad2, Film, Tv, Monitor, BookOpen, Heart, Bookmark, Search, LayoutGrid, List as ListIcon, Sparkles, ChevronRight, History } from 'lucide-react'
+import Shuriken from '../components/ui/Shuriken'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
 const MEDIA_TYPES = [
     { id: 'game', label: 'Games', icon: Gamepad2, color: '#c8ff57' },
-    { id: 'anime', label: 'Anime', icon: Monitor, color: '#5c9fff' },
+    { id: 'anime', label: 'Anime', icon: Shuriken, color: '#5c9fff' },
     { id: 'manga', label: 'Manga', icon: BookOpen, color: '#ff9f5c' },
     { id: 'movie', label: 'Movies', icon: Film, color: '#ff5c5c' },
     { id: 'tv', label: 'TV Shows', icon: Tv, color: '#c45cff' }

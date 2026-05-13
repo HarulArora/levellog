@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
-import { Plus, LayoutGrid, List as ListIcon, Filter, Search, Tv, Sparkles, Edit3, Trash2, BookOpen } from 'lucide-react'
+import { Plus, LayoutGrid, List as ListIcon, Filter, Search, Sparkles, Edit3, Trash2, BookOpen } from 'lucide-react'
+import Shuriken from '../../components/ui/Shuriken'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -157,7 +158,7 @@ function AnimeLibrary() {
                         current="anime"
                         type="anime"
                         options={[
-                            { label: 'Anime', value: 'anime', path: '/anime/library', icon: Tv },
+                            { label: 'Anime', value: 'anime', path: '/anime/library', icon: Shuriken },
                             { label: 'Manga', value: 'manga', path: '/manga/library', icon: BookOpen }
                         ]}
                     />
@@ -166,7 +167,7 @@ function AnimeLibrary() {
                         <div className="relative group w-full md:w-auto">
                             <div className="absolute -left-4 -top-4 w-12 h-12 bg-[#c8ff57]/10 rounded-full blur-2xl group-hover:bg-[#c8ff57]/20 transition-all duration-500" />
                             <div className="flex items-center gap-3 mb-2">
-                                <Tv size={16} className="text-[#c8ff57]" />
+                                <Shuriken size={16} className="text-[#c8ff57]" />
                                 <span className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[3px]">Multiverse Vault</span>
                             </div>
                             <h1 className="font-black text-4xl md:text-6xl text-white uppercase leading-tight" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
@@ -286,7 +287,7 @@ function AnimeLibrary() {
                         <div className="absolute inset-0 bg-gradient-to-b from-[#c8ff57]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                         <div className="relative z-10">
                             <div className="w-24 h-24 bg-[#1a1a25] rounded-3xl flex items-center justify-center mx-auto mb-8 border border-[#2a2a35] group-hover:scale-110 group-hover:rotate-12 transition-all duration-500">
-                                <Tv size={40} className="text-[#4a4a5e]" />
+                                <Shuriken size={40} className="text-[#4a4a5e]" />
                             </div>
                             <h3 className="text-white font-black text-3xl uppercase mb-3 tracking-wider" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
                                 {searchQuery ? 'Zero Matches' : 'Vault Empty'}

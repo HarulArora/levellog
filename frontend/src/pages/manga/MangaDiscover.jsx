@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext'
 import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Search, Star, Filter, Tv, BookOpen } from 'lucide-react'
+import Shuriken from '../../components/ui/Shuriken'
 import { GameCardSkeleton } from '../../components/ui/Skeleton'
 import { Helmet } from 'react-helmet-async'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
@@ -152,7 +153,7 @@ function MangaDiscover() {
                         current="manga"
                         type="anime"
                         options={[
-                            { label: 'Anime', value: 'anime', path: '/anime/discover', icon: Tv },
+                            { label: 'Anime', value: 'anime', path: '/anime/discover', icon: Shuriken },
                             { label: 'Manga', value: 'manga', path: '/manga/discover', icon: BookOpen }
                         ]}
                     />

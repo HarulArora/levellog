@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-    timeout: 30000, // Increased to 30 seconds
+    timeout: 5000, // Reduced to 5 seconds to prevent long hangs; we have local fallbacks.
     headers: {
         // 'Connection': 'close',
         'User-Agent': 'LevelLog/1.0 (Coding Assistant Integration)'

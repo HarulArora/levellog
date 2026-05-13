@@ -382,6 +382,7 @@ const CommentItem = memo(({ comment, currentUser, externalId, type, onRefresh, o
 })
 
 function TVDetail() {
+    const location = useLocation()
     const { id } = useParams()
     const navigate = useNavigate()
     const { user, updateUser } = useAuth()
@@ -720,15 +721,29 @@ function TVDetail() {
                             </div>
 
                             <div className="flex flex-wrap gap-3">
-                                <button onClick={() => setShowAddModal(true)} className={`btn-apple px-5 py-2.5 flex items-center gap-2 border ${myEntry ? (statusConfig[myEntry.status]?.bg || 'bg-[#c8ff57]/10') : 'bg-[#c8ff57] text-black shadow-lg'} ${myEntry ? (statusConfig[myEntry.status]?.color || 'text-[#c8ff57]') : ''} border-current hover:brightness-110 transition-all font-bold text-sm`}>
-                                    {myEntry ? `${statusConfig[myEntry.status]?.label} · Update` : <><Plus size={16} /> Add to Pond</>}
-                                </button>
-                                <button onClick={handleLike} disabled={liking} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border backdrop-blur-md ${liked ? 'border-[#ff5c5c] text-[#ff5c5c] bg-[#ff5c5c]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'} transition-all`}>
-                                    <Heart size={16} className={liked ? 'fill-current' : ''} /> {liked ? 'Liked' : 'Like'}
-                                </button>
-                                <button onClick={handleWatchlist} disabled={watching} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border backdrop-blur-md ${watchlisted ? 'border-[#5c9fff] text-[#5c9fff] bg-[#5c9fff]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#5c9fff] hover:text-[#5c9fff]'} transition-all`}>
-                                    {watchlisted ? <Check size={16} /> : <Plus size={16} />} {watchlisted ? 'Watchlisted' : 'Watchlist'}
-                                </button>
+                                {user ? (
+                                    <button onClick={() => setShowAddModal(true)} className={`btn-apple px-5 py-2.5 flex items-center gap-2 border ${myEntry ? (statusConfig[myEntry.status]?.bg || 'bg-[#c8ff57]/10') : 'bg-[#c8ff57] text-black shadow-lg'} ${myEntry ? (statusConfig[myEntry.status]?.color || 'text-[#c8ff57]') : ''} border-current hover:brightness-110 transition-all font-bold text-sm`}>
+                                        {myEntry ? `${statusConfig[myEntry.status]?.label} · Update` : <><Plus size={16} /> Add to Pond</>}
+                                    </button>
+                                ) : (
+                                    <Link to="/login" state={{ from: location }}>
+                                        <button className="btn-apple btn-apple-primary px-5 py-2.5">
+                                            Join QuestDuck
+                                        </button>
+                                    </Link>
+                                )}
+
+                                {user && (
+                                    <button onClick={handleLike} disabled={liking} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border backdrop-blur-md ${liked ? 'border-[#ff5c5c] text-[#ff5c5c] bg-[#ff5c5c]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#ff5c5c] hover:text-[#ff5c5c]'} transition-all`}>
+                                        <Heart size={16} className={liked ? 'fill-current' : ''} /> {liked ? 'Liked' : 'Like'}
+                                    </button>
+                                )}
+
+                                {user && (
+                                    <button onClick={handleWatchlist} disabled={watching} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border backdrop-blur-md ${watchlisted ? 'border-[#5c9fff] text-[#5c9fff] bg-[#5c9fff]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#5c9fff] hover:text-[#5c9fff]'} transition-all`}>
+                                        {watchlisted ? <Check size={16} /> : <Plus size={16} />} {watchlisted ? 'Watchlisted' : 'Watchlist'}
+                                    </button>
+                                )}
                                 <button onClick={handleShare} className={`btn-apple px-4 py-2.5 flex items-center gap-1.5 border transition-all ${shareCopied ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/10' : 'border-white/10 text-[#c8c8d8] hover:border-[#c8ff57] hover:text-[#c8ff57]'}`}>
                                     {shareCopied ? <Check size={16} /> : <Share size={16} />} {shareCopied ? 'Copied!' : 'Share'}
                                 </button>

@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Search, Star, Tv, BookOpen } from 'lucide-react'
+import Shuriken from '../../components/ui/Shuriken'
 import { Helmet } from 'react-helmet-async'
 import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
@@ -157,7 +158,7 @@ function AnimeDiscover() {
                         current="anime"
                         type="anime"
                         options={[
-                            { label: 'Anime', value: 'anime', path: '/anime/discover', icon: Tv },
+                            { label: 'Anime', value: 'anime', path: '/anime/discover', icon: Shuriken },
                             { label: 'Manga', value: 'manga', path: '/manga/discover', icon: BookOpen }
                         ]}
                     />

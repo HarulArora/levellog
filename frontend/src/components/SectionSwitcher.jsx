@@ -2,7 +2,8 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSection } from '../context/SectionState';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gamepad2, Tv, Popcorn } from 'lucide-react';
+import { Gamepad2, Popcorn } from 'lucide-react';
+import Shuriken from './ui/Shuriken';
 
 const SectionSwitcher = () => {
     const navigate = useNavigate();
@@ -51,7 +52,7 @@ const SectionSwitcher = () => {
             id: 'anime', 
             label: 'ANIME',
             subLabel: '& MANGA', 
-            icon: Tv, 
+            icon: Shuriken, 
             path: isManga ? '/manga' : '/anime',
             iconAnim: {
                 active: { rotate: 360 },

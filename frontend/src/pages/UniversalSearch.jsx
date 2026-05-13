@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Search as SearchIcon, User as UserIcon, Gamepad2, Tv, Film, BookOpen, Star } from 'lucide-react'
+import Shuriken from '../components/ui/Shuriken'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { useFollow } from '../context/FollowContext'
 import AvatarFrame from '../components/ui/AvatarFrame'
@@ -25,7 +26,7 @@ const RANK_TITLES = {
 const CATEGORIES = [
     { id: 'users', label: 'Players', icon: UserIcon },
     { id: 'games', label: 'Games', icon: Gamepad2 },
-    { id: 'anime', label: 'Anime', icon: Tv },
+    { id: 'anime', label: 'Anime', icon: Shuriken },
     { id: 'manga', label: 'Manga', icon: BookOpen },
     { id: 'movie', label: 'Movies', icon: Film },
     { id: 'tv', label: 'TV Shows', icon: Tv },
@@ -250,7 +251,13 @@ function MediaResultCard({ item, type }) {
                 {cover ? (
                     <img src={cover} alt={displayTitle} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                 ) : (
-                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-4xl">{type === 'tv' ? '📺' : '🎬'}</div>
+                    <div className="w-full h-full bg-[#18181f] flex items-center justify-center text-[#3a3a4a]">
+                        {type === 'anime' ? <Shuriken size={48} strokeWidth={1} /> : 
+                         type === 'manga' ? <BookOpen size={48} strokeWidth={1} /> :
+                         type === 'tv' ? <Tv size={48} strokeWidth={1} /> :
+                         type === 'movie' ? <Film size={48} strokeWidth={1} /> :
+                         <Gamepad2 size={48} strokeWidth={1} />}
+                    </div>
                 )}
                 
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">

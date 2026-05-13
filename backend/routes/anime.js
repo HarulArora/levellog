@@ -41,7 +41,7 @@ const formatJikanItem = (item, type) => ({
     cover: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
     genre: item.genres?.[0]?.name || 'Media',
     genres: item.genres?.map(g => g.name) || [],
-    year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year || item.year,
+    year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year || item.year || (item.aired?.from && !isNaN(new Date(item.aired.from).getFullYear()) ? new Date(item.aired.from).getFullYear() : null),
     score: item.score,
     summary: item.synopsis,
     status: item.status,
@@ -66,6 +66,8 @@ const fetchAnilistEnglishTitles = async (malIds, type = 'ANIME') => {
                 idMal
                 title { english romaji }
                 coverImage { large }
+                seasonYear
+                startDate { year }
             }
         }
     }`;
@@ -79,7 +81,8 @@ const fetchAnilistEnglishTitles = async (malIds, type = 'ANIME') => {
         response.data.data.Page.media.forEach(m => {
             mapping[m.idMal] = {
                 title: m.title.english || m.title.romaji,
-                cover: m.coverImage.large
+                cover: m.coverImage.large,
+                year: m.seasonYear || m.startDate?.year
             };
         });
         return mapping;
@@ -264,13 +267,14 @@ router.get('/home', async (req, res) => {
         const cacheKey = `home-${type}-v2`;
         if (jikanCache.has(cacheKey)) return res.json({ success: true, ...jikanCache.get(cacheKey) });
 
+        // 1. Fetch all rankings from DB (INSTANT)
         const [trendingRankings, topRatedRankings, upcomingRankings] = await Promise.all([
             Ranking.find({ contentType: type, rankType: 'trending' }).sort({ rankPosition: 1 }).limit(15),
             Ranking.find({ contentType: type, rankType: 'top_rated' }).sort({ rankPosition: 1 }).limit(15),
-            type === 'anime' ? Ranking.find({ contentType: type, rankType: 'coming_soon' }).sort({ rankPosition: 1 }).limit(15) : []
+            Ranking.find({ contentType: type, rankType: 'coming_soon' }).sort({ rankPosition: 1 }).limit(15)
         ]);
 
-        let trending = trendingRankings.map(r => ({
+        const mapRanking = (r) => ({
             mal_id: parseInt(r.contentId),
             externalId: parseInt(r.contentId),
             title: r.title,
@@ -278,81 +282,31 @@ router.get('/home', async (req, res) => {
             year: r.year,
             genres: r.genres || [],
             type: type
-        }));
+        });
 
-        let topRated = topRatedRankings.map(r => ({
-            mal_id: parseInt(r.contentId),
-            externalId: parseInt(r.contentId),
-            title: r.title,
-            cover: r.cover,
-            year: r.year,
-            genres: r.genres || [],
-            type: type
-        }));
+        let trending = trendingRankings.map(mapRanking);
+        let topRated = topRatedRankings.map(mapRanking);
+        let upcoming = upcomingRankings.map(mapRanking);
 
-        let upcoming = upcomingRankings.map(r => ({
-            mal_id: parseInt(r.contentId),
-            externalId: parseInt(r.contentId),
-            title: r.title,
-            cover: r.cover,
-            year: r.year,
-            genres: r.genres || [],
-            type: type
-        }));
-
-        // 4. Backfill/Fallback for Trending/Top/Upcoming if Ranking has less than 15 items
-        if (trending.length < 15 || topRated.length < 15 || upcoming.length < 15) {
-            const [trendFallback, topFallback, soonFallback] = await Promise.all([
-                trending.length < 15 ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: type === 'manga' ? 'publishing' : 'airing', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } },
-                topRated.length < 15 ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: 'bypopularity', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } },
-                upcoming.length < 15 ? apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { retry: 3, params: { limit: 25, filter: 'upcoming', sfw: true } }).catch(() => ({ data: { data: [] } })) : { data: { data: [] } }
-            ]);
-
-            const mergeUnique = (existing, fetchedRaw) => {
-                const fetched = (fetchedRaw || []).map(item => formatJikanItem(item, type));
-                const ids = new Set(existing.map(i => i.externalId));
-                const merged = [...existing];
-                for (const item of fetched) {
-                    if (!ids.has(item.externalId) && merged.length < 15) {
-                        merged.push(item);
-                        ids.add(item.externalId);
-                    }
+        // 2. Resolve missing years and titles via AniList for Home items
+        const allItems = [...trending, ...topRated, ...upcoming];
+        const missingMetaIds = allItems.map(i => i.externalId);
+        
+        if (missingMetaIds.length > 0) {
+            const aniMeta = await fetchAnilistEnglishTitles(missingMetaIds, type);
+            allItems.forEach(item => {
+                const meta = aniMeta[item.externalId];
+                if (meta) {
+                    if (meta.title) item.title = meta.title;
+                    if (meta.cover) item.cover = meta.cover;
+                    if (!item.year || item.year > 2026) item.year = meta.year || item.year;
                 }
-                return merged;
-            };
-
-            if (trending.length < 15) trending = mergeUnique(trending, trendFallback.data?.data);
-            if (topRated.length < 15) topRated = mergeUnique(topRated, topFallback.data?.data);
-            if (upcoming.length < 15) upcoming = mergeUnique(upcoming, soonFallback.data?.data);
+            });
         }
 
-        // Aggregate stats
-        const allIds = [...trending, ...topRated, ...upcoming].map(i => i.externalId);
-        const [stats, englishTitles] = await Promise.all([
-            fetchMediaStats(allIds, type),
-            fetchAnilistEnglishTitles(allIds, type)
-        ]);
-
-        // Standardize English Titles and Deduplicate
-        const finalizeList = (list) => {
-            const seen = new Set();
-            return list.map(item => {
-                const meta = englishTitles[item.externalId];
-                if (meta) {
-                    item.title = meta.title;
-                    item.cover = meta.cover;
-                }
-                return item;
-            }).filter(item => {
-                if (seen.has(item.externalId)) return false;
-                seen.add(item.externalId);
-                return true;
-            });
-        };
-
-        trending = finalizeList(trending);
-        topRated = finalizeList(topRated);
-        upcoming = finalizeList(upcoming);
+        // 3. Aggregate stats for the items found
+        const allIds = allItems.map(i => i.externalId);
+        const stats = await fetchMediaStats(allIds, type);
 
         const sections = [
             { title: `Trending ${type === 'manga' ? 'Manga' : 'Anime'}`, items: trending },
@@ -361,6 +315,8 @@ router.get('/home', async (req, res) => {
         ];
 
         const result = { sections, stats };
+        
+        // Cache the result for a short time
         jikanCache.set(cacheKey, result);
         res.json({ success: true, ...result });
     } catch (error) {
@@ -378,14 +334,27 @@ router.get('/search', protectOptional, async (req, res) => {
         const cacheKey = `search-${type}-${q}-${page}-${limit}`;
         if (jikanCache.has(cacheKey)) return res.json({ success: true, ...jikanCache.get(cacheKey) });
 
-        const response = await apiClient.get(`${JIKAN_BASE_URL}/${type}`, {
-            params: { q, limit: parseInt(limit), page: parseInt(page), sfw: true },
-            retry: 3,
-            retryDelay: 1000
-        });
+        const [response] = await Promise.all([
+            apiClient.get(`${JIKAN_BASE_URL}/${type}`, {
+                params: { q, limit: 25, page: parseInt(page), sfw: true },
+                retry: 3,
+                timeout: 10000
+            })
+        ]);
 
         let results = (response.data?.data || []).map(item => formatJikanItem(item, type));
+
+        // Quality Filter: Remove items missing important values
+        results = results.filter(item => 
+            item.title && 
+            item.cover && 
+            !item.cover.toLowerCase().includes('placeholder') &&
+            !item.cover.toLowerCase().includes('icon-manga-placeholder')
+        );
+        
         const pagination = response.data?.pagination || {};
+        const totalItems = pagination.items?.total || (pagination.last_visible_page ? pagination.last_visible_page * 25 : results.length);
+        const totalPages = Math.ceil(totalItems / 25);
         // Resolve English Titles and Deduplicate
         const englishTitles = await fetchAnilistEnglishTitles(results.map(i => i.externalId), type);
         const seen = new Set();
@@ -394,6 +363,7 @@ router.get('/search', protectOptional, async (req, res) => {
             if (meta) {
                 item.title = meta.title;
                 item.cover = meta.cover;
+                if (!item.year || item.year > 2026) item.year = meta.year || item.year;
             }
             return item;
         }).filter(item => {
@@ -420,8 +390,8 @@ router.get('/search', protectOptional, async (req, res) => {
             results, 
             stats, 
             userRatings, 
-            totalPages: pagination.last_visible_page || 1, 
-            total: pagination.items?.total || 0 
+            totalPages, 
+            total: totalItems 
         };
         jikanCache.set(cacheKey, result);
         res.json({ success: true, ...result });
@@ -434,8 +404,8 @@ router.get('/search', protectOptional, async (req, res) => {
 // ── DISCOVER ──
 router.get('/discover', async (req, res) => {
     try {
-        const { type = 'anime', genre, page = 1, limit = 24 } = req.query;
-        const cacheKey = `discover-v2-${type}-${genre || 'all'}-${page}`;
+        const { type = 'anime', genre, page = 1, limit = 25 } = req.query;
+        const cacheKey = `discover-v3-${type}-${genre || 'all'}-${page}`;
         
         if (jikanCache.has(cacheKey)) {
             return res.json({ success: true, ...jikanCache.get(cacheKey) });
@@ -446,7 +416,7 @@ router.get('/discover', async (req, res) => {
             limit: parseInt(limit),
             order_by: 'popularity',
             sort: 'asc',
-            sfw: true // Filter out explicit content
+            sfw: true
         };
 
         if (genre) {
@@ -457,40 +427,72 @@ router.get('/discover', async (req, res) => {
             }
         }
 
-        const response = await apiClient.get(`${JIKAN_BASE_URL}/${type}`, { 
-            params, 
-            retry: 3, 
-            retryDelay: 2000 
-        });
-        
-        let results = (response.data?.data || []).map(item => formatJikanItem(item, type));
-        
-        // Resolve English Titles and Deduplicate
-        const englishTitles = await fetchAnilistEnglishTitles(results.map(i => i.externalId), type);
-        const seen = new Set();
-        results = results.map(item => {
-            const meta = englishTitles[item.externalId];
-            if (meta) {
-                item.title = meta.title;
-                item.cover = meta.cover;
-            }
-            return item;
-        }).filter(item => {
-            if (seen.has(item.externalId)) return false;
-            seen.add(item.externalId);
-            return true;
-        });
+        let results = [];
+        let totalPages = 1;
+        let totalCount = 0;
 
-        const stats = await fetchMediaStats(results.map(r => r.externalId), type);
-        const result = { 
-            items: results, 
-            stats,
-            totalPages: response.data?.pagination?.last_visible_page || 1,
-            total: response.data?.pagination?.items?.total || results.length
-        };
+        try {
+            const [response] = await Promise.all([
+                apiClient.get(`${JIKAN_BASE_URL}/${type}`, { 
+                    params: { ...params, limit: 25, page: parseInt(page) }, 
+                    retry: 2, 
+                    timeout: 10000 
+                })
+            ]);
 
-        jikanCache.set(cacheKey, result);
-        res.json({ success: true, ...result });
+            results = (response.data?.data || []).map(item => formatJikanItem(item, type));
+
+            // Quality Filter: Remove items missing important values
+            results = results.filter(item => 
+                item.title && 
+                item.cover && 
+                !item.cover.toLowerCase().includes('placeholder') &&
+                !item.cover.toLowerCase().includes('icon-manga-placeholder')
+            );
+            
+            const totalItems = response.data?.pagination?.items?.total || (response.data?.pagination?.last_visible_page ? response.data.pagination.last_visible_page * 25 : results.length);
+            totalPages = Math.ceil(totalItems / 25);
+            totalCount = totalItems;
+        } catch (jikanErr) {
+            console.error('Jikan Discover Error:', jikanErr.message);
+            // No local fallback to Ranking collection as per user preference
+            results = [];
+        }
+        
+        if (results.length > 0) {
+            // Parallel fetch for English titles and Internal stats for speed
+            const [englishTitles, stats] = await Promise.all([
+                fetchAnilistEnglishTitles(results.map(i => i.externalId), type),
+                fetchMediaStats(results.map(r => r.externalId), type)
+            ]);
+
+            const seen = new Set();
+            results = results.map(item => {
+                const meta = englishTitles[item.externalId];
+                if (meta) {
+                    item.title = meta.title;
+                    item.cover = meta.cover;
+                    if (!item.year || item.year > 2026) item.year = meta.year || item.year;
+                }
+                return item;
+            }).filter(item => {
+                if (seen.has(item.externalId)) return false;
+                seen.add(item.externalId);
+                return true;
+            });
+
+            const result = { 
+                items: results, 
+                stats,
+                totalPages,
+                total: totalCount
+            };
+
+            jikanCache.set(cacheKey, result);
+            return res.json({ success: true, ...result });
+        }
+
+        res.json({ success: true, items: [], stats: {}, totalPages: 1, total: 0 });
     } catch (error) {
         console.error('Anime Discover Error:', error.message);
         res.status(500).json({ success: false, message: 'Discover failed' });

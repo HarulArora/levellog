@@ -84,18 +84,18 @@ router.get('/top_rated', async (req, res) => {
 
                 rankings = rankings.map(r => ({ 
                     ...r, 
-                    avgRating: sMap[r.contentId] || r.avgRating,
+                    avgRating: sMap[r.contentId] || 0,
                     year: r.year && r.year > 0 ? r.year : (yearMap[r.contentId] || null)
                 }));
             } else {
                 const stats = await MediaStats.find({ externalId: { $in: ids }, type }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.externalId] = s.avgRating);
-                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || r.avgRating }));
+                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || 0 }));
             }
         }
 
-        // Backfill if needed
-        if (rankings.length < 100) {
+        // Backfill ONLY if database is extremely low (< 10 items)
+        if (rankings.length < 10) {
             try {
                 let fallback = [];
                 if (type === 'game') {
@@ -108,23 +108,18 @@ router.get('/top_rated', async (req, res) => {
                         year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null
                     }));
                 } else if (type === 'anime' || type === 'manga') {
-                    // Fetch 5 pages for 125 items to ensure 100 unique after merge
-                    for (let page = 1; page <= 5; page++) {
-                        try {
-                            const resApi = await apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { 
-                                params: { page, limit: 25, filter: 'bypopularity', sfw: true },
-                                retry: 3 
-                            });
-                            const pageItems = (resApi.data?.data || []).map(item => ({
-                                id: item.mal_id, title: item.title, cover: item.images?.webp?.large_image_url,
-                                genres: item.genres?.map(g => g.name) || [], avgRating: item.score ? parseFloat(item.score.toFixed(1)) : 0,
-                                year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year
-                            }));
-                            fallback = [...fallback, ...pageItems];
-                            if (pageItems.length < 25) break;
-                            if (page < 5) await new Promise(r => setTimeout(r, 500));
-                        } catch (err) { logger.error(`[Jikan Top Page ${page}] failed:`, err.message); break; }
-                    }
+                    // Just fetch 1 page (25 items) quickly to avoid timeout
+                    try {
+                        const resApi = await apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { 
+                            params: { page: 1, limit: 25, filter: 'bypopularity', sfw: true },
+                            retry: 1 
+                        });
+                        fallback = (resApi.data?.data || []).map(item => ({
+                            id: item.mal_id, title: item.title, cover: item.images?.webp?.large_image_url,
+                            genres: item.genres?.map(g => g.name) || [], avgRating: 0,
+                            year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year
+                        }));
+                    } catch (err) { logger.error(`[Jikan Top Fallback] failed:`, err.message); }
                 } else {
                     // Fetch until we have 110 items (or max 10 pages) because filtering reduces count
                     let page = 1;
@@ -132,7 +127,7 @@ router.get('/top_rated', async (req, res) => {
                         try {
                             const resApi = await apiClient.get(`${TMDB_BASE_URL}/${type}/top_rated`, { 
                                 params: { api_key: process.env.TMDB_API_KEY, page },
-                                retry: 3
+                                retry: 1
                             });
                             const pageItems = (resApi.data?.results || [])
                                 .filter(m => !m.genre_ids?.includes(16) && m.original_language !== 'ja') 
@@ -202,17 +197,18 @@ router.get('/trending', async (req, res) => {
 
                 rankings = rankings.map(r => ({ 
                     ...r, 
-                    avgRating: sMap[r.contentId] || r.avgRating,
+                    avgRating: sMap[r.contentId] || 0,
                     year: r.year && r.year > 0 ? r.year : (yearMap[r.contentId] || null)
                 }));
             } else {
                 const stats = await MediaStats.find({ externalId: { $in: ids }, type }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.externalId] = s.avgRating);
-                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || r.avgRating }));
+                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || 0 }));
             }
         }
 
-        if (rankings.length < 100) {
+        // Backfill ONLY if database is extremely low (< 10 items)
+        if (rankings.length < 10) {
             try {
                 let fallback = [];
                 if (type === 'game') {
@@ -225,23 +221,18 @@ router.get('/trending', async (req, res) => {
                         year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null
                     }));
                 } else if (type === 'anime' || type === 'manga') {
-                    // Fetch 5 pages for 125 items to ensure 100 unique after merge
-                    for (let page = 1; page <= 5; page++) {
-                        try {
-                            const resApi = await apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { 
-                                params: { page, limit: 25, filter: type === 'manga' ? 'publishing' : 'airing', sfw: true },
-                                retry: 3
-                            });
-                            const pageItems = (resApi.data?.data || []).map(item => ({
-                                id: item.mal_id, title: item.title, cover: item.images?.webp?.large_image_url,
-                                genres: item.genres?.map(g => g.name) || [], avgRating: item.score ? parseFloat(item.score.toFixed(1)) : 0,
-                                year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year
-                            }));
-                            fallback = [...fallback, ...pageItems];
-                            if (pageItems.length < 25) break;
-                            if (page < 5) await new Promise(r => setTimeout(r, 500));
-                        } catch (err) { logger.error(`[Jikan Trending Page ${page}] failed:`, err.message); break; }
-                    }
+                    // Just fetch 1 page (25 items) quickly to avoid timeout
+                    try {
+                        const resApi = await apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { 
+                            params: { page: 1, limit: 25, filter: type === 'manga' ? 'publishing' : 'airing', sfw: true },
+                            retry: 1
+                        });
+                        fallback = (resApi.data?.data || []).map(item => ({
+                            id: item.mal_id, title: item.title, cover: item.images?.webp?.large_image_url,
+                            genres: item.genres?.map(g => g.name) || [], avgRating: 0,
+                            year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year
+                        }));
+                    } catch (err) { logger.error(`[Jikan Trending Fallback] failed:`, err.message); }
                 } else {
                     // Fetch until we have 110 items (or max 15 pages) because filtering reduces count
                     let page = 1;
@@ -249,7 +240,7 @@ router.get('/trending', async (req, res) => {
                         try {
                             const resApi = await apiClient.get(`${TMDB_BASE_URL}/trending/${type}/week`, { 
                                 params: { api_key: process.env.TMDB_API_KEY, page },
-                                retry: 3
+                                retry: 1
                             });
                             const pageItems = (resApi.data?.results || [])
                                 .filter(m => !m.genre_ids?.includes(16) && m.original_language !== 'ja') 
@@ -301,18 +292,23 @@ router.get('/coming_soon', async (req, res) => {
         // Refresh stats from website
         const ids = rankings.map(r => parseInt(r.contentId)).filter(id => !isNaN(id));
         if (ids.length > 0) {
+            const currentYear = new Date().getFullYear();
             if (type === 'game') {
                 const stats = await GlobalStats.find({ igdbId: { $in: ids } }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.igdbId] = s.avgRating);
-                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || r.avgRating }));
+                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || 0 }));
             } else {
                 const stats = await MediaStats.find({ externalId: { $in: ids }, type }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.externalId] = s.avgRating);
-                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || r.avgRating }));
+                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || 0 }));
             }
+            
+            // Fast filter for current items
+            rankings = rankings.filter(r => !r.year || r.year >= currentYear);
         }
 
-        if (rankings.length < 100 && type !== 'manga') {
+        // Backfill ONLY if database is extremely low (< 10 items)
+        if (rankings.length < 10 && type !== 'manga') {
             try {
                 let fallback = [];
                 const nowSec = Math.floor(Date.now() / 1000);
@@ -328,23 +324,17 @@ router.get('/coming_soon', async (req, res) => {
                         year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null
                     }));
                 } else if (type === 'anime') {
-                    // Fetch 5 pages for 125 items to ensure 100 unique after merge
-                    for (let page = 1; page <= 5; page++) {
-                        try {
-                            const resApi = await apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { 
-                                params: { page, limit: 25, filter: 'upcoming', sfw: true },
-                                retry: 3
-                            });
-                            const pageItems = (resApi.data?.data || []).map(item => ({
-                                id: item.mal_id, title: item.title, cover: item.images?.webp?.large_image_url,
-                                genres: item.genres?.map(g => g.name) || [], avgRating: 0,
-                                year: item.aired?.prop?.from?.year || item.year
-                            }));
-                            fallback = [...fallback, ...pageItems];
-                            if (pageItems.length < 25) break;
-                            if (page < 5) await new Promise(r => setTimeout(r, 500));
-                        } catch (err) { logger.error(`[Jikan Coming Soon Page ${page}] failed:`, err.message); break; }
-                    }
+                    try {
+                        const resApi = await apiClient.get(`${JIKAN_BASE_URL}/top/${type}`, { 
+                            params: { page: 1, limit: 25, filter: 'upcoming', sfw: true },
+                            retry: 1
+                        });
+                        fallback = (resApi.data?.data || []).map(item => ({
+                            id: item.mal_id, title: item.title, cover: item.images?.webp?.large_image_url,
+                            genres: item.genres?.map(g => g.name) || [], avgRating: 0,
+                            year: item.aired?.prop?.from?.year || item.year
+                        }));
+                    } catch (err) { logger.error(`[Jikan Coming Soon Fallback] failed:`, err.message); }
                 } else if (type === 'movie' || type === 'tv') {
                     // Fetch until we have 110 items (or max 15 pages) because filtering reduces count
                     const endpoint = type === 'movie' ? 'discover/movie' : 'discover/tv';
@@ -362,7 +352,7 @@ router.get('/coming_soon', async (req, res) => {
                                     sort_by: type === 'movie' ? 'primary_release_date.asc' : 'first_air_date.asc',
                                     page
                                 },
-                                retry: 3
+                                retry: 1
                             });
                             const pageItems = (resApi.data?.results || [])
                                 .filter(m => m.original_language !== 'ja')

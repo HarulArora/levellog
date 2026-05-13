@@ -123,14 +123,15 @@ export const calculateTopRated = async (type) => {
 
     // ── YEAR RECOVERY FOR ANIME/MANGA ──
     if (type === 'anime' || type === 'manga') {
-        const missingYearItems = ranked.filter(r => (!r.year || r.year > 2026) && r.contentId);
+        const missingYearItems = ranked.filter(r => (!r.year || r.year > 2026 || r.year < 1900) && r.contentId);
         if (missingYearItems.length > 0) {
             logger.info(`[Rankings Year Recovery] Fixing ${missingYearItems.length} ${type} titles...`);
-            for (const item of missingYearItems) {
+            // Limit recovery to top 50 missing to avoid hanging the sync
+            const itemsToFix = missingYearItems.slice(0, 50);
+            for (const item of itemsToFix) {
                 try {
-                    // Small delay to respect Jikan rate limits
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    const res = await apiClient.get(`https://api.jikan.moe/v4/${type}/${item.contentId}`, { retry: 1, timeout: 10000 });
+                    await new Promise(resolve => setTimeout(resolve, 500)); 
+                    const res = await apiClient.get(`https://api.jikan.moe/v4/${type}/${item.contentId}`, { retry: 1 });
                     const data = res.data?.data;
                     if (data) {
                         const correctYear = data.aired?.prop?.from?.year || data.published?.prop?.from?.year || data.year || (data.aired?.from ? new Date(data.aired.from).getFullYear() : null);
@@ -153,7 +154,7 @@ export const calculateTopRated = async (type) => {
         try {
             // Fetch up to 4 pages (100 items) to ensure we reach the goal
             // Using a longer timeout (60s) for background tasks to ensure data is fetched
-            for (let page = 1; page <= 4; page++) {
+            for (let page = 1; page <= 6; page++) {
                 const res = await apiClient.get(`https://api.jikan.moe/v4/top/${type}`, { 
                     params: { page, limit: 25, filter: 'bypopularity', sfw: true },
                     retry: 2,
@@ -181,7 +182,7 @@ export const calculateTopRated = async (type) => {
                     }
                 }
                 if (finalRanked.length >= 100) break;
-                if (page < 4) await new Promise(r => setTimeout(r, 500)); // Rate limit safety
+                if (page < 6) await new Promise(r => setTimeout(r, 500)); // Rate limit safety
             }
         } catch (err) { logger.error(`[Rankings] Jikan Top Rated fallback failed: ${err.message}`); }
     }
@@ -322,6 +323,19 @@ export const calculateTrending = async (type) => {
                 }));
             } catch (err) { logger.error(`[Rankings Trending Year Recovery] Failed: ${err.message}`); }
         }
+    } else if (type === 'anime' || type === 'manga') {
+        const missingYearItems = finalItems.filter(r => !r.year || r.year > 2026);
+        if (missingYearItems.length > 0) {
+            logger.info(`[Rankings Trending Year Recovery] Fixing ${missingYearItems.length} ${type}...`);
+            for (const item of missingYearItems.slice(0, 30)) { // Limit to 30 to avoid long syncs
+                try {
+                    await new Promise(r => setTimeout(r, 500));
+                    const res = await apiClient.get(`https://api.jikan.moe/v4/${type}/${item.contentId}`);
+                    const y = res.data?.data?.aired?.prop?.from?.year || res.data?.data?.published?.prop?.from?.year || res.data?.data?.year;
+                    if (y) item.year = y;
+                } catch (e) {}
+            }
+        }
     }
 
     // ── FALLBACK FOR COLD START (ANIM/MANGA) ──
@@ -329,7 +343,7 @@ export const calculateTrending = async (type) => {
         try {
             // Fetch up to 4 pages (100 items) to ensure we reach the goal
             // Using a longer timeout (60s) for background tasks
-            for (let page = 1; page <= 4; page++) {
+            for (let page = 1; page <= 6; page++) {
                 const res = await apiClient.get(`https://api.jikan.moe/v4/top/${type}`, { 
                     params: { page, limit: 25, filter: type === 'manga' ? 'publishing' : 'airing', sfw: true },
                     retry: 2,
@@ -357,7 +371,7 @@ export const calculateTrending = async (type) => {
                     }
                 }
                 if (finalItems.length >= 100) break;
-                if (page < 4) await new Promise(r => setTimeout(r, 500)); // Rate limit safety
+                if (page < 6) await new Promise(r => setTimeout(r, 500)); // Rate limit safety
             }
         } catch (err) { logger.error(`[Rankings] Jikan Trending fallback failed: ${err.message}`); }
     }
@@ -407,24 +421,41 @@ export const calculateComingSoon = async (type) => {
             const filterParams = type === 'anime' ? {} : { filter: 'upcoming' };
 
             // Fetch up to 4 pages (100 items) to ensure we reach the goal
-            for (let page = 1; page <= 4; page++) {
+            for (let page = 1; page <= 8; page++) { // Increased to 8 pages to guarantee 100 items after filtering
                 const res = await apiClient.get(`https://api.jikan.moe/v4/${endpoint}`, { 
                     params: { ...filterParams, page, limit: 25, sfw: true },
                     retry: 2,
                     timeout: 60000
                 });
                 
+                const currentYear = new Date().getFullYear();
                 const pageItems = (res.data?.data || []).map(item => ({
                     contentId: String(item.mal_id),
                     title: item.title,
                     cover: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
                     year: item.aired?.prop?.from?.year || item.published?.prop?.from?.year || item.year || (item.aired?.from ? new Date(item.aired.from).getFullYear() : null),
                     genres: item.genres?.map(g => g.name) || []
-                }));
+                }))
+                .filter(item => !item.year || item.year >= currentYear);
+                
                 items = [...items, ...pageItems];
-                if (pageItems.length < 25) break;
                 if (items.length >= 100) break;
-                if (page < 4) await new Promise(r => setTimeout(r, 1000)); // Be gentle
+                if ((res.data?.data || []).length < 25) break; 
+                if (page < 8) await new Promise(r => setTimeout(r, 1000)); 
+            }
+
+            // --- Background "Healing" for Missing Years ---
+            const missingYearItems = items.filter(r => !r.year || r.year > 2026).slice(0, 40);
+            if (missingYearItems.length > 0) {
+                logger.info(`[Rankings Sync] Fixing ${missingYearItems.length} missing years for ${type}...`);
+                for (const item of missingYearItems) {
+                    try {
+                        await new Promise(r => setTimeout(r, 500));
+                        const res = await apiClient.get(`https://api.jikan.moe/v4/${type}/${item.contentId}`);
+                        const y = res.data?.data?.aired?.prop?.from?.year || res.data?.data?.published?.prop?.from?.year || res.data?.data?.year;
+                        if (y) item.year = y;
+                    } catch (e) {}
+                }
             }
         } catch (err) { logger.error(`[Rankings] Jikan Coming Soon error for ${type}: ${err.message}`); }
     } else {

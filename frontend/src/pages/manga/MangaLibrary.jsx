@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
-import { Plus, LayoutGrid, List as ListIcon, Filter, Search, BookOpen, Sparkles, Edit3, Trash2, Tv } from 'lucide-react'
+import { Plus, LayoutGrid, List as ListIcon, Filter, Search, BookOpen, Sparkles, Edit3, Trash2 } from 'lucide-react'
+import Shuriken from '../../components/ui/Shuriken'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -157,7 +158,7 @@ function MangaLibrary() {
                         current="manga"
                         type="anime"
                         options={[
-                            { label: 'Anime', value: 'anime', path: '/anime/library', icon: Tv },
+                            { label: 'Anime', value: 'anime', path: '/anime/library', icon: Shuriken },
                             { label: 'Manga', value: 'manga', path: '/manga/library', icon: BookOpen }
                         ]}
                     />

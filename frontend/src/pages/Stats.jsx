@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import { Target, Heart, Search, Gamepad2, TrendingUp, Trophy, Star, Sparkles, Flame, Diamond, Crown, Rocket, Zap, Clock, BarChart3, Check, X, Film, BookOpen, Tv as TvIcon, Play } from 'lucide-react'
+import Shuriken from '../components/ui/Shuriken'
 import { getLevelInfo, getXPProgress, LEVELS } from '../utils/levels'
 import AvatarFrame from '../components/ui/AvatarFrame'
 import { useLeaderboard } from '../context/LeaderboardContext'
@@ -404,7 +405,7 @@ function Stats() {
                     <div className="flex flex-wrap items-center gap-2 mb-8 p-1 bg-[#111118] border border-[#2a2a35] rounded-2xl w-fit">
                         {[
                             { id: 'game', label: 'Games', icon: <Gamepad2 size={14} /> },
-                            { id: 'anime', label: 'Anime', icon: <Play size={14} /> },
+                            { id: 'anime', label: 'Anime', icon: <Shuriken size={14} /> },
                             { id: 'manga', label: 'Manga', icon: <BookOpen size={14} /> },
                             { id: 'movie', label: 'Movies', icon: <Film size={14} /> },
                             { id: 'tv', label: 'TV Shows', icon: <TvIcon size={14} /> },

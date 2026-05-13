@@ -1068,7 +1068,7 @@ function GameDetail() {
                                         </button>
                                     )
                                 ) : (
-                                    <Link to="/login">
+                                    <Link to="/login" state={{ from: location }}>
                                         <button className="btn-apple btn-apple-primary px-5 py-2.5">
                                             Join QuestDuck
                                         </button>

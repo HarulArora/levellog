@@ -6,6 +6,7 @@ import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { ThumbsUp, ThumbsDown, MessageSquare, Plus, Check, ListChecks, Heart, Share, Play, Film, Tv, Flame, ChevronRight, CreditCard, ShoppingBag, Layers, Star, Users, Target, Gamepad2, Trash2, Edit2 } from 'lucide-react'
+import Shuriken from '../../components/ui/Shuriken'
 import AddAnimeModal from '../../components/library/AddAnimeModal'
 import Skeleton from '../../components/ui/Skeleton'
 import Avatar from '../../components/ui/Avatar'
@@ -744,7 +745,7 @@ function AnimeDetail() {
                                 {/* Logged */}
                                 <div className="bg-[#111118]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:bg-[#1a1a25]/80 hover:border-[#ff9f5c]/30 transition-all duration-300 shadow-lg">
                                     <div className="w-8 h-8 rounded-full bg-[#ff9f5c]/10 flex items-center justify-center text-[#ff9f5c] mb-2 group-hover:scale-110 transition-transform">
-                                        <Tv size={16} />
+                                        <Shuriken size={16} />
                                     </div>
                                     <span className="text-2xl font-bold text-white tracking-tight">{stats?.loggedCount ?? '0'}</span>
                                     <div className="text-[10px] text-[#7a7a90] uppercase tracking-[0.1em] font-bold mt-1">Pond</div>

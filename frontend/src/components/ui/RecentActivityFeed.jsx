@@ -5,6 +5,7 @@ import { useGamesContext } from '../../context/GamesContext'
 import { useSection } from '../../context/SectionState'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Gamepad2, Users, Film, Tv, BookOpen } from 'lucide-react'
+import Shuriken from './Shuriken'
 import { getIGDBImage, SIZES } from '../../utils/igdb'
 import Skeleton from './Skeleton'
 
@@ -176,7 +177,7 @@ const SUB_TABS = [
     { id: 'game', label: 'Games', icon: <Gamepad2 size={12} /> },
     { id: 'movie', label: 'Movies', icon: <Film size={12} /> },
     { id: 'tv', label: 'TV Shows', icon: <Tv size={12} /> },
-    { id: 'anime', label: 'Anime', icon: <Star size={12} /> },
+    { id: 'anime', label: 'Anime', icon: <Shuriken size={12} /> },
     { id: 'manga', label: 'Manga', icon: <BookOpen size={12} /> },
 ]
 
