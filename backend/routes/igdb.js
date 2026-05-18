@@ -44,7 +44,7 @@ router.get('/search', protectOptional, async (req, res) => {
         }
 
         const performSearch = async () => {
-            const results = await searchGames(query, page, limit)
+            const { results, total, totalPages } = await searchGames(query, page, limit)
             
             // ── FETCH COMMUNITY STATS FOR SEARCH RESULTS (Optional) ──
             const allIds = results.map(g => g.igdbId || g.id).filter(id => typeof id === 'number')
@@ -81,7 +81,7 @@ router.get('/search', protectOptional, async (req, res) => {
                 // Continue without stats/ratings
             }
 
-            const finalResponse = { games: results, stats, userRatings }
+            const finalResponse = { games: results, stats, userRatings, total, totalPages }
             igdbCache.set(cacheKey, finalResponse)
             return finalResponse
         }
@@ -464,6 +464,54 @@ router.get('/home', async (req, res) => {
             releaseDate: r.year ? `Jan 1, ${r.year}` : null
         })).filter(g => !isNaN(g.id));
 
+        // 5. Backfill/Fallback to IGDB API if Rankings have less than 15 items
+        if (trending.length < 15 || topRated.length < 15 || comingSoon.length < 15) {
+            try {
+                const token = await getAccessToken();
+                const now = Math.floor(Date.now() / 1000);
+                const headers = { 'Client-ID': process.env.IGDB_CLIENT_ID, 'Authorization': `Bearer ${token}`, 'Content-Type': 'text/plain' };
+                
+                const fetchList = async (body) => {
+                    const res = await apiClient.post('https://api.igdb.com/v4/games', body, { headers });
+                    return (res.data || []).map(g => ({
+                        id: g.id,
+                        title: g.name,
+                        cover: normalizeCover(g.cover?.url),
+                        genre: g.genres?.[0]?.name || 'Game',
+                        year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
+                        releaseDate: g.first_release_date
+                            ? new Date(g.first_release_date * 1000).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric'
+                            })
+                            : null
+                    }));
+                };
+
+                const [trendLive, topLive, soonLive] = await Promise.all([
+                    trending.length < 15 ? fetchList(`fields name, cover.url, genres.name, rating, rating_count, first_release_date; where rating > 70 & rating_count > 50 & cover != null; sort rating_count desc; limit 50;`) : [],
+                    topRated.length < 15 ? fetchList(`fields name, cover.url, genres.name, rating, rating_count, first_release_date; where rating > 85 & rating_count > 20 & cover != null; sort rating desc; limit 50;`) : [],
+                    comingSoon.length < 15 ? fetchList(`fields name, cover.url, genres.name, first_release_date; where first_release_date >= ${now} & cover != null; sort first_release_date asc; limit 50;`) : []
+                ]);
+
+                // Helper to merge and unique
+                const mergeUnique = (existing, fetched) => {
+                    const ids = new Set(existing.map(i => i.id));
+                    const merged = [...existing];
+                    for (const item of fetched) {
+                        if (!ids.has(item.id) && merged.length < 15) {
+                            merged.push(item);
+                            ids.add(item.id);
+                        }
+                    }
+                    return merged;
+                };
+
+                if (trending.length < 15) trending = mergeUnique(trending, trendLive);
+                if (topRated.length < 15) topRated = mergeUnique(topRated, topLive);
+                if (comingSoon.length < 15) comingSoon = mergeUnique(comingSoon, soonLive);
+            } catch (err) { logger.error('[IGDB Home] Backfill failed:', err.message); }
+        }
+
         // ── ON-THE-FLY RECOVERY FOR MISSING YEARS ──
         const missingYearIds = [...trending, ...topRated, ...comingSoon]
             .filter(g => !g.year && g.id && !isNaN(g.id))
@@ -508,54 +556,6 @@ router.get('/home', async (req, res) => {
                 });
                 if (healingOps.length > 0) Promise.all(healingOps).catch(e => logger.error('[Home Healing] DB update failed:', e.message));
             } catch (err) { logger.error('[Home Year Recovery] Failed:', err.message); }
-        }
-
-        // 5. Backfill/Fallback to IGDB API if Rankings have less than 15 items
-        if (trending.length < 15 || topRated.length < 15 || comingSoon.length < 15) {
-            try {
-                const token = await getAccessToken();
-                const now = Math.floor(Date.now() / 1000);
-                const headers = { 'Client-ID': process.env.IGDB_CLIENT_ID, 'Authorization': `Bearer ${token}`, 'Content-Type': 'text/plain' };
-                
-                const fetchList = async (body) => {
-                    const res = await apiClient.post('https://api.igdb.com/v4/games', body, { headers });
-                    return (res.data || []).map(g => ({
-                        id: g.id,
-                        title: g.name,
-                        cover: normalizeCover(g.cover?.url),
-                        genre: g.genres?.[0]?.name || 'Game',
-                        year: g.first_release_date ? new Date(g.first_release_date * 1000).getFullYear() : null,
-                        releaseDate: g.first_release_date
-                            ? new Date(g.first_release_date * 1000).toLocaleDateString('en-US', {
-                                month: 'short', day: 'numeric', year: 'numeric'
-                            })
-                            : null
-                    }));
-                };
-
-                const [trendLive, topLive, soonLive] = await Promise.all([
-                    trending.length < 15 ? fetchList(`fields name, cover.url, genres.name, rating, rating_count; where rating > 70 & rating_count > 50 & cover != null; sort rating_count desc; limit 50;`) : [],
-                    topRated.length < 15 ? fetchList(`fields name, cover.url, genres.name, rating, rating_count; where rating > 85 & rating_count > 20 & cover != null; sort rating desc; limit 50;`) : [],
-                    comingSoon.length < 15 ? fetchList(`fields name, cover.url, genres.name, first_release_date; where first_release_date >= ${now} & cover != null; sort first_release_date asc; limit 50;`) : []
-                ]);
-
-                // Helper to merge and unique
-                const mergeUnique = (existing, fetched) => {
-                    const ids = new Set(existing.map(i => i.id));
-                    const merged = [...existing];
-                    for (const item of fetched) {
-                        if (!ids.has(item.id) && merged.length < 15) {
-                            merged.push(item);
-                            ids.add(item.id);
-                        }
-                    }
-                    return merged;
-                };
-
-                if (trending.length < 15) trending = mergeUnique(trending, trendLive);
-                if (topRated.length < 15) topRated = mergeUnique(topRated, topLive);
-                if (comingSoon.length < 15) comingSoon = mergeUnique(comingSoon, soonLive);
-            } catch (err) { logger.error('[IGDB Home] Backfill failed:', err.message); }
         }
 
         // 6. Fetch Fresh Stats for all items

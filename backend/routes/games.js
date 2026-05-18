@@ -12,8 +12,54 @@ import GlobalStats from '../models/GlobalStats.js'
 import { fetchGameDetailById } from './igdb.js'
 import { logEngagement } from '../utils/engagement.js'
 import mongoose from 'mongoose'
+import { getAccessToken } from '../utils/igdb.js'
+import apiClient from '../utils/apiClient.js'
 
 const router = express.Router()
+
+// ── INTERNAL HELPER FOR LIBRARY YEAR AUTO-HEALING ──
+async function healMissingYears(games) {
+    const missingYearIds = games
+        .filter(g => !g.year && g.igdbId && !isNaN(Number(g.igdbId)))
+        .map(g => Number(g.igdbId));
+
+    if (missingYearIds.length > 0) {
+        try {
+            const token = await getAccessToken();
+            const headers = { 
+                'Client-ID': process.env.IGDB_CLIENT_ID, 
+                'Authorization': `Bearer ${token}`, 
+                'Content-Type': 'text/plain' 
+            };
+            const igdbRes = await apiClient.post('https://api.igdb.com/v4/games', 
+                `fields first_release_date; where id = (${missingYearIds.join(',')});`, 
+                { headers }
+            );
+            const yearMap = {};
+            (igdbRes.data || []).forEach(g => {
+                if (g.first_release_date) {
+                    yearMap[g.id] = new Date(g.first_release_date * 1000).getFullYear();
+                }
+            });
+
+            // Update in-memory and write back to database asynchronously
+            const healingOps = [];
+            games.forEach(g => {
+                if (!g.year && g.igdbId && yearMap[g.igdbId]) {
+                    g.year = yearMap[g.igdbId];
+                    healingOps.push(
+                        Game.updateOne({ _id: g._id }, { $set: { year: g.year } })
+                    );
+                }
+            });
+            if (healingOps.length > 0) {
+                Promise.all(healingOps).catch(err => console.error('[Library Year Healing] DB update failed:', err.message));
+            }
+        } catch (err) {
+            console.error('[Library Year Healing] IGDB fetch failed:', err.message);
+        }
+    }
+}
 
 // ── GET /api/games ──
 router.get('/', protect, async (req, res) => {
@@ -22,6 +68,8 @@ router.get('/', protect, async (req, res) => {
             .select('title cover status genre rating hours platforms igdbId steamId year createdAt updatedAt')
             .sort({ createdAt: -1 })
             .lean()
+
+        await healMissingYears(games)
 
         // ── FETCH COMMUNITY STATS FOR LIBRARY ──
         const allIds = games.map(g => g.igdbId).filter(Boolean)
@@ -72,6 +120,8 @@ router.get('/user/:userId', async (req, res) => {
             }
         })
         games = Array.from(uniqueMap.values())
+
+        await healMissingYears(games)
 
         // ── FETCH COMMUNITY STATS FOR USER LIBRARY ──
         const allIds = games.map(g => g.igdbId).filter(Boolean)
@@ -296,7 +346,7 @@ router.post('/stats/batch', async (req, res) => {
 // ── POST /api/games ── +1 XP for logging, +1 XP if rated on first log
 router.post('/', protect, async (req, res) => {
     try {
-        const { title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId } = req.body
+        const { title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId, year } = req.body
         if (!title) return res.status(400).json({ success: false, message: 'Title is required' })
         const session = await mongoose.startSession()
         session.startTransaction()
@@ -316,7 +366,8 @@ router.post('/', protect, async (req, res) => {
 
             const updateData = {
                 userId: req.user._id,
-                title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId: searchId
+                title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId: searchId,
+                year: year ? parseInt(year) : null
             }
 
             const savedGame = await Game.findOneAndUpdate(

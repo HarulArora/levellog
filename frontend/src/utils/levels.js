@@ -1,12 +1,12 @@
 export const LEVELS = [
-    { level: 1, xpRequired: 0, badge: '🎮', title: 'Newbie' },
-    { level: 2, xpRequired: 5, badge: '🕹️', title: 'Gamer' },
-    { level: 3, xpRequired: 25, badge: '⭐', title: 'Enthusiast' },
-    { level: 4, xpRequired: 60, badge: '🔥', title: 'Veteran' },
-    { level: 5, xpRequired: 100, badge: '💎', title: 'Legend' },
-    { level: 6, xpRequired: 150, badge: '👑', title: 'Elite' },
-    { level: 7, xpRequired: 500, badge: '🚀', title: 'Master' },
-    { level: 8, xpRequired: 1000, badge: '🌟', title: 'Immortal' },
+    { level: 1, xpRequired: 0, badge: '🔰', title: 'Initiate' },
+    { level: 2, xpRequired: 500, badge: '🧭', title: 'Explorer' },
+    { level: 3, xpRequired: 2500, badge: '🍿', title: 'Enthusiast' },
+    { level: 4, xpRequired: 10000, badge: '✍️', title: 'Critic' },
+    { level: 5, xpRequired: 30000, badge: '🍷', title: 'Connoisseur' },
+    { level: 6, xpRequired: 70000, badge: '🏛️', title: 'Curator' },
+    { level: 7, xpRequired: 100000, badge: '🔮', title: 'Oracle' },
+    { level: 8, xpRequired: 150000, badge: '🌠', title: 'Immortal' },
 ]
 
 export const getLevelInfo = (xp) => {

@@ -1,10 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
-import { Trophy, Play, Star, ListChecks, X, Pause, Gamepad2, Users } from 'lucide-react'
-import { getIGDBImage, SIZES } from '../utils/igdb'
+import { Trophy, Play, Star, ListChecks, X, Pause, Gamepad2, Users, ArrowLeft, Film, Tv, BookOpen } from 'lucide-react'
+import Shuriken from '../components/ui/Shuriken'
+
+const SUB_TABS = [
+    { id: 'all', label: 'All', icon: <Star size={12} /> },
+    { id: 'game', label: 'Games', icon: <Gamepad2 size={12} /> },
+    { id: 'movie', label: 'Movies', icon: <Film size={12} /> },
+    { id: 'tv', label: 'TV Shows', icon: <Tv size={12} /> },
+    { id: 'anime', label: 'Anime', icon: <Shuriken size={12} /> },
+    { id: 'manga', label: 'Manga', icon: <BookOpen size={12} /> },
+]
 
 const timeAgo = (date) => {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000)
@@ -167,27 +176,53 @@ function Activity() {
     const { user } = useAuth()
     const { games: myGames } = useGamesContext()
     const navigate = useNavigate()
-    const [activeTab, setActiveTab] = useState('mine')
 
     const activityConfig = makeActivityConfig(navigate)
+    const [subTab, setSubTab] = useState('all')
+    const [visibleCount, setVisibleCount] = useState(10)
+    const observerTarget = useRef(null)
 
     const userId = user?.id || user?._id
 
     // Cached — instant on return within 2 min
-    const { data: activityData, loading: loadingActivity } = useCachedFetch(
+    const { data: activityData, loading } = useCachedFetch(
         userId ? `activity_${userId}` : null,
         userId ? `/auth/activity/${userId}` : null,
         { enabled: !!userId, ttl: 2 * 60 * 1000 }
     )
-    const { data: feedData, loading: loadingFeed } = useCachedFetch(
-        userId ? `feed_${userId}` : null,
-        userId ? '/auth/feed' : null,
-        { enabled: !!userId, ttl: 2 * 60 * 1000 }
-    )
 
-    const loading = loadingActivity || loadingFeed
     const activity = activityData?.activity ?? []
-    const feed     = feedData?.games ?? []
+
+    const filteredActivity = useMemo(() => {
+        if (subTab === 'all') return activity
+        return activity.filter(a => {
+            const m = a.game || a.movie || a.anime || a.manga;
+            return m?.mediaType === subTab;
+        })
+    }, [activity, subTab])
+
+    // Reset visibility when category changes
+    useEffect(() => {
+        setVisibleCount(10)
+    }, [subTab])
+
+    // Progressive Lazy Loading / Infinite Scroll
+    useEffect(() => {
+        const limit = Math.min(100, filteredActivity.length)
+        if (!filteredActivity.length || visibleCount >= limit) return
+
+        const observer = new IntersectionObserver(
+            entries => {
+                if (entries[0].isIntersecting) {
+                    setVisibleCount(prev => Math.min(prev + 10, limit))
+                }
+            },
+            { threshold: 0.1, rootMargin: '150px' }
+        )
+
+        if (observerTarget.current) observer.observe(observerTarget.current)
+        return () => observer.disconnect()
+    }, [filteredActivity.length, visibleCount])
 
     const statusConfig = {
         playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
@@ -229,7 +264,7 @@ function Activity() {
         )
     }
 
-    if (loading && activity.length === 0 && feed.length === 0) {
+    if (loading && activity.length === 0) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="text-[#7a7a90] font-mono text-sm">Loading...</div>
@@ -241,295 +276,78 @@ function Activity() {
         <div className="w-full max-w-[800px] mx-auto px-3 sm:px-6 md:px-10 pt-4 pb-10 overflow-x-hidden">
 
             {/* Header */}
-            <div className="flex items-baseline gap-4 mb-6 pb-4 border-b border-[#2a2a35]">
+            <div className="flex items-center gap-4 mb-6 pb-4 border-b border-[#2a2a35]">
+                <button
+                    onClick={() => navigate(-1)}
+                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-[#2a2a35] text-[#7a7a90] hover:text-[#c8ff57] hover:border-[#c8ff57]/30 bg-[#111118] transition-all"
+                >
+                    <ArrowLeft size={16} />
+                </button>
                 <h2
                     className="font-black text-2xl md:text-3xl tracking-widest uppercase text-white"
                     style={{ fontFamily: 'Bebas Neue, sans-serif' }}
                 >
-                    Activity
+                    Activity <span className="text-[#c8ff57]">Odyssey</span>
                 </h2>
             </div>
 
-            {/* Tabs */}
-            <div className="flex flex-wrap gap-1.5 mb-5">
-                <button
-                    onClick={() => setActiveTab('mine')}
-                    className={`px-4 py-2 rounded font-mono text-xs uppercase
-                     tracking-wider border transition-all
-                     ${activeTab === 'mine'
-                            ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/06'
-                            : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'
-                        }`}
-                >
-                    My Activity
-                </button>
-                <button
-                    onClick={() => setActiveTab('feed')}
-                    className={`px-4 py-2 rounded font-mono text-xs uppercase
-                     tracking-wider border transition-all
-                     ${activeTab === 'feed'
-                            ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/06'
-                            : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'
-                        }`}
-                >
-                    Following Feed
-                </button>
+            {/* Media Sub-Tabs */}
+            <div className="flex flex-wrap gap-2 mb-8 p-1 bg-[#111118] border border-[#2a2a35] rounded-lg inline-flex">
+                {SUB_TABS.map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setSubTab(tab.id)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded font-mono text-[9px] uppercase tracking-widest transition-all
+                                   ${subTab === tab.id ? 'bg-[#c8ff57] text-black font-bold' : 'text-[#7a7a90] hover:text-white'}`}
+                    >
+                        {tab.icon}
+                        {tab.label}
+                    </button>
+                ))}
             </div>
 
-            {/* ── My Activity Tab ── */}
-            {activeTab === 'mine' && (
-                <>
-                    {activity.length > 0 ? (
-                        <div className="flex flex-col divide-y divide-[#2a2a35]
-                            border border-[#2a2a35] rounded-lg overflow-hidden">
-                            {activity.map((item, index) => {
-                                const config = activityConfig[item.type] || activityConfig.planned
-                                return (
-                                    <div
-                                        key={index}
-                                        className="flex items-center gap-2 md:gap-4 px-2 md:px-5 py-3 md:py-4 bg-[#111118]
-                               hover:bg-[#18181f] transition-all"
-                                    >
-                                        <div className={`w-9 h-9 rounded-lg flex items-center
-                                     justify-center text-sm flex-shrink-0
-                                     ${config.bg}`}>
-                                            {config.icon}
-                                        </div>
-                                        <div className="flex-1 text-[13px] md:text-sm text-[#7a7a90]">
-                                            {config.getText(item)}
-                                        </div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] flex-shrink-0">
-                                            {timeAgo(item.time)}
-                                        </div>
+            {/* ── My Activity ── */}
+            {filteredActivity.length > 0 ? (
+                <div className="flex flex-col gap-4">
+                    <div className="flex flex-col divide-y divide-[#2a2a35]
+                        border border-[#2a2a35] rounded-lg overflow-hidden">
+                        {filteredActivity.slice(0, visibleCount).map((item, index) => {
+                            const config = activityConfig[item.type] || activityConfig.planned
+                            return (
+                                <div
+                                    key={index}
+                                    className="flex items-center gap-2 md:gap-4 px-2 md:px-5 py-3 md:py-4 bg-[#111118]
+                           hover:bg-[#18181f] transition-all"
+                                >
+                                    <div className={`w-9 h-9 rounded-lg flex items-center
+                                 justify-center text-sm flex-shrink-0
+                                 ${config.bg}`}>
+                                        {config.icon}
                                     </div>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="text-center py-16 flex flex-col items-center">
-                            <Gamepad2 size={48} className="text-[#2a2a35] mb-4" />
-                            <div className="text-[#7a7a90] font-mono text-sm mb-4">
-                                No activity yet. Start your odyssey!
-                            </div>
-                            <Link to="/library">
-                                <button className="btn-apple btn-apple-primary px-6 py-2.5">
-                                    + Add to Pond
-                                </button>
-                            </Link>
+                                    <div className="flex-1 text-[13px] md:text-sm text-[#7a7a90]">
+                                        {config.getText(item)}
+                                    </div>
+                                    <div className="font-mono text-[10px] text-[#7a7a90] flex-shrink-0">
+                                        {timeAgo(item.time)}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {visibleCount < Math.min(100, filteredActivity.length) && (
+                        <div ref={observerTarget} className="flex items-center justify-center py-6 text-[#7a7a90] font-mono text-[10px] uppercase tracking-widest animate-pulse mt-4">
+                            Loading more activity...
                         </div>
                     )}
-                </>
-            )}
-
-            {/* ── Following Feed Tab ── */}
-            {activeTab === 'feed' && (
-                <>
-                    {feed.length > 0 ? (
-                        <div className="flex flex-col gap-3">
-                            {feed.map(item => {
-                                const sc = statusConfig[item.status] || statusConfig.planned
-                                const isGame = item.mediaType === 'game'
-                                const imageUrl = isGame 
-                                    ? getIGDBImage(item.cover || (item.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${item.steamId}/header.jpg` : null), SIZES.THUMB)
-                                    : item.cover
-
-                                const myRating = getMyRating(item.title)
-                                const id = item.igdbId || item.externalId
-                                const pathMap = {
-                                    game: `/game/${id}`,
-                                    anime: `/anime/${id}`,
-                                    manga: `/manga/${id}`,
-                                    movie: `/movies/${id}`,
-                                    tv: `/tv/${id}`
-                                }
-                                const detailPath = pathMap[item.mediaType] || '#'
-
-                                return (
-                                    <div
-                                        key={item._id}
-                                        className="bg-[#111118] border border-[#2a2a35] rounded-lg
-                               overflow-hidden hover:border-[#c8ff57]/30 transition-all w-full"
-                                    >
-                                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4 p-3 md:p-4">
-                                            <div className="flex items-center gap-3 flex-1 min-w-0">
-
-                                            {/* Cover — clickable if ID exists */}
-                                            <div
-                                                onClick={() => detailPath !== '#' && navigate(detailPath)}
-                                                className={`w-10 h-7.5 md:w-16 md:h-12 bg-cover bg-center bg-[#18181f]
-                                   rounded-sm flex-shrink-0 relative
-                                   ${detailPath !== '#' ? 'cursor-pointer' : ''}`}
-                                                style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}
-                                            >
-                                                {!imageUrl && (
-                                                    <div className="w-full h-full flex items-center
-                                          justify-center text-xl">{isGame ? '🎮' : '🎬'}</div>
-                                                )}
-                                                
-                                                {/* Community Average Rating Badge */}
-                                                {item.avgRating > 0 && (
-                                                    <div className="absolute top-0.5 right-0.5 flex items-center gap-0.5 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-0.5 py-0.2 shadow-lg z-10">
-                                                        <Star size={7} className="text-[#5c9fff] fill-current" />
-                                                        <span className="font-black text-[9px] text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{item.avgRating}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <div
-                                                    onClick={() => detailPath !== '#' && navigate(detailPath)}
-                                                    className={`text-white font-semibold text-[13px] md:text-sm truncate mb-1
-                                      ${detailPath !== '#' ? 'cursor-pointer hover:text-[#c8ff57] transition-colors' : ''}`}
-                                                >
-                                                    {item.title}
-                                                </div>
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className={`font-mono text-[9px] uppercase
-                                           tracking-wider px-2 py-[2px]
-                                           rounded-sm ${sc.bg} ${sc.color}`}>
-                                                        {sc.label}
-                                                    </span>
-                                                    {item.userId?.username && (
-                                                        <span className="font-mono text-[9px] md:text-[10px] text-[#7a7a90]">
-                                                            by{' '}
-                                                            <Link
-                                                                to={`/user/${item.userId.username}`}
-                                                                className="text-[#7a7a90] hover:text-[#c8ff57] transition-colors truncate max-w-[40px] md:max-w-none inline-block align-bottom"
-                                                            >
-                                                                {item.userId.username}
-                                                            </Link>
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                            {/* Ratings column — stacks on mobile, row on desktop */}
-                                                                                        {!(item.rating > 0 && myRating) && (
-                                                <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 md:gap-1 flex-shrink-0 pt-2 sm:pt-0 border-t border-[#2a2a35]/40 sm:border-t-0">
-
-                                                {/* Friend's rating — BLUE */}
-                                                {item.rating > 0 && (
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90]
-                                             uppercase tracking-wider max-w-[60px] md:max-w-none truncate text-right">
-                                                            {item.userId?.username
-                                                                ? `${item.userId.username}'s`
-                                                                : "friend's"}
-                                                        </span>
-                                                        <div
-                                                            className="font-black text-sm md:text-xl text-[#5c9fff] leading-none"
-                                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                                        >
-                                                            {item.rating}
-                                                            <small className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] font-normal">
-                                                                /10
-                                                            </small>
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* My rating — GREEN */}
-                                                {myRating ? (
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90]
-                                             uppercase tracking-wider">
-                                                            my rating
-                                                        </span>
-                                                        <div
-                                                            className="font-black text-sm md:text-xl text-[#c8ff57] leading-none"
-                                                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                                                        >
-                                                            {myRating}
-                                                            <small className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] font-normal">
-                                                                /10
-                                                            </small>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="font-mono text-[8px] md:text-[9px] text-[#2a2a35]
-                                          uppercase tracking-wider">
-                                                        not rated
-                                                    </div>
-                                                )}
-
-                                                </div>
-                                            )}
-
-                                            {/* Date */}
-                                            <div className="font-mono text-[10px] text-[#7a7a90]
-                                     flex-shrink-0 hidden sm:block ml-2">
-                                                {new Date(item.createdAt).toLocaleDateString('en-US', {
-                                                    month: 'short', day: 'numeric'
-                                                })}
-                                            </div>
-
-                                        </div>
-
-                                        {/* Comparison bars — only if both rated */}
-                                        {item.rating > 0 && myRating && (
-                                            <div className="px-3 md:px-4 pb-3 flex flex-col gap-1">
-
-                                                {/* Friend bar — BLUE */}
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] w-10 md:w-14 text-right truncate">
-                                                        {item.userId?.username?.slice(0, 8) || 'friend'}
-                                                    </span>
-                                                    <div className="flex-1 relative h-1 md:h-1.5 bg-[#2a2a35] rounded-full">
-                                                        <div
-                                                            className="absolute left-0 top-0 h-full rounded-full bg-[#5c9fff]"
-                                                            style={{ width: `${(item.rating / 10) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#5c9fff] w-4 text-right">
-                                                        {item.rating}
-                                                    </span>
-                                                </div>
-
-                                                {/* My bar — GREEN */}
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#7a7a90] w-10 md:w-14 text-right">
-                                                        you
-                                                    </span>
-                                                    <div className="flex-1 relative h-1 md:h-1.5 bg-[#2a2a35] rounded-full">
-                                                        <div
-                                                            className="absolute left-0 top-0 h-full rounded-full bg-[#c8ff57]"
-                                                            style={{ width: `${(myRating / 10) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="font-mono text-[8px] md:text-[9px] text-[#c8ff57] w-3 md:w-4 text-right flex-shrink-0">
-                                                        {myRating}
-                                                    </span>
-                                                </div>
-
-                                            </div>
-                                        )}
-
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-20 gap-4">
-                            <Users size={56} className="text-[#2a2a35] mb-2" strokeWidth={1.5} />
-                            <div
-                                className="text-white font-black text-xl tracking-widest uppercase"
-                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                            >
-                                No Activity Yet
-                            </div>
-                            <div className="text-[#7a7a90] font-mono text-sm text-center max-w-sm mb-2">
-                                Follow other gamers to see their games here
-                            </div>
-                            <Link to="/search">
-                                <button className="btn-apple btn-apple-primary px-6 py-2.5">
-                                    Find Friends
-                                </button>
-                            </Link>
-                        </div>
-                    )}
-                </>
+                </div>
+            ) : (
+                <div className="text-center py-16 flex flex-col items-center">
+                    <Gamepad2 size={48} className="text-[#2a2a35] mb-4" />
+                    <div className="text-[#7a7a90] font-mono text-sm mb-4">
+                        No activity found in this category.
+                    </div>
+                </div>
             )}
 
         </div>

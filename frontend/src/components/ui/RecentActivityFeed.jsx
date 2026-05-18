@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useGamesContext } from '../../context/GamesContext'
@@ -184,28 +184,19 @@ const SUB_TABS = [
 function RecentActivityFeed({ defaultMedia = 'all' }) {
     const navigate = useNavigate()
     const { user } = useAuth()
-    const { games: myGames } = useGamesContext()
     
     const activityConfig = useMemo(() => makeActivityConfig(navigate), [navigate])
-    const [mainTab, setMainTab] = useState('mine')
     const [subTab, setSubTab] = useState(defaultMedia)
 
     const userId = user?.id || user?._id
 
-    const { data: activityData, loading: loadingActivity } = useCachedFetch(
+    const { data: activityData, loading } = useCachedFetch(
         userId ? `activity_${userId}` : null,
         userId ? `/auth/activity/${userId}` : null,
         { enabled: !!userId, ttl: 2 * 60 * 1000 }
     )
-    const { data: feedData, loading: loadingFeed } = useCachedFetch(
-        userId ? `feed_${userId}` : null,
-        userId ? '/auth/feed' : null,
-        { enabled: !!userId, ttl: 2 * 60 * 1000 }
-    )
 
-    const loading = loadingActivity || loadingFeed
     const activityRaw = useMemo(() => activityData?.activity ?? [], [activityData])
-    const feedRaw = useMemo(() => feedData?.games ?? [], [feedData])
 
     const filteredActivity = useMemo(() => {
         if (subTab === 'all') return activityRaw
@@ -214,32 +205,6 @@ function RecentActivityFeed({ defaultMedia = 'all' }) {
             return m?.mediaType === subTab;
         })
     }, [activityRaw, subTab])
-
-    const filteredFeed = useMemo(() => {
-        if (subTab === 'all') return feedRaw
-        return feedRaw.filter(f => f.mediaType === subTab)
-    }, [feedRaw, subTab])
-
-    const statusConfig = {
-        playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
-        completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
-        planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
-        dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
-        paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
-        Playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
-        Completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
-        Planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
-        Dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
-        Paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
-    }
-
-    const getMyRating = (gameTitle) => {
-        if (!myGames) return null
-        const match = myGames.find(
-            g => g.title.toLowerCase() === gameTitle.toLowerCase()
-        )
-        return match?.rating > 0 ? match.rating : null
-    }
 
     if (!user) return null
 
@@ -251,23 +216,6 @@ function RecentActivityFeed({ defaultMedia = 'all' }) {
                         Quest <span className="text-[#c8ff57]">Feed</span>
                     </h2>
                     <p className="font-mono text-[10px] text-[#7a7a90] uppercase tracking-[0.2em]">Activity across the pond</p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => setMainTab('mine')}
-                        className={`px-4 py-2 rounded font-mono text-[10px] uppercase tracking-wider border transition-all
-                                   ${mainTab === 'mine' ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/5' : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'}`}
-                    >
-                        My Activity
-                    </button>
-                    <button
-                        onClick={() => setMainTab('feed')}
-                        className={`px-4 py-2 rounded font-mono text-[10px] uppercase tracking-wider border transition-all
-                                   ${mainTab === 'feed' ? 'border-[#c8ff57] text-[#c8ff57] bg-[#c8ff57]/5' : 'border-[#2a2a35] text-[#7a7a90] hover:border-[#c8ff57]'}`}
-                    >
-                        Following
-                    </button>
                 </div>
             </div>
 
@@ -295,101 +243,33 @@ function RecentActivityFeed({ defaultMedia = 'all' }) {
                         </div>
                     ))}
                 </div>
-            ) : mainTab === 'mine' ? (
+            ) : (
                 <>
                     {filteredActivity.length > 0 ? (
-                        <div className="flex flex-col divide-y divide-[#2a2a35] border border-[#2a2a35] rounded-lg overflow-hidden">
-                            {filteredActivity.slice(0, 6).map((item, index) => {
-                                const config = activityConfig[item.type] || activityConfig.planned
-                                return (
-                                    <div key={index} className="flex items-center gap-4 px-5 py-4 bg-[#111118] hover:bg-[#18181f] transition-all group">
-                                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${config.bg} transition-transform group-hover:scale-110`}>
-                                            {config.icon}
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-col divide-y divide-[#2a2a35] border border-[#2a2a35] rounded-lg overflow-hidden">
+                                {filteredActivity.slice(0, 10).map((item, index) => {
+                                    const config = activityConfig[item.type] || activityConfig.planned
+                                    return (
+                                        <div key={index} className="flex items-center gap-4 px-5 py-4 bg-[#111118] hover:bg-[#18181f] transition-all group">
+                                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${config.bg} transition-transform group-hover:scale-110`}>
+                                                {config.icon}
+                                            </div>
+                                            <div className="flex-1 text-sm text-[#7a7a90]">
+                                                {config.getText(item)}
+                                            </div>
+                                            <div className="font-mono text-[10px] text-[#7a7a90] flex-shrink-0">
+                                                {timeAgo(item.time)}
+                                            </div>
                                         </div>
-                                        <div className="flex-1 text-sm text-[#7a7a90]">
-                                            {config.getText(item)}
-                                        </div>
-                                        <div className="font-mono text-[10px] text-[#7a7a90] flex-shrink-0">
-                                            {timeAgo(item.time)}
-                                        </div>
-                                    </div>
-                                )
-                            })}
+                                    )
+                                })}
+                            </div>
                         </div>
                     ) : (
                         <div className="text-center py-20 bg-[#111118] border border-[#2a2a35] border-dashed rounded-xl">
                             <div className="text-[#3a3a4a] mb-4 flex justify-center"><Star size={40} opacity={0.3} /></div>
                             <div className="text-[#7a7a90] font-mono text-xs uppercase tracking-widest">No activity found for this category</div>
-                        </div>
-                    )}
-                </>
-            ) : (
-                <>
-                    {filteredFeed.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {filteredFeed.slice(0, 6).map(item => {
-                                const sc = statusConfig[item.status] || statusConfig.planned
-                                const isGame = item.mediaType === 'game'
-                                const imageUrl = isGame 
-                                    ? getIGDBImage(item.cover || (item.steamId ? `https://cdn.akamai.steamstatic.com/steam/apps/${item.steamId}/header.jpg` : null), SIZES.THUMB)
-                                    : item.cover
-
-                                const myRating = getMyRating(item.title)
-                                const id = item.igdbId || item.externalId
-                                const pathMap = {
-                                    game: `/game/${id}`,
-                                    anime: `/anime/${id}`,
-                                    manga: `/manga/${id}`,
-                                    movie: `/movies/${id}`,
-                                    tv: `/tv/${id}`
-                                }
-                                const detailPath = pathMap[item.mediaType] || '#'
-
-                                const displayTitle = item.title_english || item.title
-
-                                return (
-                                    <div key={item._id} className="bg-[#111118] border border-[#2a2a35] rounded-xl p-4 hover:border-[#c8ff57]/30 transition-all flex items-center gap-4">
-                                        <div 
-                                            onClick={() => detailPath !== '#' && navigate(detailPath)}
-                                            className={`w-16 h-12 bg-cover bg-center bg-[#18181f] rounded-lg flex-shrink-0 relative ${detailPath !== '#' ? 'cursor-pointer' : ''}`}
-                                            style={{ backgroundImage: imageUrl ? `url(${imageUrl})` : 'none' }}
-                                        >
-                                            {!imageUrl && <div className="w-full h-full flex items-center justify-center text-xl">{isGame ? '🎮' : '🎬'}</div>}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div 
-                                                onClick={() => detailPath !== '#' && navigate(detailPath)}
-                                                className={`text-white font-bold text-sm truncate mb-1 ${detailPath !== '#' ? 'cursor-pointer hover:text-[#c8ff57]' : ''}`}
-                                            >
-                                                {displayTitle}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`font-mono text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm ${sc.bg} ${sc.color}`}>{sc.label}</span>
-                                                <span className="font-mono text-[9px] text-[#7a7a90]">
-                                                    by <Link to={`/user/${item.userId?.username}`} className="text-[#c8ff57] hover:underline">{item.userId?.username}</Link>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        {item.rating > 0 && (
-                                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                                <div className="font-black text-xl text-[#5c9fff] leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                                                    {item.rating}
-                                                </div>
-                                                {myRating && (
-                                                    <div className="flex items-center gap-1 bg-[#c8ff57]/10 border border-[#c8ff57]/20 rounded px-1 py-0.5">
-                                                        <span className="font-mono text-[7px] text-[#c8ff57] font-bold uppercase leading-none">me: {myRating}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="text-center py-20 bg-[#111118] border border-[#2a2a35] border-dashed rounded-xl">
-                            <div className="text-[#3a3a4a] mb-4 flex justify-center"><Users size={40} opacity={0.3} /></div>
-                            <div className="text-[#7a7a90] font-mono text-xs uppercase tracking-widest">No follow activity in this category</div>
                         </div>
                     )}
                 </>

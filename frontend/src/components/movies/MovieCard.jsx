@@ -39,7 +39,7 @@ const MovieCard = memo(({ movie, onDelete, onEdit, showAvgRating = true }) => {
         <div
             onClick={handleCardClick}
             className={`bg-[#111118] border border-[#2a2a35] rounded-lg overflow-hidden
-                        flex flex-col
+                        flex flex-col h-full
                         group hover:border-[#c8ff57] hover:-translate-y-1
                         transition-all duration-200
                         hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)]
@@ -110,7 +110,7 @@ const MovieCard = memo(({ movie, onDelete, onEdit, showAvgRating = true }) => {
                     </span>
                 </div>
 
-                <div className="mt-auto flex justify-between items-end">
+                <div className="flex justify-between items-end">
                     <div className="flex flex-col gap-0.5">
                         <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[100px]">
                             {movie.genre}
@@ -123,7 +123,7 @@ const MovieCard = memo(({ movie, onDelete, onEdit, showAvgRating = true }) => {
                     </div>
                 </div>
 
-                <div className="mt-2 flex gap-1">
+                <div className="mt-auto pt-2 flex gap-1">
                     <button
                         onClick={(e) => {
                             e.stopPropagation()

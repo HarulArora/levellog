@@ -11,6 +11,101 @@ const router = express.Router();
 const TMDB_BASE_URL = 'https://api.tmdb.org/3';
 const JIKAN_BASE_URL = 'https://api.jikan.moe/v4';
 
+// In-memory cache for resolved release years to prevent rate limit issues
+const yearCache = new Map();
+
+const recoverMissingYears = async (rankings, type) => {
+    const missingItems = rankings.filter(r => !r.year || r.year === 0);
+    if (missingItems.length === 0) return rankings;
+
+    const idsToFetch = missingItems.map(r => parseInt(r.contentId)).filter(id => !isNaN(id) && id > 0);
+    if (idsToFetch.length === 0) return rankings;
+
+    const fetchedYears = {};
+
+    try {
+        if (type === 'game') {
+            const uncachedIds = idsToFetch.filter(id => !yearCache.has(`game-${id}`));
+            if (uncachedIds.length > 0) {
+                const token = await getAccessToken();
+                const headers = { 
+                    'Client-ID': process.env.IGDB_CLIENT_ID, 
+                    'Authorization': `Bearer ${token}`, 
+                    'Content-Type': 'text/plain' 
+                };
+                const resApi = await apiClient.post(
+                    'https://api.igdb.com/v4/games', 
+                    `fields first_release_date; where id = (${uncachedIds.join(',')}); limit 100;`, 
+                    { headers }
+                );
+                (resApi.data || []).forEach(g => {
+                    if (g.first_release_date) {
+                        const y = new Date(g.first_release_date * 1000).getFullYear();
+                        yearCache.set(`game-${g.id}`, y);
+                    }
+                });
+            }
+            idsToFetch.forEach(id => {
+                fetchedYears[id] = yearCache.get(`game-${id}`) || null;
+            });
+        } 
+        else if (type === 'anime' || type === 'manga') {
+            for (const id of idsToFetch) {
+                const cacheKey = `${type}-${id}`;
+                if (yearCache.has(cacheKey)) {
+                    fetchedYears[id] = yearCache.get(cacheKey);
+                    continue;
+                }
+                try {
+                    // Quick rate-limit safe delay
+                    await new Promise(r => setTimeout(r, 340));
+                    const resApi = await apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}`, { retry: 1 });
+                    const y = resApi.data?.data?.aired?.prop?.from?.year || resApi.data?.data?.published?.prop?.from?.year || resApi.data?.data?.year;
+                    if (y) {
+                        yearCache.set(cacheKey, y);
+                        fetchedYears[id] = y;
+                    }
+                } catch (e) {
+                    logger.warn(`[Rankings Year Recover] Anime/Manga ${id} failed: ${e.message}`);
+                }
+            }
+        } 
+        else if (type === 'movie' || type === 'tv') {
+            for (const id of idsToFetch) {
+                const cacheKey = `${type}-${id}`;
+                if (yearCache.has(cacheKey)) {
+                    fetchedYears[id] = yearCache.get(cacheKey);
+                    continue;
+                }
+                try {
+                    const resApi = await apiClient.get(`${TMDB_BASE_URL}/${type}/${id}`, {
+                        params: { api_key: process.env.TMDB_API_KEY },
+                        retry: 1
+                    });
+                    const dateStr = resApi.data?.release_date || resApi.data?.first_air_date || '';
+                    const y = parseInt(dateStr.split('-')[0]);
+                    if (y && !isNaN(y)) {
+                        yearCache.set(cacheKey, y);
+                        fetchedYears[id] = y;
+                    }
+                } catch (e) {
+                    logger.warn(`[Rankings Year Recover] Movie/TV ${id} failed: ${e.message}`);
+                }
+            }
+        }
+    } catch (err) {
+        logger.error(`[Rankings Universal Year Recover] Failed: ${err.message}`);
+    }
+
+    return rankings.map(r => {
+        const idNum = parseInt(r.contentId);
+        return {
+            ...r,
+            year: r.year && r.year > 0 ? r.year : (fetchedYears[idNum] || null)
+        };
+    });
+};
+
 // Helper to merge and unique with Website Stats Priority
 const mergeUnique = async (existing, fetched, type) => {
     const ids = new Set(existing.map(i => String(i.contentId || i.id || i.externalId)));
@@ -70,28 +165,14 @@ router.get('/top_rated', async (req, res) => {
             if (type === 'game') {
                 const stats = await GlobalStats.find({ igdbId: { $in: ids } }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.igdbId] = s.avgRating);
-                
-                const missingYearIds = rankings.filter(r => !r.year || r.year === 0).map(r => parseInt(r.contentId)).filter(id => !isNaN(id));
-                let yearMap = {};
-                if (missingYearIds.length > 0) {
-                    try {
-                        const token = await getAccessToken();
-                        const headers = { 'Client-ID': process.env.IGDB_CLIENT_ID, 'Authorization': `Bearer ${token}`, 'Content-Type': 'text/plain' };
-                        const resApi = await apiClient.post('https://api.igdb.com/v4/games', `fields first_release_date; where id = (${missingYearIds.join(',')}); limit 50;`, { headers });
-                        (resApi.data || []).forEach(g => { if (g.first_release_date) yearMap[g.id] = new Date(g.first_release_date * 1000).getFullYear(); });
-                    } catch (err) { logger.error(`[Rankings Year Refresh] Failed:`, err.message); }
-                }
-
-                rankings = rankings.map(r => ({ 
-                    ...r, 
-                    avgRating: sMap[r.contentId] || 0,
-                    year: r.year && r.year > 0 ? r.year : (yearMap[r.contentId] || null)
-                }));
+                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || 0 }));
             } else {
                 const stats = await MediaStats.find({ externalId: { $in: ids }, type }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.externalId] = s.avgRating);
                 rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || 0 }));
             }
+            // Recover any missing years universally
+            rankings = await recoverMissingYears(rankings, type);
         }
 
         // Backfill ONLY if database is extremely low (< 10 items)
@@ -183,28 +264,14 @@ router.get('/trending', async (req, res) => {
             if (type === 'game') {
                 const stats = await GlobalStats.find({ igdbId: { $in: ids } }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.igdbId] = s.avgRating);
-                
-                const missingYearIds = rankings.filter(r => !r.year || r.year === 0).map(r => parseInt(r.contentId)).filter(id => !isNaN(id));
-                let yearMap = {};
-                if (missingYearIds.length > 0) {
-                    try {
-                        const token = await getAccessToken();
-                        const headers = { 'Client-ID': process.env.IGDB_CLIENT_ID, 'Authorization': `Bearer ${token}`, 'Content-Type': 'text/plain' };
-                        const resApi = await apiClient.post('https://api.igdb.com/v4/games', `fields first_release_date; where id = (${missingYearIds.join(',')}); limit 50;`, { headers });
-                        (resApi.data || []).forEach(g => { if (g.first_release_date) yearMap[g.id] = new Date(g.first_release_date * 1000).getFullYear(); });
-                    } catch (err) { logger.error(`[Rankings Year Refresh] Failed:`, err.message); }
-                }
-
-                rankings = rankings.map(r => ({ 
-                    ...r, 
-                    avgRating: sMap[r.contentId] || 0,
-                    year: r.year && r.year > 0 ? r.year : (yearMap[r.contentId] || null)
-                }));
+                rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || 0 }));
             } else {
                 const stats = await MediaStats.find({ externalId: { $in: ids }, type }).lean();
                 const sMap = {}; stats.forEach(s => sMap[s.externalId] = s.avgRating);
                 rankings = rankings.map(r => ({ ...r, avgRating: sMap[r.contentId] || 0 }));
             }
+            // Recover any missing years universally
+            rankings = await recoverMissingYears(rankings, type);
         }
 
         // Backfill ONLY if database is extremely low (< 10 items)

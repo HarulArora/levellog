@@ -205,35 +205,38 @@ export const calculateTrending = async (type) => {
     
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
-    // 1. Aggregate engagement events
-    const events = await EngagementEvent.aggregate([
-        { $match: { contentType: type, timestamp: { $gte: thirtyDaysAgo } } },
-        { $group: {
-            _id: '$contentId',
-            likes: { $sum: { $cond: [{ $eq: ['$eventType', 'like'] }, 1, 0] } },
-            comments: { $sum: { $cond: [{ $eq: ['$eventType', 'comment'] }, 1, 0] } },
-            wishlists: { $sum: { $cond: [{ $eq: ['$eventType', 'wishlist'] }, 1, 0] } },
-            ratings: { $sum: { $cond: [{ $eq: ['$eventType', 'rating'] }, 1, 0] } },
-            views: { $sum: { $cond: [{ $eq: ['$eventType', 'view'] }, 1, 0] } },
-            lastActivity: { $max: '$timestamp' }
-        }}
-    ]);
+    // 1. Fetch engagement buckets
+    const eventBuckets = await EngagementEvent.find({ 
+        contentType: type, 
+        date: { $gte: thirtyDaysAgo } 
+    }).lean();
 
-    // 2. Calculate scores with decay
+    // 2. Calculate scores with decay per daily bucket
     const now = Date.now();
-    const ranked = events.map(e => {
-        const rawScore = (e.likes * 3) + (e.comments * 4) + (e.wishlists * 2) + (e.ratings * 5) + (e.views * 1);
-        const hoursSinceActivity = (now - new Date(e.lastActivity).getTime()) / (1000 * 60 * 60);
-        const decay = 1 / (1 + hoursSinceActivity / 24);
-        const score = rawScore * decay;
+    const scoreMap = {};
+
+    eventBuckets.forEach(bucket => {
+        const contentId = bucket.contentId;
+        const bucketDate = new Date(bucket.date).getTime();
         
-        return {
-            contentId: e._id,
-            contentType: type,
-            rankType: 'trending',
-            score: parseFloat(score.toFixed(3)),
-        };
-    })
+        // Decay based on the bucket's date (midday approximation)
+        const hoursSinceActivity = (now - (bucketDate + 12 * 60 * 60 * 1000)) / (1000 * 60 * 60);
+        const decay = 1 / (1 + Math.max(0, hoursSinceActivity) / 24);
+        
+        const decayedScore = bucket.dailyScore * decay;
+
+        if (!scoreMap[contentId]) {
+            scoreMap[contentId] = 0;
+        }
+        scoreMap[contentId] += decayedScore;
+    });
+
+    const ranked = Object.keys(scoreMap).map(contentId => ({
+        contentId,
+        contentType: type,
+        rankType: 'trending',
+        score: parseFloat(scoreMap[contentId].toFixed(3))
+    }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 100);
 

@@ -211,7 +211,7 @@ function AnimeLibrary() {
                         <AnimeFilterBar activeFilter={filter} onFilter={setFilter} counts={counts} />
                     </div>
                     
-                    <div className="flex items-center gap-3 w-full lg:auto lg:border-l lg:border-[#2a2a35] lg:pl-6">
+                    <div className="flex items-center gap-3 w-full lg:w-auto lg:border-l lg:border-[#2a2a35] lg:pl-6">
                         <div className="relative flex-1 lg:w-64 group">
                             <input 
                                 type="text" 

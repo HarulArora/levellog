@@ -861,9 +861,9 @@ router.get('/activity/:userId', protect, async (req, res) => {
         const AnimeEntry = (await import('../models/AnimeEntry.js')).default
 
         const [games, movies, anime] = await Promise.all([
-            Game.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(20).lean(),
-            MovieEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(20).lean(),
-            AnimeEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(20).lean()
+            Game.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(100).lean(),
+            MovieEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(100).lean(),
+            AnimeEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 }).limit(100).lean()
         ])
 
         const activity = []
@@ -899,7 +899,7 @@ router.get('/activity/:userId', protect, async (req, res) => {
         })
 
         activity.sort((a, b) => new Date(b.time) - new Date(a.time))
-        res.json({ success: true, activity: activity.slice(0, 30) })
+        res.json({ success: true, activity: activity.slice(0, 100) })
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch activity', error: error.message })
     }

@@ -1,12 +1,15 @@
-import { useState, memo, useEffect, useRef } from 'react'
+import { useState, memo, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { ChevronLeft, Flame, Trophy, Calendar, Star } from 'lucide-react'
+import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
+import { useGamesContext } from '../context/GamesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { GameCardSkeleton } from '../components/ui/Skeleton'
 import { getIGDBImage, SIZES } from '../utils/igdb'
 
-const RankingCard = memo(({ item, contentType, index }) => {
+const RankingCard = memo(({ item, contentType, index, myRating }) => {
     const navigate = useNavigate()
     
     const handleClick = () => {
@@ -51,19 +54,27 @@ const RankingCard = memo(({ item, contentType, index }) => {
                     <span className="font-black text-sm text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{index + 1}</span>
                 </div>
 
-                {/* Rating Badge */}
-                {item.avgRating > 0 && (
-                    <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1.5 shadow-xl z-10">
-                        <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
-                        <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
-                            {(() => {
-                                const raw = item.avgRating;
-                                const val = raw > 10 ? raw / 10 : raw;
-                                return Number(val.toFixed(1)); 
-                            })()}
-                        </span>
-                    </div>
-                )}
+                {/* Rating Badges */}
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
+                    {item.avgRating > 0 && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#5c9fff]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center h-[22px]">
+                            <Star size={10} style={{ color: '#5c9fff', fill: '#5c9fff' }} />
+                            <span className="font-black text-xs text-[#5c9fff]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>
+                                {(() => {
+                                    const raw = item.avgRating;
+                                    const val = raw > 10 ? raw / 10 : raw;
+                                    return Number(val.toFixed(1)); 
+                                })()}
+                            </span>
+                        </div>
+                    )}
+                    {myRating && (
+                        <div className="bg-black/80 backdrop-blur-md border border-[#c8ff57]/30 rounded px-2 py-1 flex items-center gap-1 shadow-xl w-[48px] justify-center h-[22px]">
+                            <span className="font-black text-[8px] text-[#c8ff57] mt-0.5" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>ME</span>
+                            <span className="font-black text-xs text-[#c8ff57]" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{myRating}</span>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="p-4">
@@ -85,6 +96,54 @@ const RankingCard = memo(({ item, contentType, index }) => {
 export default function RankingList() {
     const { contentType, rankType } = useParams()
     const navigate = useNavigate()
+    const { user } = useAuth()
+    const { games } = useGamesContext()
+    const [userLibrary, setUserLibrary] = useState([])
+
+    // Load appropriate library based on media type
+    useEffect(() => {
+        const fetchLibrary = async () => {
+            if (!user) {
+                setUserLibrary([])
+                return
+            }
+            if (contentType === 'game') {
+                setUserLibrary(games)
+                return
+            }
+            try {
+                if (contentType === 'anime' || contentType === 'manga') {
+                    const res = await api.get('/anime/library')
+                    setUserLibrary(res.data.library || [])
+                } else if (contentType === 'movie' || contentType === 'tv') {
+                    const res = await api.get('/movies/library')
+                    setUserLibrary(res.data.library || [])
+                }
+            } catch (err) {
+                console.error('[RankingList] Failed to fetch library:', err)
+            }
+        }
+        fetchLibrary()
+    }, [user, contentType, games])
+
+    const getMyRating = useCallback((contentId) => {
+        if (!user || !contentId) return null
+        const idStr = String(contentId)
+
+        if (contentType === 'game') {
+            const match = userLibrary.find(g => g.igdbId && String(g.igdbId) === idStr)
+            return match?.rating > 0 ? match.rating : null
+        }
+        if (contentType === 'anime' || contentType === 'manga') {
+            const match = userLibrary.find(a => String(a.externalId) === idStr && (a.type || a.mediaType) === contentType)
+            return match?.rating > 0 ? match.rating : null
+        }
+        if (contentType === 'movie' || contentType === 'tv') {
+            const match = userLibrary.find(m => String(m.externalId) === idStr && (m.type || m.mediaType) === contentType)
+            return match?.rating > 0 ? match.rating : null
+        }
+        return null
+    }, [user, contentType, userLibrary])
 
     const { data: rankingData, loading } = useCachedFetch(
         `rankings_${contentType}_${rankType}`,
@@ -182,6 +241,7 @@ export default function RankingList() {
                                     contentType={contentType}
                                     index={index}
                                     rankType={rankType}
+                                    myRating={getMyRating(item.contentId)}
                                 />
                             ))}
                         </div>

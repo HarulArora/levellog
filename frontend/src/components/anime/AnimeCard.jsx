@@ -43,7 +43,7 @@ const AnimeCard = memo(({ anime, onDelete, onEdit, showAvgRating = true, showPro
     return (
         <div
             onClick={handleCardClick}
-            className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)]"
+            className="group relative bg-[#111118] border border-[#2a2a35] rounded-xl overflow-hidden cursor-pointer hover:border-[#c8ff57] hover:-translate-y-1 transition-all duration-300 shadow-lg hover:shadow-[0_12px_40px_rgba(0,0,0,0.5)] flex flex-col h-full"
         >
             <div className="aspect-[3/4] relative overflow-hidden bg-[#18181f] shrink-0">
                 {imageUrl ? (
@@ -111,7 +111,7 @@ const AnimeCard = memo(({ anime, onDelete, onEdit, showAvgRating = true, showPro
                     )}
                 </div>
 
-                <div className="mt-auto flex justify-between items-end pb-2">
+                <div className="flex justify-between items-end pb-2">
                     <span className="text-[#94a3b8] font-mono text-[10px] uppercase tracking-wider truncate max-w-[1200px]">
                         {anime.genres?.[0] || anime.genre}
                     </span>
@@ -161,7 +161,7 @@ const AnimeCard = memo(({ anime, onDelete, onEdit, showAvgRating = true, showPro
                 )}
 
                 {(onEdit || onDelete) && (
-                    <div className="mt-2 flex gap-1">
+                    <div className="mt-auto pt-2 flex gap-1">
                         {onEdit && (
                             <button
                                 onClick={(e) => {

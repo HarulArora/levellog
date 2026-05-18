@@ -40,10 +40,12 @@ function UniversalSearch() {
     
     const initialQuery = searchParams.get('q') || ''
     const initialTab = searchParams.get('type') || 'users'
+    const initialPage = parseInt(searchParams.get('page')) || 1
 
     const [query, setQuery] = useState(initialQuery)
     const [debouncedQuery, setDebouncedQuery] = useState(initialQuery)
     const [activeTab, setActiveTab] = useState(initialTab)
+    const [page, setPage] = useState(initialPage)
     
     const { getFollowStatus, handleFollowToggle, loadingMap } = useFollow()
     const { topUsers } = useLeaderboard()
@@ -51,34 +53,41 @@ function UniversalSearch() {
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedQuery(query)
+            setPage(1) // Reset page on new search
         }, 300)
         return () => clearTimeout(timer)
     }, [query])
+
+    // Reset page when tab changes
+    useEffect(() => {
+        setPage(1)
+    }, [activeTab])
 
     useEffect(() => {
         const params = new URLSearchParams()
         if (debouncedQuery) params.set('q', debouncedQuery)
         params.set('type', activeTab)
+        if (page > 1) params.set('page', page)
         navigate(`/universal-search?${params.toString()}`, { replace: true })
-    }, [debouncedQuery, activeTab, navigate])
+    }, [debouncedQuery, activeTab, page, navigate])
 
     const trimmed = debouncedQuery.trim()
     const isSearchable = trimmed.length >= 2
 
-    const userSearchKey = activeTab === 'users' && isSearchable ? `user_search_${trimmed.toLowerCase()}` : null
+    const userSearchKey = activeTab === 'users' && isSearchable ? `user_search_${trimmed.toLowerCase()}_${page}` : null
     const { data: userData, loading: loadingUsers } = useCachedFetch(
         userSearchKey,
-        userSearchKey ? `/auth/search?q=${encodeURIComponent(trimmed)}` : null,
+        userSearchKey ? `/auth/search?q=${encodeURIComponent(trimmed)}&page=${page}&limit=24` : null,
         { enabled: !!userSearchKey, ttl: 5 * 60 * 1000 }
     )
 
-    const mediaSearchKey = activeTab !== 'users' && isSearchable ? `${activeTab}_search_${trimmed.toLowerCase()}` : null
+    const mediaSearchKey = activeTab !== 'users' && isSearchable ? `${activeTab}_search_${trimmed.toLowerCase()}_${page}` : null
     const endpointMap = {
-        games: `/igdb/search?q=${encodeURIComponent(trimmed)}`,
-        anime: `/anime/search?q=${encodeURIComponent(trimmed)}&type=anime&limit=24`,
-        manga: `/anime/search?q=${encodeURIComponent(trimmed)}&type=manga&limit=24`,
-        movie: `/movies/search?q=${encodeURIComponent(trimmed)}&type=movie&limit=24`,
-        tv: `/movies/search?q=${encodeURIComponent(trimmed)}&type=tv&limit=24`,
+        games: `/igdb/search?q=${encodeURIComponent(trimmed)}&page=${page}&limit=24`,
+        anime: `/anime/search?q=${encodeURIComponent(trimmed)}&type=anime&limit=24&page=${page}`,
+        manga: `/anime/search?q=${encodeURIComponent(trimmed)}&type=manga&limit=24&page=${page}`,
+        movie: `/movies/search?q=${encodeURIComponent(trimmed)}&type=movie&limit=24&page=${page}`,
+        tv: `/movies/search?q=${encodeURIComponent(trimmed)}&type=tv&limit=24&page=${page}`,
     }
 
     const { data: mediaData, loading: loadingMedia } = useCachedFetch(
@@ -161,13 +170,51 @@ function UniversalSearch() {
                     <div className="text-white font-bold text-lg mb-2">Nothing found in this sector</div>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                    {results.map(item => (
-                        activeTab === 'users' 
-                            ? <UserResultCard key={item._id} u={item} getFollowStatus={getFollowStatus} handleFollowToggle={handleFollowToggle} loadingMap={loadingMap} topUsers={topUsers} currentUser={currentUser} />
-                            : <MediaResultCard key={item.id || item.externalId} item={item} type={activeTab} />
-                    ))}
-                </div>
+                <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                        {results.map(item => (
+                            activeTab === 'users' 
+                                ? <UserResultCard key={item._id} u={item} getFollowStatus={getFollowStatus} handleFollowToggle={handleFollowToggle} loadingMap={loadingMap} topUsers={topUsers} currentUser={currentUser} />
+                                : <MediaResultCard key={item.id || item.externalId} item={item} type={activeTab} />
+                        ))}
+                    </div>
+
+                    {activeTab !== 'users' && (
+                        <div className="flex justify-center items-center gap-4 mt-12">
+                            <button
+                                onClick={() => {
+                                    setPage(p => Math.max(1, p - 1))
+                                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                                }}
+                                disabled={page === 1}
+                                className="px-6 py-2.5 rounded-lg font-mono text-xs uppercase tracking-widest bg-[#111118] border border-[#2a2a35] text-white hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all disabled:opacity-50 disabled:hover:border-[#2a2a35] disabled:hover:text-white"
+                            >
+                                Previous
+                            </button>
+                            
+                            {mediaData?.totalPages ? (
+                                <span className="font-mono text-xs text-[#7a7a90]">
+                                    Page <span className="text-white font-bold">{page}</span> of <span className="text-white font-bold">{mediaData.totalPages}</span>
+                                </span>
+                            ) : (
+                                <span className="font-mono text-xs text-[#7a7a90]">
+                                    Page <span className="text-white font-bold">{page}</span>
+                                </span>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    setPage(p => p + 1)
+                                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                                }}
+                                disabled={mediaData?.totalPages ? page >= mediaData.totalPages : results.length < 24}
+                                className="px-6 py-2.5 rounded-lg font-mono text-xs uppercase tracking-widest bg-[#111118] border border-[#2a2a35] text-white hover:border-[#c8ff57] hover:text-[#c8ff57] transition-all disabled:opacity-50 disabled:hover:border-[#2a2a35] disabled:hover:text-white"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     )

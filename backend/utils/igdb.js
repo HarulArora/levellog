@@ -51,21 +51,23 @@ export const searchGames = async (query, page = 1, limit = 20) => {
 
     try {
         // 1. Primary: High-relevance search command
+        let searchString = `search "${sanitizedQuery}";`
         let response = await performQuery(
-            `search "${sanitizedQuery}"; fields name, cover.url, genres.name, platforms.name, summary, first_release_date, rating; limit ${limit}; offset ${offset};`
+            `${searchString} fields name, cover.url, genres.name, platforms.name, summary, first_release_date, rating; limit ${limit}; offset ${offset};`
         )
 
         // 2. Fallback: If no results, try pattern matching (better for partial matches)
         if (!response.data || response.data.length === 0) {
+            searchString = `where name ~ *"${sanitizedQuery}"*;`
             response = await performQuery(
-                `fields name, cover.url, genres.name, platforms.name, summary, first_release_date, rating; where name ~ *"${sanitizedQuery}"*; limit ${limit}; offset ${offset};`
+                `fields name, cover.url, genres.name, platforms.name, summary, first_release_date, rating; ${searchString} limit ${limit}; offset ${offset};`
             )
         }
 
         const data = response.data
-        if (!Array.isArray(data)) return []
+        if (!Array.isArray(data)) return { results: [], total: 0, totalPages: 1 }
 
-        return data.map(game => {
+        const results = data.map(game => {
             const cover = normalizeCover(game.cover?.url)
             
             // 🚀 Defensive platform mapping
@@ -99,6 +101,25 @@ export const searchGames = async (query, page = 1, limit = 20) => {
                 rating: game.rating ? (game.rating / 10).toFixed(1) : null
             }
         }).filter(g => !isNaN(g.id)) // Last safety check
+
+        // Fetch total count
+        let total = 0
+        try {
+            const countRes = await apiClient.post('https://api.igdb.com/v4/games/count', searchString, {
+                headers: {
+                    'Client-ID': process.env.IGDB_CLIENT_ID,
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'text/plain'
+                }
+            })
+            total = countRes.data?.count || 0
+        } catch (countErr) {
+            console.error('Failed to fetch count for search:', countErr.message)
+        }
+
+        const totalPages = Math.ceil(total / limit) || 1
+
+        return { results, total, totalPages }
     } catch (error) {
         console.error(`[IGDB Search Error] Query: "${query}" | Error:`, error.message)
         throw error
