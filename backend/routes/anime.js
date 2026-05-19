@@ -1122,55 +1122,61 @@ router.delete('/log/:id', protect, async (req, res) => {
 // AniList Public Sync GraphQL Endpoint
 router.post('/import/anilist', protect, async (req, res) => {
     try {
-        const { username, mediaType } = req.body;
+        const { username, mediaType, anilistData } = req.body;
         if (!username) {
             return res.status(400).json({ success: false, message: 'AniList username is required' });
         }
 
-        const typeFilter = mediaType === 'manga' ? 'MANGA' : 'ANIME';
-        
-        // Query public lists without OAuth tokens using AniList GraphQL API
-        const query = `
-            query ($username: String, $type: MediaType) {
-                MediaListCollection(userName: $username, type: $type) {
-                    lists {
-                        name
-                        isCustomList
-                        status
-                        entries {
-                            score(format: POINT_10)
-                            progress
-                            progressVolumes
+        let data;
+
+        if (anilistData) {
+            data = anilistData;
+        } else {
+            const typeFilter = mediaType === 'manga' ? 'MANGA' : 'ANIME';
+            
+            // Query public lists without OAuth tokens using AniList GraphQL API (Fallback)
+            const query = `
+                query ($username: String, $type: MediaType) {
+                    MediaListCollection(userName: $username, type: $type) {
+                        lists {
+                            name
+                            isCustomList
                             status
-                            media {
-                                idMal
-                                title {
-                                    romaji
-                                    english
-                                }
-                                coverImage {
-                                    large
-                                }
-                                genres
-                                episodes
-                                chapters
-                                volumes
-                                startDate {
-                                    year
+                            entries {
+                                score(format: POINT_10)
+                                progress
+                                progressVolumes
+                                status
+                                media {
+                                    idMal
+                                    title {
+                                        romaji
+                                        english
+                                    }
+                                    coverImage {
+                                        large
+                                    }
+                                    genres
+                                    episodes
+                                    chapters
+                                    volumes
+                                    startDate {
+                                        year
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-        `;
+            `;
 
-        const response = await apiClient.post('https://graphql.anilist.co', {
-            query,
-            variables: { username, type: typeFilter }
-        });
+            const response = await apiClient.post('https://graphql.anilist.co', {
+                query,
+                variables: { username, type: typeFilter }
+            });
 
-        const data = response.data;
+            data = response.data;
+        }
         
         // 🛡️ Inspect for GraphQL Errors (e.g. User not found, private list)
         if (data.errors && data.errors.length > 0) {

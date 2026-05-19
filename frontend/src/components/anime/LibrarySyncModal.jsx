@@ -31,9 +31,83 @@ function LibrarySyncModal({ onClose, onSyncSuccess, mediaType }) {
             setTimeout(() => setStatusLog('Synchronizing list entries and computing XP awards...'), 3600)
 
             const endpoint = service === 'anilist' ? '/anime/import/anilist' : '/anime/import/mal'
+            
+            let clientAnilistData = null;
+            if (service === 'anilist') {
+                try {
+                    const typeFilter = mediaType === 'manga' ? 'MANGA' : 'ANIME';
+                    const aniListRes = await fetch('https://graphql.anilist.co', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            query: `
+                                query ($username: String, $type: MediaType) {
+                                    MediaListCollection(userName: $username, type: $type) {
+                                        lists {
+                                            name
+                                            isCustomList
+                                            status
+                                            entries {
+                                                score(format: POINT_10)
+                                                progress
+                                                progressVolumes
+                                                status
+                                                media {
+                                                    idMal
+                                                    title {
+                                                        romaji
+                                                        english
+                                                    }
+                                                    coverImage {
+                                                        large
+                                                    }
+                                                    genres
+                                                    episodes
+                                                    chapters
+                                                    volumes
+                                                    startDate {
+                                                        year
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            `,
+                            variables: { username: username.trim(), type: typeFilter }
+                        })
+                    });
+                    
+                    if (aniListRes.ok) {
+                        const payload = await aniListRes.json();
+                        if (payload.errors && payload.errors.length > 0) {
+                            throw new Error(payload.errors[0].message);
+                        }
+                        clientAnilistData = payload;
+                    } else {
+                        const errorText = await aniListRes.text();
+                        console.warn('Client-side AniList fetch failed with status:', aniListRes.status, errorText);
+                    }
+                } catch (clientErr) {
+                    console.error('Client-side AniList fetch failed, falling back to server-side sync:', clientErr);
+                    // Propagate user validation/not found error if explicit
+                    if (clientErr.message && (
+                        clientErr.message.toLowerCase().includes('user not found') || 
+                        clientErr.message.toLowerCase().includes('notfound') ||
+                        clientErr.message.toLowerCase().includes('no user')
+                    )) {
+                        throw clientErr;
+                    }
+                }
+            }
+
             const res = await api.post(endpoint, {
                 username: username.trim(),
-                mediaType: mediaType // 'anime' or 'manga'
+                mediaType: mediaType, // 'anime' or 'manga'
+                anilistData: clientAnilistData
             })
 
             // Add short delay to let the final visual step breathe
