@@ -12,6 +12,7 @@ import Avatar from '../../components/ui/Avatar'
 import { useLeaderboard } from '../../context/LeaderboardContext'
 import AvatarFrame from '../../components/ui/AvatarFrame'
 import GifPicker from '../../components/ui/GifPicker'
+import { useAnimeContext } from '../../context/AnimeContext'
 
 
 const GifIcon = ({ size = 16, className = "" }) => (
@@ -399,7 +400,7 @@ function MangaDetail() {
     const [activeTab, setActiveTab] = useState('overview')
     const [expanded, setExpanded] = useState(false)
     const [showAddModal, setShowAddModal] = useState(false)
-    const [userLibrary, setUserLibrary] = useState([])
+    const { animeList: userLibrary, logAnime } = useAnimeContext()
     const [liked, setLiked] = useState(false)
     const [wishlisted, setWishlisted] = useState(false)
     const [liking, setLiking] = useState(false)
@@ -429,13 +430,6 @@ function MangaDetail() {
             setLiked(contextData.userStatus.liked)
             setWishlisted(contextData.userStatus.wishlisted)
         }
-        const fetchLib = async () => {
-            if (user) {
-                const res = await api.get('/anime/library')
-                setUserLibrary(res.data.library || [])
-            }
-        }
-        fetchLib()
     }, [contextData, user])
 
     const { data: commentsData, refetch: refetchComments } = useCachedFetch(
@@ -1072,15 +1066,13 @@ function MangaDetail() {
                     onClose={() => setShowAddModal(false)}
                     onAdd={async (formData) => {
                         try {
-                            const res = await api.post('/anime/log', formData)
-                            if (res.data.xp) {
-                                updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                            const res = await logAnime(formData)
+                            if (res.success) {
+                                setShowAddModal(false)
+                                refetchContext(true)
+                                return { success: true }
                             }
-                            setShowAddModal(false)
-                            refetchContext(true)
-                            const libRes = await api.get('/anime/library')
-                            setUserLibrary(libRes.data.library || [])
-                            return { success: true }
+                            return { success: false }
                         } catch (err) {
                             console.error('Log error:', err)
                             return { success: false }

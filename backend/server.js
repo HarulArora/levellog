@@ -50,14 +50,25 @@ if (process.env.SENTRY_DSN) {
 }
 
 app.use(cors({
-    origin: [
-        'http://localhost:5173',
-        'https://questduck.com',
-        'https://www.questduck.com',
-        'https://questduck.onrender.com',
-        'https://levellog-b3tf.onrender.com',
-        process.env.CLIENT_URL?.replace(/\/$/, '')
-    ].filter(Boolean),
+    origin: (origin, callback) => {
+        const allowedOrigins = [
+            'https://questduck.com',
+            'https://www.questduck.com',
+            'https://questduck.onrender.com',
+            'https://levellog-b3tf.onrender.com',
+            process.env.CLIENT_URL?.replace(/\/$/, '')
+        ].filter(Boolean);
+        
+        // Allow requests with no origin (like mobile apps, curl, or server-to-server requests)
+        if (!origin) return callback(null, true);
+        
+        // Allow if it matches allowedOrigins or is a local development origin (localhost/127.0.0.1 on any port)
+        if (allowedOrigins.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+            return callback(null, true);
+        }
+        
+        return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Cookie']

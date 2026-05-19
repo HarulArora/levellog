@@ -38,10 +38,15 @@ function Library() {
     const [editingGame, setEditingGame] = useState(null)
     const [showModal, setShowModal] = useState(false)
     const [toast, setToast] = useState(null)
-    const [currentPage, setCurrentPage] = useState(1)
+    const [visibleCount, setVisibleCount] = useState(24)
     const [confirmDelete, setConfirmDelete] = useState(null)
     
     const [viewMode, setViewMode] = useState(user?.settings?.libraryViewMode || 'grid')
+
+    // Reset visible count when filter or query changes
+    useEffect(() => {
+        setVisibleCount(24)
+    }, [activeFilter, debouncedQ])
 
     // Sync viewMode with user settings on load
     useEffect(() => {
@@ -64,13 +69,11 @@ function Library() {
         if (searchTimer.current) clearTimeout(searchTimer.current)
         searchTimer.current = setTimeout(() => {
             setDebouncedQ(query)
-            setCurrentPage(1)
         }, 200)
     }, [])
 
     const handleFilter = useCallback((filter) => {
         setActiveFilter(filter)
-        setCurrentPage(1)
     }, [])
 
     const showToast = useCallback((message, type = 'success') => {
@@ -94,12 +97,33 @@ function Library() {
         )
     }, [games, activeFilter, debouncedQ])
 
-    const totalPages = Math.max(1, Math.ceil(filteredGames.length / PAGE_SIZE))
-
     const paginatedGames = useMemo(() => {
-        const start = (currentPage - 1) * PAGE_SIZE
-        return filteredGames.slice(start, start + PAGE_SIZE)
-    }, [filteredGames, currentPage])
+        return filteredGames.slice(0, visibleCount)
+    }, [filteredGames, visibleCount])
+
+    const observerTarget = useRef(null)
+    const hasMore = filteredGames.length > visibleCount
+
+    useEffect(() => {
+        if (!hasMore) return
+
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                setVisibleCount(prev => prev + 24)
+            }
+        }, { threshold: 0.1 })
+
+        const currentTarget = observerTarget.current
+        if (currentTarget) {
+            observer.observe(currentTarget)
+        }
+
+        return () => {
+            if (currentTarget) {
+                observer.unobserve(currentTarget)
+            }
+        }
+    }, [hasMore, visibleCount])
 
     // Stable callbacks
     const handleDeleteRequest = useCallback((id, title) => setConfirmDelete({ id, title }), [])
@@ -120,12 +144,10 @@ function Library() {
         const result = await deleteGame(id)
         if (result.success) {
             showToast(`"${title}" removed`)
-            const newTotalPages = Math.max(1, Math.ceil((filteredGames.length - 1) / PAGE_SIZE))
-            if (currentPage > newTotalPages) setCurrentPage(newTotalPages)
         } else {
             showToast(result.message, 'error')
         }
-    }, [confirmDelete, deleteGame, filteredGames.length, currentPage, showToast])
+    }, [confirmDelete, deleteGame, showToast])
 
     const handleCloseModal = useCallback(() => {
         setShowModal(false)
@@ -273,7 +295,7 @@ function Library() {
                                             <GameRow 
                                                 key={game._id} 
                                                 game={game} 
-                                                index={(currentPage - 1) * PAGE_SIZE + idx + 1}
+                                                index={idx + 1}
                                                 onDelete={() => handleDeleteRequest(game._id, game.title)}
                                                 onEdit={() => setEditingGame(game)}
                                             />
@@ -283,13 +305,12 @@ function Library() {
                             </div>
                         )}
 
-                        {totalPages > 1 && (
-                            <div className="mt-16">
-                                <Pagination
-                                    currentPage={currentPage}
-                                    totalPages={totalPages}
-                                    onPageChange={setCurrentPage}
-                                />
+                        {hasMore && (
+                            <div ref={observerTarget} className="w-full flex justify-center py-8 mt-6">
+                                <div className="flex items-center gap-2 text-[#7a7a90] font-mono text-xs uppercase tracking-widest animate-pulse">
+                                    <span className="w-2 h-2 rounded-full bg-[#c8ff57] animate-ping" />
+                                    Loading more games...
+                                </div>
                             </div>
                         )}
                     </>

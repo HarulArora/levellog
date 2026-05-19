@@ -46,7 +46,7 @@ const makeActivityConfig = (navigate) => {
 
     const getMedia = (a) => a.game || a.movie || a.anime || a.manga;
 
-    return {
+    const config = {
         completed: {
             icon: <Trophy size={16} />,
             bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
@@ -170,6 +170,9 @@ const makeActivityConfig = (navigate) => {
             }
         }
     };
+    config.watching = config.playing;
+    config.reading = config.playing;
+    return config;
 };
 
 function Activity() {
@@ -226,12 +229,16 @@ function Activity() {
 
     const statusConfig = {
         playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
+        watching: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Watching' },
+        reading: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Reading' },
         completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
         planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
         dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
         paused: { color: 'text-[#c45cff]', bg: 'bg-[#c45cff]/15', label: 'Paused' },
         // TitleCase variants for robustness
         Playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Playing' },
+        Watching: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Watching' },
+        Reading: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Reading' },
         Completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
         Planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
         Dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },

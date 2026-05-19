@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import { useSection } from '../../context/SectionState'
+import { useMoviesContext } from '../../context/MoviesContext'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, Flame, Plus, Tv, ChevronRight, Film } from 'lucide-react'
 import Skeleton, { GameCardSkeleton } from '../../components/ui/Skeleton'
@@ -261,37 +262,26 @@ function TVHome() {
 
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
-    const [userMovies, setUserMovies] = useState([])
+    const { moviesList: userMovies, logMovie } = useMoviesContext()
 
     const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type })
         setTimeout(() => setToast(null), 3000)
     }, [])
 
-    useEffect(() => {
-        const fetchLibrary = async () => {
-            if (!user) return
-            try {
-                const res = await api.get('/movies/library')
-                setUserMovies(res.data.library || [])
-            } catch (err) { console.error(err) }
-        }
-        fetchLibrary()
-    }, [user, location.key])
-
     const handleAddMovie = useCallback(async (data) => {
         setShowAddModal(false)
         try {
-            const res = await api.post('/movies/log', data)
-            if (res.data.success) {
-                showToast(res.data.updated ? `"${data.title}" updated!` : `"${data.title}" added!`)
-                const libRes = await api.get('/movies/library')
-                setUserMovies(libRes.data.library || [])
+            const res = await logMovie(data)
+            if (res.success) {
+                showToast(res.updated ? `"${data.title}" updated!` : `"${data.title}" added!`)
+            } else {
+                showToast('Failed to log', 'error')
             }
         } catch (err) {
-            showToast(err.response?.data?.message || 'Failed to log', 'error')
+            showToast('Failed to log', 'error')
         }
-    }, [showToast])
+    }, [showToast, logMovie])
 
     const { data: homeData, loading, error, refetch: refetchHome } = useCachedFetch(
         'tv_home_v2',
@@ -302,7 +292,7 @@ function TVHome() {
     const stats = homeData?.stats ?? {}
 
     const userStats = useMemo(() => {
-        const filtered = userMovies.filter(m => (m.type || m.mediaType) === 'tv')
+        const filtered = (userMovies || []).filter(m => (m.type || m.mediaType) === 'tv')
         return {
             total: filtered.length,
             watching: filtered.filter(m => m.status === 'playing').length,
@@ -317,7 +307,7 @@ function TVHome() {
 
     const getMyRating = useCallback((externalId) => {
         if (!user) return null
-        const match = userMovies.find(m => String(m.externalId) === String(externalId) && (m.type === 'tv' || m.mediaType === 'tv'))
+        const match = (userMovies || []).find(m => String(m.externalId) === String(externalId) && (m.type === 'tv' || m.mediaType === 'tv'))
         return match?.rating > 0 ? match.rating : null
     }, [user, userMovies])
 
@@ -326,7 +316,7 @@ function TVHome() {
         return topUsers.find(tu => tu._id === (user.id || user._id))?.rank
     }, [topUsers, user])
 
-    const recentMovies = useMemo(() => userMovies.filter(m => (m.type || m.mediaType) === 'tv').slice(0, 4), [userMovies])
+    const recentMovies = useMemo(() => (userMovies || []).filter(m => (m.type || m.mediaType) === 'tv').slice(0, 4), [userMovies])
 
     const statusConfig = useMemo(() => ({
         playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Watching' },
@@ -406,7 +396,7 @@ function TVHome() {
                                 )}
                             </div>
 
-                            {user && userMovies.length > 0 ? (
+                            {user && userMovies?.length > 0 ? (
                                 <div className="flex gap-8">
                                     {[
                                         { val: userStats.total, lab: 'Shows' },

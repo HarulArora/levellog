@@ -1,62 +1,46 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
-import { Plus, LayoutGrid, List as ListIcon, Filter, Search, Sparkles, Edit3, Trash2, BookOpen } from 'lucide-react'
+import { useState, useMemo, useEffect, lazy, Suspense, useRef } from 'react'
+import { Plus, LayoutGrid, List as ListIcon, Filter, Search, Sparkles, Edit3, Trash2, BookOpen, RefreshCw } from 'lucide-react'
 import Shuriken from '../../components/ui/Shuriken'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
-import api from '../../api/axios'
+import { useAnimeContext } from '../../context/AnimeContext'
 import AnimeCard from '../../components/anime/AnimeCard'
 import AnimeFilterBar from '../../components/anime/AnimeFilterBar'
 import Skeleton from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
+import LibrarySyncModal from '../../components/anime/LibrarySyncModal'
 
 const AnimeLogModal = lazy(() => import('../../components/anime/AnimeLogModal'))
 
 function AnimeLibrary() {
     const { user, updateSettings } = useAuth()
+    const { animeList, loading, fetchAnime, logAnime, deleteAnime } = useAnimeContext()
     const navigate = useNavigate()
     const location = useLocation()
     
-    const [library, setLibrary] = useState([])
-    const [loading, setLoading] = useState(true)
+    // Select only anime items
+    const library = useMemo(() => {
+        return animeList.filter(a => (a.type || a.mediaType) === 'anime')
+    }, [animeList])
+
     const [filter, setFilter] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
+    const [visibleCount, setVisibleCount] = useState(24)
     
     const [viewMode, setViewMode] = useState(user?.settings?.libraryViewMode || 'grid')
     
     const [showAddModal, setShowAddModal] = useState(false)
+    const [showSyncModal, setShowSyncModal] = useState(false)
     const [editingAnime, setEditingAnime] = useState(null)
     const [confirmDelete, setConfirmDelete] = useState(null)
     const [toast, setToast] = useState(null)
 
-    const fetchLibrary = async () => {
-        try {
-            setLoading(true)
-            const res = await api.get('/anime/library')
-            const rawList = res.data.library || []
-            const uniqueMap = new Map()
-            rawList.forEach(item => {
-                const type = item.type || item.mediaType || 'anime'
-                if (type !== 'anime') return // Only show anime in AnimeLibrary
-                const key = item.externalId ? `${type}_ext_${item.externalId}` : `${type}_title_${item.title?.toLowerCase()}`
-                if (!uniqueMap.has(key)) uniqueMap.set(key, item)
-            })
-            setLibrary(Array.from(uniqueMap.values()))
-        } catch (err) {
-            console.error('Failed to fetch library:', err)
-        } finally {
-            setLoading(false)
-        }
-    }
-
+    // Reset visible count when filter or query changes
     useEffect(() => {
-        if (user) {
-            fetchLibrary()
-        } else {
-            setLoading(false)
-        }
-    }, [user])
+        setVisibleCount(24)
+    }, [filter, searchQuery])
 
     useEffect(() => {
         if (user?.settings?.libraryViewMode) {
@@ -77,15 +61,13 @@ function AnimeLibrary() {
     }
 
     const handleLogAnime = async (data) => {
-        try {
-            const res = await api.post('/anime/log', data)
-            if (res.data.success) {
-                showToast(res.data.updated ? `"${data.title}" updated!` : `"${data.title}" added to Pond!`)
-                fetchLibrary()
-                return { success: true }
-            }
-        } catch (err) {
-            showToast(err.response?.data?.message || 'Action failed', 'error')
+        const isUpdate = !!(data._id || data.id || editingAnime)
+        const result = await logAnime(data)
+        if (result.success) {
+            showToast(isUpdate ? `"${data.title}" updated!` : `"${data.title}" added to Pond!`)
+            return { success: true }
+        } else {
+            showToast(result.error || 'Action failed', 'error')
             return { success: false }
         }
     }
@@ -98,12 +80,11 @@ function AnimeLibrary() {
         if (!confirmDelete) return
         const { id, title } = confirmDelete
         setConfirmDelete(null)
-        try {
-            await api.delete(`/anime/log/${id}`)
+        const result = await deleteAnime(id, title)
+        if (result.success) {
             showToast(`"${title}" removed from library`)
-            fetchLibrary()
-        } catch {
-            showToast('Failed to remove', 'error')
+        } else {
+            showToast(result.error || 'Failed to remove', 'error')
         }
     }
 
@@ -113,6 +94,34 @@ function AnimeLibrary() {
             .filter(a => filter === 'all' || a.status === filter || (filter === 'playing' && (a.status === 'watching' || a.status === 'reading')))
             .filter(a => a.title.toLowerCase().includes(searchQuery.toLowerCase()))
     }, [library, filter, searchQuery])
+
+    const paginatedAnime = useMemo(() => {
+        return filteredAnime.slice(0, visibleCount)
+    }, [filteredAnime, visibleCount])
+
+    const observerTarget = useRef(null)
+    const hasMore = filteredAnime.length > visibleCount
+
+    useEffect(() => {
+        if (!hasMore) return
+
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                setVisibleCount(prev => prev + 24)
+            }
+        }, { threshold: 0.1 })
+
+        const currentTarget = observerTarget.current
+        if (currentTarget) {
+            observer.observe(currentTarget)
+        }
+
+        return () => {
+            if (currentTarget) {
+                observer.unobserve(currentTarget)
+            }
+        }
+    }, [hasMore, visibleCount])
 
     const counts = useMemo(() => {
         const sectionItems = library.filter(a => (a.type || a.mediaType) === 'anime')
@@ -189,17 +198,30 @@ function AnimeLibrary() {
                             </div>
                         </div>
 
-                        <button 
-                            onClick={() => {
-                                if (!user) { navigate('/login', { state: { from: location } }); return }
-                                setShowAddModal(true)
-                            }}
-                            className="group relative w-full md:w-auto bg-[#c8ff57] text-black px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_40px_rgba(200,255,87,0.25)]"
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                        >
-                            <Plus size={20} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" /> 
-                            Log New Anime
-                        </button>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <button 
+                                onClick={() => {
+                                    if (!user) { navigate('/login', { state: { from: location } }); return }
+                                    setShowSyncModal(true)
+                                }}
+                                className="group relative bg-[#111118]/80 border border-[#2a2a35] text-white hover:text-[#c8ff57] hover:border-[#c8ff57]/30 px-6 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all"
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                            >
+                                <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" /> 
+                                Import from MAL / AniList
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!user) { navigate('/login', { state: { from: location } }); return }
+                                    setShowAddModal(true)
+                                }}
+                                className="group relative w-full md:w-auto bg-[#c8ff57] text-black px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_40px_rgba(200,255,87,0.25)]"
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                            >
+                                <Plus size={20} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" /> 
+                                Log New Anime
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -242,46 +264,57 @@ function AnimeLibrary() {
 
                 {/* Library Content */}
                 {filteredAnime.length > 0 ? (
-                    viewMode === 'grid' ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-10">
-                            {filteredAnime.map(item => (
-                                <AnimeCard 
-                                    key={item._id} 
-                                    anime={item} 
-                                    showAvgRating={false}
-                                    onDelete={() => handleDeleteRequest(item._id, item.title)}
-                                    onEdit={() => setEditingAnime(item)}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto no-scrollbar bg-[#111118]/50 border border-[#2a2a35] rounded-3xl">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-[#2a2a35] bg-[#0d0d14]">
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-16 hidden md:table-cell">#</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-20 md:w-24">Image</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Title & Info</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Score</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden lg:table-cell">Status</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden md:table-cell">Progress</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredAnime.map((anime, idx) => (
-                                        <AnimeRow 
-                                            key={anime._id} 
-                                            anime={anime} 
-                                            index={idx + 1}
-                                            onDelete={() => handleDeleteRequest(anime._id, anime.title)}
-                                            onEdit={() => setEditingAnime(anime)}
-                                        />
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )
+                    <>
+                        {viewMode === 'grid' ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-10">
+                                {paginatedAnime.map(item => (
+                                    <AnimeCard 
+                                        key={item._id} 
+                                        anime={item} 
+                                        showAvgRating={false}
+                                        onDelete={() => handleDeleteRequest(item._id, item.title)}
+                                        onEdit={() => setEditingAnime(item)}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto md:overflow-visible bg-[#111118]/50 border border-[#2a2a35] rounded-[2rem] no-scrollbar">
+                                <table className="w-full text-left border-collapse table-fixed">
+                                    <thead>
+                                        <tr className="border-b border-[#2a2a35] bg-[#0d0d14]">
+                                            <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-16 hidden md:table-cell">#</th>
+                                            <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-[60px] sm:w-20 md:w-24">Image</th>
+                                            <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-[40%] sm:w-auto">Title & Info</th>
+                                            <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center w-[50px] sm:w-16 md:w-20">Score</th>
+                                            <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden lg:table-cell lg:w-28 text-center">Status</th>
+                                            <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden md:table-cell md:w-40">Progress</th>
+                                            <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center w-[70px] sm:w-24 md:w-28">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedAnime.map((anime, idx) => (
+                                            <AnimeRow 
+                                                key={anime._id} 
+                                                anime={anime} 
+                                                index={idx + 1}
+                                                onDelete={() => handleDeleteRequest(anime._id, anime.title)}
+                                                onEdit={() => setEditingAnime(anime)}
+                                            />
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {hasMore && (
+                            <div ref={observerTarget} className="w-full flex justify-center py-8 mt-6">
+                                <div className="flex items-center gap-2 text-[#7a7a90] font-mono text-xs uppercase tracking-widest animate-pulse">
+                                    <span className="w-2 h-2 rounded-full bg-[#c8ff57] animate-ping" />
+                                    Loading more anime...
+                                </div>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="py-32 text-center border-2 border-dashed border-[#2a2a35] rounded-[40px] bg-[#111118]/30 backdrop-blur-sm relative overflow-hidden group">
                         <div className="absolute inset-0 bg-gradient-to-b from-[#c8ff57]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
@@ -318,6 +351,20 @@ function AnimeLibrary() {
                         onClose={() => setShowAddModal(false)} 
                         onAdd={handleLogAnime}
                         items={library}
+                    />
+                )}
+                {showSyncModal && (
+                    <LibrarySyncModal 
+                        onClose={() => setShowSyncModal(false)}
+                        onSyncSuccess={(data) => {
+                            fetchAnime()
+                            setShowSyncModal(false)
+                            navigate('/anime/library')
+                            const imported = data?.importedCount || 0
+                            const updated = data?.updatedCount || 0
+                            showToast(`Import successful! Added +${imported} entries and updated ${updated}.`)
+                        }}
+                        mediaType="anime"
                     />
                 )}
                 {editingAnime && (
@@ -420,7 +467,7 @@ function AnimeRow({ anime, index, onDelete, onEdit }) {
                         <div className={`w-1 h-3 rounded-full ${sc.color} md:hidden`} />
                         <h4 
                             onClick={() => anime.externalId && navigate(`/anime/${anime.externalId}`)}
-                            className="text-white font-bold text-[11px] md:text-sm hover:text-[#c8ff57] cursor-pointer transition-colors truncate max-w-[80px] sm:max-w-[150px] md:max-w-none"
+                            className="text-white font-bold text-[11px] md:text-sm hover:text-[#c8ff57] cursor-pointer transition-colors line-clamp-2 break-words whitespace-normal"
                         >
                             {anime.title}
                         </h4>
@@ -438,19 +485,19 @@ function AnimeRow({ anime, index, onDelete, onEdit }) {
                     </div>
                 </div>
             </td>
-            <td className="px-4 md:px-6 py-4 text-center">
+            <td className="px-2 md:px-6 py-3 text-center">
                 {anime.rating > 0 ? (
                     <span className="text-[#c8ff57] font-black text-xl md:text-2xl leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{anime.rating}</span>
                 ) : (
                     <span className="text-[#3a3a4a] font-mono text-[10px]">—</span>
                 )}
             </td>
-            <td className="px-4 md:px-6 py-4 hidden lg:table-cell text-center">
+            <td className="px-2 md:px-6 py-3 hidden lg:table-cell text-center">
                 <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest ${sc.color.replace('bg-', 'text-')} bg-white/5 border border-white/5`}>
                     {sc.label}
                 </span>
             </td>
-            <td className="px-4 md:px-6 py-4 hidden md:table-cell">
+            <td className="px-2 md:px-6 py-3 hidden md:table-cell">
                 <div className="flex items-center gap-2">
                     <div className="h-1 flex-1 min-w-[60px] bg-[#1a1a25] rounded-full overflow-hidden">
                         <div 
@@ -463,7 +510,7 @@ function AnimeRow({ anime, index, onDelete, onEdit }) {
                     </span>
                 </div>
             </td>
-            <td className="px-4 md:px-6 py-4 text-center">
+            <td className="px-2 md:px-6 py-3 text-center">
                 <div className="flex justify-center gap-1 md:gap-2">
                     <button 
                         onClick={() => onEdit()}

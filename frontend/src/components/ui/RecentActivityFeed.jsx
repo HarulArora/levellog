@@ -40,7 +40,7 @@ const makeActivityConfig = (navigate) => {
 
     const getMedia = (a) => a.game || a.movie || a.anime || a.manga;
 
-    return {
+    const config = {
         completed: {
             icon: <Trophy size={14} />,
             bg: 'bg-[#5c9fff]/15 text-[#5c9fff]',
@@ -170,6 +170,9 @@ const makeActivityConfig = (navigate) => {
             }
         }
     };
+    config.watching = config.playing;
+    config.reading = config.playing;
+    return config;
 };
 
 const SUB_TABS = [

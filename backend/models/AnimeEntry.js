@@ -39,7 +39,7 @@ const animeEntrySchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ['playing', 'completed', 'planned', 'dropped', 'paused'],
+            enum: ['playing', 'watching', 'reading', 'completed', 'planned', 'dropped', 'paused'],
             required: true
         },
         rating: {
@@ -103,5 +103,25 @@ animeEntrySchema.index({ userId: 1, externalId: 1, type: 1 }, { unique: true });
 animeEntrySchema.index({ userId: 1, createdAt: -1 });
 animeEntrySchema.index({ externalId: 1, type: 1 });
 
+// Auto-heal broken cdn.myanimelist.netimages cover URLs
+animeEntrySchema.pre('save', function () {
+    if (this.cover && this.cover.includes('cdn.myanimelist.netimages')) {
+        this.cover = this.cover.replace('cdn.myanimelist.netimages', 'cdn.myanimelist.net/images');
+    }
+    if (this.coverImage && this.coverImage.includes('cdn.myanimelist.netimages')) {
+        this.coverImage = this.coverImage.replace('cdn.myanimelist.netimages', 'cdn.myanimelist.net/images');
+    }
+});
+
+animeEntrySchema.post('init', function (doc) {
+    if (doc.cover && doc.cover.includes('cdn.myanimelist.netimages')) {
+        doc.cover = doc.cover.replace('cdn.myanimelist.netimages', 'cdn.myanimelist.net/images');
+    }
+    if (doc.coverImage && doc.coverImage.includes('cdn.myanimelist.netimages')) {
+        doc.coverImage = doc.coverImage.replace('cdn.myanimelist.netimages', 'cdn.myanimelist.net/images');
+    }
+});
+
 const AnimeEntry = mongoose.model('AnimeEntry', animeEntrySchema);
 export default AnimeEntry;
+

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../api/axios'
@@ -9,6 +9,7 @@ import { GameCardSkeleton } from '../../components/ui/Skeleton'
 import { Helmet } from 'react-helmet-async'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
 import MangaCard from '../../components/anime/MangaCard'
+import { useAnimeContext } from '../../context/AnimeContext'
 
 const MANGA_GENRES = [
     { label: 'Action', mal: 1, emoji: '⚔️' },
@@ -42,28 +43,17 @@ function MangaDiscover() {
     const [searchResults, setSearchResults] = useState([])
     const [searchPerformed, setSearchPerformed] = useState(!!searchParams.get('q'))
     const [isSearching, setIsSearching] = useState(false)
-    const [libraryMap, setLibraryMap] = useState({})
     const [searchTotalPages, setSearchTotalPages] = useState(1)
-
-    // Fetch library to show personal ratings/status
-    useEffect(() => {
-        const fetchLibrary = async () => {
-            if (!user) return
-            try {
-                const res = await api.get('/anime/library') // Same endpoint for manga
-                const map = {}
-                res.data.library.forEach(entry => {
-                    if (entry.externalId && (entry.type === 'manga' || entry.mediaType === 'manga')) {
-                        map[entry.externalId] = entry
-                    }
-                })
-                setLibraryMap(map)
-            } catch (err) {
-                console.error('Failed to fetch library for discovery mapping:', err)
+    const { animeList } = useAnimeContext()
+    const libraryMap = useMemo(() => {
+        const map = {}
+        animeList.forEach(entry => {
+            if (entry.externalId && (entry.type === 'manga' || entry.mediaType === 'manga')) {
+                map[entry.externalId] = entry
             }
-        }
-        fetchLibrary()
-    }, [user])
+        })
+        return map
+    }, [animeList])
 
     const genreKey = activeGenre?.mal || 'all'
     const { data: discoverData, loading, error, refetch } = useCachedFetch(

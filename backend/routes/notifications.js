@@ -5,6 +5,7 @@ import Follow from '../models/Follow.js'
 import User from '../models/User.js'
 import { protect } from '../middleware/auth.js'
 import { awardXP, deductXP } from '../utils/xp.js'
+import { withRetryTransaction } from '../utils/transaction.js'
 
 const router = express.Router()
 

@@ -87,13 +87,14 @@ function mcColor(n) {
 
 
 function DealCard({ deal }) {
+    if (!deal) return null
     const store = STORE_META[deal.storeID] || { name: 'Store', color: '#888', icon: '🛒' }
-    const normal = parseFloat(deal.normalPrice)
-    const sale = parseFloat(deal.salePrice)
+    const normal = parseFloat(deal.normalPrice || 0)
+    const sale = parseFloat(deal.salePrice || 0)
     const isFree = sale === 0
-    const savings = Math.trunc(parseFloat(deal.savings))
-    const mc = parseInt(deal.metacriticScore)
-    const url = buildStoreUrl(deal.storeID, deal.steamAppID, deal.title)
+    const savings = Math.trunc(parseFloat(deal.savings || 0))
+    const mc = parseInt(deal.metacriticScore || 0)
+    const url = buildStoreUrl(deal.storeID, deal.steamAppID, deal.title || '')
     const hasDiscount = savings > 0 && normal > sale
 
     return (
@@ -105,11 +106,11 @@ function DealCard({ deal }) {
         >
             <div className="w-[85px] sm:w-[100px] flex-shrink-0 bg-[#18181f] relative overflow-hidden">
                 {deal.thumb
-                    ? <img src={deal.thumb} alt={deal.title} className="w-full h-full object-cover block transition-transform group-hover:scale-110" />
-                    : <div className="w-full h-full flex items-center justify-center text-2xl text-[#2a2a35]">🎮</div>
+                    ? <img src={deal.thumb} alt={deal.title} className="absolute inset-0 w-full h-full object-cover block transition-transform group-hover:scale-110" style={{ height: '100%', objectFit: 'cover' }} />
+                    : <div className="absolute inset-0 w-full h-full flex items-center justify-center text-2xl text-[#2a2a35]">🎮</div>
                 }
                 {(hasDiscount || isFree) && (
-                    <div className={`absolute bottom-0 left-0 right-0 font-mono font-bold text-[10px] 
+                    <div className={`absolute bottom-0 left-0 right-0 z-10 font-mono font-bold text-[10px] 
                                     text-center py-0.5 ${isFree ? 'bg-[#c8ff57] text-black' : 'bg-[#ff3232]/95 text-white'}`}>
                         {isFree ? 'FREE' : `-${savings}%`}
                     </div>
@@ -203,10 +204,10 @@ export default function Deals() {
         fetchDeals(storeFilter, freeOnly)
     }, [storeFilter, freeOnly, fetchDeals])
 
-    const filtered = useMemo(() => 
-        deals.filter(d => !search || d.title.toLowerCase().includes(search.toLowerCase())),
-        [deals, search]
-    )
+    const filtered = useMemo(() => {
+        if (!Array.isArray(deals)) return []
+        return deals.filter(d => d && d.title && (!search || d.title.toLowerCase().includes(search.toLowerCase())))
+    }, [deals, search])
     const totalPages = Math.ceil(filtered.length / DEALS_PER_PAGE)
     const paginated = filtered.slice((page - 1) * DEALS_PER_PAGE, page * DEALS_PER_PAGE)
 
@@ -223,6 +224,7 @@ export default function Deals() {
         .deals-grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
         @media (min-width: 640px)  { .deals-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
         @media (min-width: 1024px) { .deals-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
+        .deals-grid img { height: 100% !important; object-fit: cover !important; }
         .filter-row { display: flex; gap: 8px; align-items: center; }
         @media (max-width: 640px) { 
             .filter-row { 

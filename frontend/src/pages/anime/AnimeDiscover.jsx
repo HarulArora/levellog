@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, memo, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Search, Star, Tv, BookOpen } from 'lucide-react'
@@ -9,6 +9,7 @@ import useCachedFetch from '../../hooks/useCachedFetch'
 import { GameCardSkeleton } from '../../components/ui/Skeleton'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
 import AnimeCard from '../../components/anime/AnimeCard'
+import { useAnimeContext } from '../../context/AnimeContext'
 
 const ANIME_GENRES = [
     { label: 'Action', mal: 1, emoji: '🤺' },
@@ -49,25 +50,14 @@ function AnimeDiscover() {
     const [searchResults, setSearchResults] = useState([])
     const [searchPerformed, setSearchPerformed] = useState(!!searchParams.get('q'))
     const [isSearching, setIsSearching] = useState(false)
-    const [libraryMap, setLibraryMap] = useState({})
-
-    // Fetch library to show personal ratings/status
-    useEffect(() => {
-        const fetchLibrary = async () => {
-            if (!user) return
-            try {
-                const res = await api.get('/anime/library')
-                const map = {}
-                res.data.library.forEach(entry => {
-                    if (entry.externalId) map[entry.externalId] = entry
-                })
-                setLibraryMap(map)
-            } catch (err) {
-                console.error('Failed to fetch library for discovery mapping:', err)
-            }
-        }
-        fetchLibrary()
-    }, [user])
+    const { animeList } = useAnimeContext()
+    const libraryMap = useMemo(() => {
+        const map = {}
+        animeList.forEach(entry => {
+            if (entry.externalId && entry.type === 'anime') map[entry.externalId] = entry
+        })
+        return map
+    }, [animeList])
 
     // Discovery Data
     const genreKey = activeGenre?.mal || 'all'

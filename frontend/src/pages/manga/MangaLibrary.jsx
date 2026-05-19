@@ -1,15 +1,16 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
-import { Plus, LayoutGrid, List as ListIcon, Filter, Search, BookOpen, Sparkles, Edit3, Trash2 } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
+import { Plus, LayoutGrid, List as ListIcon, Filter, Search, BookOpen, Sparkles, Edit3, Trash2, RefreshCw } from 'lucide-react'
 import Shuriken from '../../components/ui/Shuriken'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
-import api from '../../api/axios'
+import { useAnimeContext } from '../../context/AnimeContext'
 import MangaCard from '../../components/anime/MangaCard'
 import AnimeFilterBar from '../../components/anime/AnimeFilterBar'
 import Skeleton from '../../components/ui/Skeleton'
 import Toast from '../../components/ui/Toast'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
+import LibrarySyncModal from '../../components/anime/LibrarySyncModal'
 
 const AnimeLogModal = lazy(() => import('../../components/anime/AnimeLogModal'))
 
@@ -17,46 +18,22 @@ function MangaLibrary() {
     const { user, updateSettings } = useAuth()
     const navigate = useNavigate()
     const location = useLocation()
+    const { animeList: library, loading, fetchAnime: fetchLibrary, logAnime, deleteAnime } = useAnimeContext()
     
-    const [library, setLibrary] = useState([])
-    const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
     
     const [viewMode, setViewMode] = useState(user?.settings?.libraryViewMode || 'grid')
     
     const [showAddModal, setShowAddModal] = useState(false)
+    const [showSyncModal, setShowSyncModal] = useState(false)
     const [editingAnime, setEditingAnime] = useState(null)
     const [confirmDelete, setConfirmDelete] = useState(null)
     const [toast, setToast] = useState(null)
 
-    const fetchLibrary = async () => {
-        try {
-            setLoading(true)
-            const res = await api.get('/anime/library')
-            const rawList = res.data.library || []
-            const uniqueMap = new Map()
-            rawList.forEach(item => {
-                const type = item.type || item.mediaType || 'manga'
-                if (type !== 'manga') return // Only show manga in MangaLibrary
-                const key = item.externalId ? `${type}_ext_${item.externalId}` : `${type}_title_${item.title?.toLowerCase()}`
-                if (!uniqueMap.has(key)) uniqueMap.set(key, item)
-            })
-            setLibrary(Array.from(uniqueMap.values()))
-        } catch (err) {
-            console.error('Failed to fetch library:', err)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        if (user) {
-            fetchLibrary()
-        } else {
-            setLoading(false)
-        }
-    }, [user])
+    // Infinite Scroll State
+    const [visibleCount, setVisibleCount] = useState(24)
+    const observerTarget = useRef(null)
 
     useEffect(() => {
         if (user?.settings?.libraryViewMode) {
@@ -78,14 +55,16 @@ function MangaLibrary() {
 
     const handleLogAnime = async (data) => {
         try {
-            const res = await api.post('/anime/log', data)
-            if (res.data.success) {
-                showToast(res.data.updated ? `"${data.title}" updated!` : `"${data.title}" added to Pond!`)
-                fetchLibrary()
+            const res = await logAnime(data)
+            if (res.success) {
+                showToast(res.updated ? `"${data.title}" updated!` : `"${data.title}" added to Pond!`)
                 return { success: true }
+            } else {
+                showToast('Action failed', 'error')
+                return { success: false }
             }
         } catch (err) {
-            showToast(err.response?.data?.message || 'Action failed', 'error')
+            showToast('Action failed', 'error')
             return { success: false }
         }
     }
@@ -99,9 +78,12 @@ function MangaLibrary() {
         const { id, title } = confirmDelete
         setConfirmDelete(null)
         try {
-            await api.delete(`/anime/log/${id}`)
-            showToast(`"${title}" removed from library`)
-            fetchLibrary()
+            const res = await deleteAnime(id)
+            if (res.success) {
+                showToast(`"${title}" removed from library`)
+            } else {
+                showToast('Failed to remove', 'error')
+            }
         } catch {
             showToast('Failed to remove', 'error')
         }
@@ -113,6 +95,32 @@ function MangaLibrary() {
             .filter(a => filter === 'all' || a.status === filter || (filter === 'playing' && (a.status === 'watching' || a.status === 'reading')))
             .filter(a => a.title.toLowerCase().includes(searchQuery.toLowerCase()))
     }, [library, filter, searchQuery])
+
+    // Reset pagination on filter change
+    useEffect(() => {
+        setVisibleCount(24)
+    }, [filter, searchQuery, viewMode])
+
+    // Progressive rendering slice
+    const paginatedManga = useMemo(() => {
+        return filteredManga.slice(0, visibleCount)
+    }, [filteredManga, visibleCount])
+
+    // Intersection Observer for Infinite Scroll
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && visibleCount < filteredManga.length) {
+                    setVisibleCount(prev => Math.min(prev + 24, filteredManga.length))
+                }
+            },
+            { rootMargin: '400px' }
+        )
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current)
+        }
+        return () => observer.disconnect()
+    }, [visibleCount, filteredManga.length])
 
     const counts = useMemo(() => {
         const sectionItems = library.filter(a => (a.type || a.mediaType) === 'manga')
@@ -189,17 +197,30 @@ function MangaLibrary() {
                             </div>
                         </div>
 
-                        <button 
-                            onClick={() => {
-                                if (!user) { navigate('/login', { state: { from: location } }); return }
-                                setShowAddModal(true)
-                            }}
-                            className="group relative w-full md:w-auto bg-[#c8ff57] text-black px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_40px_rgba(200,255,87,0.25)]"
-                            style={{ fontFamily: 'Bebas Neue, sans-serif' }}
-                        >
-                            <Plus size={20} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" /> 
-                            Log New Manga
-                        </button>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                            <button 
+                                onClick={() => {
+                                    if (!user) { navigate('/login', { state: { from: location } }); return }
+                                    setShowSyncModal(true)
+                                }}
+                                className="group relative bg-[#111118]/80 border border-[#2a2a35] text-white hover:text-[#c8ff57] hover:border-[#c8ff57]/30 px-6 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all"
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                            >
+                                <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" /> 
+                                Import from MAL / AniList
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!user) { navigate('/login', { state: { from: location } }); return }
+                                    setShowAddModal(true)
+                                }}
+                                className="group relative w-full md:w-auto bg-[#c8ff57] text-black px-8 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-[0_15px_40px_rgba(200,255,87,0.25)]"
+                                style={{ fontFamily: 'Bebas Neue, sans-serif' }}
+                            >
+                                <Plus size={20} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" /> 
+                                Log New Manga
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -244,7 +265,7 @@ function MangaLibrary() {
                 {filteredManga.length > 0 ? (
                     viewMode === 'grid' ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-10">
-                            {filteredManga.map(item => (
+                            {paginatedManga.map(item => (
                                 <MangaCard 
                                     key={item._id} 
                                     manga={item} 
@@ -255,21 +276,21 @@ function MangaLibrary() {
                             ))}
                         </div>
                     ) : (
-                        <div className="overflow-x-auto no-scrollbar bg-[#111118]/50 border border-[#2a2a35] rounded-3xl">
-                            <table className="w-full text-left border-collapse">
+                        <div className="overflow-x-auto md:overflow-visible bg-[#111118]/50 border border-[#2a2a35] rounded-[2rem] no-scrollbar">
+                            <table className="w-full text-left border-collapse table-fixed">
                                 <thead>
                                     <tr className="border-b border-[#2a2a35] bg-[#0d0d14]">
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-16 hidden md:table-cell">#</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-20 md:w-24">Image</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest">Title & Info</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Score</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden lg:table-cell">Status</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden md:table-cell">Progress</th>
-                                        <th className="px-4 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center">Action</th>
+                                        <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-16 hidden md:table-cell">#</th>
+                                        <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-[60px] sm:w-20 md:w-24">Image</th>
+                                        <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest w-[40%] sm:w-auto">Title & Info</th>
+                                        <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center w-[50px] sm:w-16 md:w-20">Score</th>
+                                        <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden lg:table-cell lg:w-28 text-center">Status</th>
+                                        <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest hidden md:table-cell md:w-40">Progress</th>
+                                        <th className="px-2 md:px-6 py-4 font-mono text-[10px] text-[#7a7a90] uppercase tracking-widest text-center w-[70px] sm:w-24 md:w-28">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredManga.map((manga, idx) => (
+                                    {paginatedManga.map((manga, idx) => (
                                         <MangaRow 
                                             key={manga._id} 
                                             manga={manga} 
@@ -310,6 +331,13 @@ function MangaLibrary() {
                         </div>
                     </div>
                 )}
+
+                {/* Invisible sentinel for intersection observer */}
+                {visibleCount < filteredManga.length && (
+                    <div ref={observerTarget} className="h-20 w-full mt-8 flex items-center justify-center">
+                        <div className="w-8 h-8 border-4 border-[#2a2a35] border-t-[#c8ff57] rounded-full animate-spin" />
+                    </div>
+                )}
             </div>
 
             <Suspense fallback={null}>
@@ -318,6 +346,20 @@ function MangaLibrary() {
                         onClose={() => setShowAddModal(false)} 
                         onAdd={handleLogAnime}
                         items={library}
+                    />
+                )}
+                {showSyncModal && (
+                    <LibrarySyncModal 
+                        onClose={() => setShowSyncModal(false)}
+                        onSyncSuccess={(data) => {
+                            fetchLibrary()
+                            setShowSyncModal(false)
+                            navigate('/manga/library')
+                            const imported = data?.importedCount || 0
+                            const updated = data?.updatedCount || 0
+                            showToast(`Import successful! Added +${imported} entries and updated ${updated}.`)
+                        }}
+                        mediaType="manga"
                     />
                 )}
                 {editingAnime && (
@@ -384,6 +426,7 @@ function MangaLibrary() {
 function MangaRow({ manga, index, onDelete, onEdit }) {
     const navigate = useNavigate()
     const statusConfig = {
+        reading: { color: 'bg-[#c8ff57]', label: 'Reading' },
         watching: { color: 'bg-[#c8ff57]', label: 'Reading' },
         playing: { color: 'bg-[#c8ff57]', label: 'Reading' },
         completed: { color: 'bg-[#5c9fff]', label: 'Completed' },
@@ -419,7 +462,7 @@ function MangaRow({ manga, index, onDelete, onEdit }) {
                         <div className={`w-1 h-3 rounded-full ${sc.color} md:hidden`} />
                         <h4 
                             onClick={() => manga.externalId && navigate(`/manga/${manga.externalId}`)}
-                            className="text-white font-bold text-[11px] md:text-sm hover:text-[#c8ff57] cursor-pointer transition-colors truncate max-w-[80px] sm:max-w-[150px] md:max-w-none"
+                            className="text-white font-bold text-[11px] md:text-sm hover:text-[#c8ff57] cursor-pointer transition-colors line-clamp-2 break-words whitespace-normal"
                         >
                             {manga.title}
                         </h4>
@@ -440,19 +483,19 @@ function MangaRow({ manga, index, onDelete, onEdit }) {
                     </div>
                 </div>
             </td>
-            <td className="px-4 md:px-6 py-4 text-center">
+            <td className="px-2 md:px-6 py-3 text-center">
                 {manga.rating > 0 ? (
                     <span className="text-[#c8ff57] font-black text-xl md:text-2xl leading-none" style={{ fontFamily: 'Bebas Neue, sans-serif' }}>{manga.rating}</span>
                 ) : (
                     <span className="text-[#3a3a4a] font-mono text-[10px]">—</span>
                 )}
             </td>
-            <td className="px-4 md:px-6 py-4 hidden lg:table-cell text-center">
+            <td className="px-2 md:px-6 py-3 hidden lg:table-cell text-center">
                 <span className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase tracking-widest ${sc.color.replace('bg-', 'text-')} bg-white/5 border border-white/5`}>
                     {sc.label}
                 </span>
             </td>
-            <td className="px-4 md:px-6 py-4 hidden md:table-cell">
+            <td className="px-2 md:px-6 py-3 hidden md:table-cell">
                 <div className="flex flex-col gap-1 md:gap-2">
                     <div className="flex items-center gap-2">
                         <div className="h-1 flex-1 min-w-[60px] bg-[#1a1a25] rounded-full overflow-hidden">
@@ -478,7 +521,7 @@ function MangaRow({ manga, index, onDelete, onEdit }) {
                     </div>
                 </div>
             </td>
-            <td className="px-4 md:px-6 py-4 text-center">
+            <td className="px-2 md:px-6 py-3 text-center">
                 <div className="flex justify-center gap-1 md:gap-2">
                     <button 
                         onClick={() => onEdit()}

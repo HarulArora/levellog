@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from 'react'
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react'
 import { Plus, LayoutGrid, List as ListIcon, Filter, Search, Film, Sparkles, Edit3, Trash2, Tv } from 'lucide-react'
 import { Helmet } from 'react-helmet-async'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
-import api from '../../api/axios'
+import { useMoviesContext } from '../../context/MoviesContext'
 import MovieCard from '../../components/movies/MovieCard'
 import MovieFilterBar from '../../components/movies/MovieFilterBar'
 import Skeleton from '../../components/ui/Skeleton'
@@ -16,9 +16,8 @@ function MoviesLibrary() {
     const { user, updateSettings, updateUser } = useAuth()
     const navigate = useNavigate()
     const location = useLocation()
+    const { moviesList: library, loading, fetchMovies: fetchLibrary, logMovie, deleteMovie } = useMoviesContext()
 
-    const [library, setLibrary] = useState([])
-    const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState('all')
     const [searchQuery, setSearchQuery] = useState('')
 
@@ -29,33 +28,9 @@ function MoviesLibrary() {
     const [confirmDelete, setConfirmDelete] = useState(null)
     const [toast, setToast] = useState(null)
 
-    const fetchLibrary = async () => {
-        try {
-            setLoading(true)
-            const res = await api.get('/movies/library')
-            const rawList = res.data.library || []
-            const uniqueMap = new Map()
-            rawList.forEach(item => {
-                const type = item.type || item.mediaType || 'movie'
-                if (type !== 'movie') return // Only show movies in MoviesLibrary
-                const key = item.externalId ? `${type}_ext_${item.externalId}` : `${type}_title_${item.title?.toLowerCase()}`
-                if (!uniqueMap.has(key)) uniqueMap.set(key, item)
-            })
-            setLibrary(Array.from(uniqueMap.values()))
-        } catch (err) {
-            console.error('Failed to fetch library:', err)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    useEffect(() => {
-        if (user) {
-            fetchLibrary()
-        } else {
-            setLoading(false)
-        }
-    }, [user])
+    // Infinite Scroll State
+    const [visibleCount, setVisibleCount] = useState(24)
+    const observerTarget = useRef(null)
 
     useEffect(() => {
         if (user?.settings?.libraryViewMode) {
@@ -85,16 +60,11 @@ function MoviesLibrary() {
         const { id, title } = confirmDelete
         setConfirmDelete(null)
         try {
-            const res = await api.delete(`/movies/log/${id}`)
-            if (res.data.success) {
+            const res = await deleteMovie(id)
+            if (res.success) {
                 showToast(`"${title}" removed from library`)
-
-                // Update local user XP/Stats
-                if (res.data.xp !== undefined) {
-                    updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
-                }
-
-                fetchLibrary()
+            } else {
+                showToast('Failed to remove', 'error')
             }
         } catch {
             showToast('Failed to remove', 'error')
@@ -107,6 +77,32 @@ function MoviesLibrary() {
             .filter(m => filter === 'all' || m.status === filter || (filter === 'playing' && (m.status === 'watching' || m.status === 'reading')))
             .filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()))
     }, [library, filter, searchQuery])
+
+    // Reset pagination on filter change
+    useEffect(() => {
+        setVisibleCount(24)
+    }, [filter, searchQuery, viewMode])
+
+    // Progressive rendering slice
+    const paginatedMovies = useMemo(() => {
+        return filteredMovies.slice(0, visibleCount)
+    }, [filteredMovies, visibleCount])
+
+    // Intersection Observer for Infinite Scroll
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && visibleCount < filteredMovies.length) {
+                    setVisibleCount(prev => Math.min(prev + 24, filteredMovies.length))
+                }
+            },
+            { rootMargin: '400px' }
+        )
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current)
+        }
+        return () => observer.disconnect()
+    }, [visibleCount, filteredMovies.length])
 
     const counts = useMemo(() => {
         const sectionItems = library.filter(m => (m.type || m.mediaType) === 'movie')
@@ -238,7 +234,7 @@ function MoviesLibrary() {
                 {filteredMovies.length > 0 ? (
                     viewMode === 'grid' ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-10">
-                            {filteredMovies.map(item => (
+                            {paginatedMovies.map(item => (
                                 <MovieCard
                                     key={item._id}
                                     movie={item}
@@ -263,7 +259,7 @@ function MoviesLibrary() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredMovies.map((movie, idx) => (
+                                    {paginatedMovies.map((movie, idx) => (
                                         <MovieRow
                                             key={movie._id}
                                             movie={movie}
@@ -304,6 +300,13 @@ function MoviesLibrary() {
                         </div>
                     </div>
                 )}
+
+                {/* Invisible sentinel for intersection observer */}
+                {visibleCount < filteredMovies.length && (
+                    <div ref={observerTarget} className="h-20 w-full mt-8 flex items-center justify-center">
+                        <div className="w-8 h-8 border-4 border-[#2a2a35] border-t-[#c8ff57] rounded-full animate-spin" />
+                    </div>
+                )}
             </div>
 
             <Suspense fallback={null}>
@@ -312,20 +315,22 @@ function MoviesLibrary() {
                         onClose={() => setShowAddModal(false)}
                         onAdd={async (formData) => {
                             try {
-                                const res = await api.post('/movies/log', formData)
-                                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
-                                setShowAddModal(false)
-                                fetchLibrary()
-                                return { success: true }
+                                const res = await logMovie(formData)
+                                if (res.success) {
+                                    setShowAddModal(false)
+                                    return { success: true }
+                                }
+                                return { success: false }
                             } catch { return { success: false } }
                         }}
                         onDelete={async (logId) => {
                             try {
-                                const res = await api.delete(`/movies/log/${logId}`)
-                                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
-                                setShowAddModal(false)
-                                fetchLibrary()
-                                return { success: true }
+                                const res = await deleteMovie(logId)
+                                if (res.success) {
+                                    setShowAddModal(false)
+                                    return { success: true }
+                                }
+                                return { success: false }
                             } catch { return { success: false } }
                         }}
                         items={library}
@@ -337,20 +342,22 @@ function MoviesLibrary() {
                         onClose={() => setEditingMovie(null)}
                         onAdd={async (formData) => {
                             try {
-                                const res = await api.post('/movies/log', formData)
-                                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
-                                setEditingMovie(null)
-                                fetchLibrary()
-                                return { success: true }
+                                const res = await logMovie(formData)
+                                if (res.success) {
+                                    setEditingMovie(null)
+                                    return { success: true }
+                                }
+                                return { success: false }
                             } catch { return { success: false } }
                         }}
                         onDelete={async (logId) => {
                             try {
-                                const res = await api.delete(`/movies/log/${logId}`)
-                                if (res.data.xp) updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
-                                setEditingMovie(null)
-                                fetchLibrary()
-                                return { success: true }
+                                const res = await deleteMovie(logId)
+                                if (res.success) {
+                                    setEditingMovie(null)
+                                    return { success: true }
+                                }
+                                return { success: false }
                             } catch { return { success: false } }
                         }}
                         preselectedItem={editingMovie}

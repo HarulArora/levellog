@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, memo, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { Search, Flame, Star, Trophy, Film, Tv, ChevronRight, LayoutGrid, List } from 'lucide-react'
@@ -7,6 +7,7 @@ import api from '../../api/axios'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { GameCardSkeleton } from '../../components/ui/Skeleton'
 import SubSectionToggle from '../../components/ui/SubSectionToggle'
+import { useMoviesContext } from '../../context/MoviesContext'
 
 const GENRE_EMOJIS = {
     'Action': '🤺',
@@ -105,27 +106,16 @@ function MoviesDiscover() {
     const [activeGenre, setActiveGenre] = useState(null)
     const [genres, setGenres] = useState([])
     const [page, setPage] = useState(1)
-    const [libraryMap, setLibraryMap] = useState({})
-
-    // Fetch library to show personal ratings/status
-    useEffect(() => {
-        const fetchLibrary = async () => {
-            if (!user) return
-            try {
-                const res = await api.get('/movies/library')
-                const map = {}
-                res.data.library.forEach(entry => {
-                    if (entry.externalId && (entry.type === 'movie' || entry.mediaType === 'movie')) {
-                        map[entry.externalId] = entry
-                    }
-                })
-                setLibraryMap(map)
-            } catch (err) {
-                console.error('Failed to fetch library for discovery mapping:', err)
+    const { moviesList } = useMoviesContext()
+    const libraryMap = useMemo(() => {
+        const map = {}
+        moviesList.forEach(entry => {
+            if (entry.externalId && (entry.type === 'movie' || entry.mediaType === 'movie')) {
+                map[entry.externalId] = entry
             }
-        }
-        fetchLibrary()
-    }, [user])
+        })
+        return map
+    }, [moviesList])
     
     const [query, setQuery] = useState('')
     const [searchResults, setSearchResults] = useState([])

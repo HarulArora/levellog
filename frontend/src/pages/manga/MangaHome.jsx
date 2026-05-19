@@ -2,6 +2,7 @@ import { useState, useRef, useMemo, useEffect, lazy, Suspense, memo, useCallback
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
+import { useAnimeContext } from '../../context/AnimeContext'
 import { useSection } from '../../context/SectionState'
 import useCachedFetch from '../../hooks/useCachedFetch'
 import { Trophy, Play, Star, ListChecks, X, Pause, Search, BookOpen, Flame, Plus, Tv, ChevronRight } from 'lucide-react'
@@ -308,39 +309,26 @@ function MangaHome() {
     
     const [showAddModal, setShowAddModal] = useState(false)
     const [toast, setToast] = useState(null)
-    const [userAnime, setUserAnime] = useState([])
+    const { animeList: userAnime, logAnime } = useAnimeContext()
 
     const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type })
         setTimeout(() => setToast(null), 3000)
     }, [])
 
-    // ── Fetch user library ──
-    useEffect(() => {
-        const fetchLibrary = async () => {
-            if (!user) return
-            try {
-                const res = await api.get('/anime/library')
-                setUserAnime(res.data.library || [])
-            } catch (err) { console.error(err) }
-        }
-        fetchLibrary()
-    }, [user, location.key])
-
     const handleAddAnime = useCallback(async (data) => {
         setShowAddModal(false)
         try {
-            const res = await api.post('/anime/log', data)
-            if (res.data.success) {
-                showToast(res.data.updated ? `"${data.title}" updated!` : `"${data.title}" added!`)
-                // Refresh local list
-                const libRes = await api.get('/anime/library')
-                setUserAnime(libRes.data.library || [])
+            const res = await logAnime(data)
+            if (res.success) {
+                showToast(res.updated ? `"${data.title}" updated!` : `"${data.title}" added!`)
+            } else {
+                showToast('Failed to log', 'error')
             }
         } catch (err) {
-            showToast(err.response?.data?.message || 'Failed to log', 'error')
+            showToast('Failed to log', 'error')
         }
-    }, [showToast])
+    }, [showToast, logAnime])
 
     const { data: homeData, loading, error, refetch: refetchHome } = useCachedFetch(
         'manga_home_manga',
@@ -359,10 +347,10 @@ function MangaHome() {
     }, [homeData?.sections])
 
     const userStats = useMemo(() => {
-        const filtered = userAnime.filter(a => (a.type || a.mediaType) === 'manga')
+        const filtered = (userAnime || []).filter(a => (a.type || a.mediaType) === 'manga')
         return {
             total: filtered.length,
-            watching: filtered.filter(a => a.status === 'playing').length,
+            watching: filtered.filter(a => a.status === 'playing' || a.status === 'reading').length,
             completed: filtered.filter(a => a.status === 'completed').length,
             planned: filtered.filter(a => a.status === 'planned').length,
             progress: filtered.reduce((s, a) => s + (a.chaptersRead || 0), 0),
@@ -374,7 +362,7 @@ function MangaHome() {
 
     const getMyRating = useCallback((externalId) => {
         if (!user) return null
-        const match = userAnime.find(a => String(a.externalId) === String(externalId) && (a.type === 'manga' || a.mediaType === 'manga'))
+        const match = (userAnime || []).find(a => String(a.externalId) === String(externalId) && (a.type === 'manga' || a.mediaType === 'manga'))
         return match?.rating > 0 ? match.rating : null
     }, [user, userAnime])
 
@@ -383,10 +371,11 @@ function MangaHome() {
         return topUsers.find(tu => tu._id === (user.id || user._id))?.rank
     }, [topUsers, user])
 
-    const recentAnime = useMemo(() => userAnime.filter(a => (a.type || a.mediaType) === 'manga').slice(0, 4), [userAnime])
+    const recentAnime = useMemo(() => (userAnime || []).filter(a => (a.type || a.mediaType) === 'manga').slice(0, 4), [userAnime])
 
     const statusConfig = useMemo(() => ({
         playing: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Reading' },
+        reading: { color: 'text-[#c8ff57]', bg: 'bg-[#c8ff57]/15', label: 'Reading' },
         completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
         planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
         dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
@@ -469,7 +458,7 @@ function MangaHome() {
                                 )}
                             </div>
 
-                            {user && userAnime.length > 0 ? (
+                            {user && userAnime?.length > 0 ? (
                                 <div className="flex gap-8">
                                     {[
                                         { value: userStats.total, label: 'Manga' },

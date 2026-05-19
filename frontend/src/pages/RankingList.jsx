@@ -5,6 +5,8 @@ import { ChevronLeft, Flame, Trophy, Calendar, Star } from 'lucide-react'
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useGamesContext } from '../context/GamesContext'
+import { useAnimeContext } from '../context/AnimeContext'
+import { useMoviesContext } from '../context/MoviesContext'
 import useCachedFetch from '../hooks/useCachedFetch'
 import { GameCardSkeleton } from '../components/ui/Skeleton'
 import { getIGDBImage, SIZES } from '../utils/igdb'
@@ -98,33 +100,24 @@ export default function RankingList() {
     const navigate = useNavigate()
     const { user } = useAuth()
     const { games } = useGamesContext()
+    const { animeList } = useAnimeContext()
+    const { moviesList } = useMoviesContext()
     const [userLibrary, setUserLibrary] = useState([])
 
     // Load appropriate library based on media type
     useEffect(() => {
-        const fetchLibrary = async () => {
-            if (!user) {
-                setUserLibrary([])
-                return
-            }
-            if (contentType === 'game') {
-                setUserLibrary(games)
-                return
-            }
-            try {
-                if (contentType === 'anime' || contentType === 'manga') {
-                    const res = await api.get('/anime/library')
-                    setUserLibrary(res.data.library || [])
-                } else if (contentType === 'movie' || contentType === 'tv') {
-                    const res = await api.get('/movies/library')
-                    setUserLibrary(res.data.library || [])
-                }
-            } catch (err) {
-                console.error('[RankingList] Failed to fetch library:', err)
-            }
+        if (!user) {
+            setUserLibrary([])
+            return
         }
-        fetchLibrary()
-    }, [user, contentType, games])
+        if (contentType === 'game') {
+            setUserLibrary(games)
+        } else if (contentType === 'anime' || contentType === 'manga') {
+            setUserLibrary(animeList)
+        } else if (contentType === 'movie' || contentType === 'tv') {
+            setUserLibrary(moviesList)
+        }
+    }, [user, contentType, games, animeList, moviesList])
 
     const getMyRating = useCallback((contentId) => {
         if (!user || !contentId) return null

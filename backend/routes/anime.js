@@ -11,7 +11,7 @@ import MediaStats from '../models/MediaStats.js';
 import Ranking from '../models/Ranking.js';
 import { protect, protectOptional } from '../middleware/auth.js';
 import { awardXP, deductXP } from '../utils/xp.js';
-import { updateMediaStats, getBulkStats } from '../utils/stats.js';
+import { updateMediaStats, getBulkStats, syncMediaStats } from '../utils/stats.js';
 import { logEngagement } from '../utils/engagement.js';
 import { withRetryTransaction } from '../utils/transaction.js';
 
@@ -55,6 +55,23 @@ const formatJikanItem = (item, type) => ({
     rating: item.rating,
     type: type
 });
+
+const cleanMALCover = (url) => {
+    if (!url) return '';
+    // Strip sizing patterns like /r/192x272/ or /r/96x136/
+    let cleaned = url.replace(/\/r\/\d+x\d+\//g, '/');
+    // Strip signatures and query params
+    cleaned = cleaned.split('?')[0];
+    // Ensure absolute URL
+    if (cleaned && !cleaned.startsWith('http')) {
+        cleaned = `https://cdn.myanimelist.net${cleaned.startsWith('/') ? '' : '/'}${cleaned}`;
+    }
+    // Auto-heal double cdn prefixes or missing slashes
+    if (cleaned.includes('cdn.myanimelist.netimages')) {
+        cleaned = cleaned.replace('cdn.myanimelist.netimages', 'cdn.myanimelist.net/images');
+    }
+    return cleaned;
+};
 
 const fetchAnilistEnglishTitles = async (malIds, type = 'ANIME') => {
     if (!malIds || malIds.length === 0) return {};
@@ -298,7 +315,7 @@ router.get('/home', async (req, res) => {
                 const meta = aniMeta[item.externalId];
                 if (meta) {
                     if (meta.title) item.title = meta.title;
-                    if (meta.cover) item.cover = meta.cover;
+                    if (meta.cover && !item.cover) item.cover = meta.cover;
                     if (!item.year || item.year > 2026) item.year = meta.year || item.year;
                 }
             });
@@ -362,7 +379,7 @@ router.get('/search', protectOptional, async (req, res) => {
             const meta = englishTitles[item.externalId];
             if (meta) {
                 item.title = meta.title;
-                item.cover = meta.cover;
+                if (meta.cover && !item.cover) item.cover = meta.cover;
                 if (!item.year || item.year > 2026) item.year = meta.year || item.year;
             }
             return item;
@@ -471,7 +488,7 @@ router.get('/discover', async (req, res) => {
                 const meta = englishTitles[item.externalId];
                 if (meta) {
                     item.title = meta.title;
-                    item.cover = meta.cover;
+                    if (meta.cover && !item.cover) item.cover = meta.cover;
                     if (!item.year || item.year > 2026) item.year = meta.year || item.year;
                 }
                 return item;
@@ -882,24 +899,50 @@ router.get('/user/:userId', async (req, res) => {
     try {
         const library = await AnimeEntry.find({ userId: req.params.userId }).sort({ updatedAt: -1 });
         
+        let healCount = 0;
+        const MAX_HEALS_PER_REQUEST = 3;
+
         // Populate legacy fields for frontend compatibility
         const sanitizedLibrary = await Promise.all(library.map(async (entry) => {
             const obj = entry.toObject();
             if (!obj.cover && obj.coverImage) obj.cover = obj.coverImage;
             if (!obj.type && obj.mediaType) obj.type = obj.mediaType;
 
-            // Heal generic genres if possible
+            // Heal generic genres or AniList/broken covers if possible
             const isGeneric = !obj.genre || ['anime', 'manga'].includes(obj.genre.toLowerCase());
-            if (isGeneric && obj.externalId) {
-                try {
-                    const response = await apiClient.get(`${JIKAN_BASE_URL}/${obj.type}/${obj.externalId}`, { retry: 1 });
-                    const fresh = formatJikanItem(response.data.data, obj.type);
-                    if (fresh.genre && !['anime', 'manga'].includes(fresh.genre.toLowerCase())) {
-                        obj.genre = fresh.genre;
-                        // Save back to DB asynchronously to fix it permanently
-                        AnimeEntry.updateOne({ _id: obj._id }, { genre: fresh.genre }).catch(e => console.error('Genre heal save error:', e));
-                    }
-                } catch (e) { /* ignore */ }
+            const isNonStandardCover = !obj.cover || 
+                                       obj.cover.includes('anilist.co') || 
+                                       obj.cover.includes('?s=') || 
+                                       !obj.cover.startsWith('https://cdn.myanimelist.net/');
+
+            if ((isGeneric || isNonStandardCover) && obj.externalId) {
+                let shouldHeal = false;
+                if (healCount < MAX_HEALS_PER_REQUEST) {
+                    healCount++;
+                    shouldHeal = true;
+                }
+
+                if (shouldHeal) {
+                    try {
+                        const response = await apiClient.get(`${JIKAN_BASE_URL}/${obj.type}/${obj.externalId}`, { retry: 1 });
+                        const fresh = formatJikanItem(response.data.data, obj.type);
+                        
+                        const updates = {};
+                        if (fresh.genre && !['anime', 'manga'].includes(fresh.genre.toLowerCase())) {
+                            obj.genre = fresh.genre;
+                            updates.genre = fresh.genre;
+                        }
+                        if (fresh.cover && fresh.cover !== obj.cover) {
+                            obj.cover = fresh.cover;
+                            updates.cover = fresh.cover;
+                        }
+
+                        if (Object.keys(updates).length > 0) {
+                            // Save back to DB asynchronously to fix it permanently
+                            AnimeEntry.updateOne({ _id: obj._id }, updates).catch(e => console.error('Library heal save error:', e));
+                        }
+                    } catch (e) { /* ignore */ }
+                }
             }
             return obj;
         }));
@@ -914,24 +957,50 @@ router.get('/library', protect, async (req, res) => {
     try {
         const library = await AnimeEntry.find({ userId: req.user._id }).sort({ updatedAt: -1 });
         
+        let healCount = 0;
+        const MAX_HEALS_PER_REQUEST = 3;
+
         // Populate legacy fields for frontend compatibility
         const sanitizedLibrary = await Promise.all(library.map(async (entry) => {
             const obj = entry.toObject();
             if (!obj.cover && obj.coverImage) obj.cover = obj.coverImage;
             if (!obj.type && obj.mediaType) obj.type = obj.mediaType;
 
-            // Heal generic genres if possible
+            // Heal generic genres or AniList/broken covers if possible
             const isGeneric = !obj.genre || ['anime', 'manga'].includes(obj.genre.toLowerCase());
-            if (isGeneric && obj.externalId) {
-                try {
-                    const response = await apiClient.get(`${JIKAN_BASE_URL}/${obj.type}/${obj.externalId}`, { retry: 1 });
-                    const fresh = formatJikanItem(response.data.data, obj.type);
-                    if (fresh.genre && !['anime', 'manga'].includes(fresh.genre.toLowerCase())) {
-                        obj.genre = fresh.genre;
-                        // Save back to DB asynchronously to fix it permanently
-                        AnimeEntry.updateOne({ _id: obj._id }, { genre: fresh.genre }).catch(e => console.error('Genre heal save error:', e));
-                    }
-                } catch (e) { /* ignore */ }
+            const isNonStandardCover = !obj.cover || 
+                                       obj.cover.includes('anilist.co') || 
+                                       obj.cover.includes('?s=') || 
+                                       !obj.cover.startsWith('https://cdn.myanimelist.net/');
+
+            if ((isGeneric || isNonStandardCover) && obj.externalId) {
+                let shouldHeal = false;
+                if (healCount < MAX_HEALS_PER_REQUEST) {
+                    healCount++;
+                    shouldHeal = true;
+                }
+
+                if (shouldHeal) {
+                    try {
+                        const response = await apiClient.get(`${JIKAN_BASE_URL}/${obj.type}/${obj.externalId}`, { retry: 1 });
+                        const fresh = formatJikanItem(response.data.data, obj.type);
+                        
+                        const updates = {};
+                        if (fresh.genre && !['anime', 'manga'].includes(fresh.genre.toLowerCase())) {
+                            obj.genre = fresh.genre;
+                            updates.genre = fresh.genre;
+                        }
+                        if (fresh.cover && fresh.cover !== obj.cover) {
+                            obj.cover = fresh.cover;
+                            updates.cover = fresh.cover;
+                        }
+
+                        if (Object.keys(updates).length > 0) {
+                            // Save back to DB asynchronously to fix it permanently
+                            AnimeEntry.updateOne({ _id: obj._id }, updates).catch(e => console.error('Library heal save error:', e));
+                        }
+                    } catch (e) { /* ignore */ }
+                }
             }
             return obj;
         }));
@@ -946,6 +1015,21 @@ router.post('/log', protect, async (req, res) => {
     try {
         let { externalId, type, status, rating, episodesWatched, chaptersRead, volumesRead, totalEpisodes, totalChapters, totalVolumes, airingStatus, notes, title, cover, genre, year } = req.body;
         
+        // Normalize cover images to use MyAnimeList standard, resolving AniList on-demand
+        if (cover && cover.includes('anilist.co')) {
+            try {
+                const response = await apiClient.get(`${JIKAN_BASE_URL}/${type}/${externalId}`, { retry: 1 });
+                const fresh = formatJikanItem(response.data.data, type);
+                if (fresh.cover) {
+                    cover = fresh.cover;
+                }
+            } catch (e) {
+                cover = cleanMALCover(cover);
+            }
+        } else {
+            cover = cleanMALCover(cover);
+        }
+
         const result = await withRetryTransaction(async (session) => {
             const oldEntry = await AnimeEntry.findOne({ userId: req.user._id, externalId: parseInt(externalId), type }).session(session);
             const isNew = !oldEntry;
@@ -1028,6 +1112,447 @@ router.delete('/log/:id', protect, async (req, res) => {
     } catch (error) {
         console.error('Anime Delete Log Error:', error);
         res.status(500).json({ success: false, message: 'Delete failed' });
+    }
+});
+
+// ==========================================
+// AUTO-IMPORT & SYNC ENDPOINTS
+// ==========================================
+
+// AniList Public Sync GraphQL Endpoint
+router.post('/import/anilist', protect, async (req, res) => {
+    try {
+        const { username, mediaType } = req.body;
+        if (!username) {
+            return res.status(400).json({ success: false, message: 'AniList username is required' });
+        }
+
+        const typeFilter = mediaType === 'manga' ? 'MANGA' : 'ANIME';
+        
+        // Query public lists without OAuth tokens using AniList GraphQL API
+        const query = `
+            query ($username: String, $type: MediaType) {
+                MediaListCollection(userName: $username, type: $type) {
+                    lists {
+                        name
+                        isCustomList
+                        status
+                        entries {
+                            score(format: POINT_10)
+                            progress
+                            progressVolumes
+                            status
+                            media {
+                                idMal
+                                title {
+                                    romaji
+                                    english
+                                }
+                                coverImage {
+                                    large
+                                }
+                                genres
+                                episodes
+                                chapters
+                                volumes
+                                startDate {
+                                    year
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        `;
+
+        const response = await apiClient.post('https://graphql.anilist.co', {
+            query,
+            variables: { username, type: typeFilter }
+        });
+
+        const data = response.data;
+        
+        // 🛡️ Inspect for GraphQL Errors (e.g. User not found, private list)
+        if (data.errors && data.errors.length > 0) {
+            const firstError = data.errors[0].message;
+            return res.status(400).json({ success: false, message: `AniList: ${firstError}` });
+        }
+
+        const lists = data.data?.MediaListCollection?.lists || [];
+        
+        let importedCount = 0;
+        let updatedCount = 0;
+        let xpGained = 0;
+        
+        // Map AniList Statuses to LevelLog standard
+        const statusMap = {
+            CURRENT: mediaType === 'manga' ? 'reading' : 'watching',
+            COMPLETED: 'completed',
+            PAUSED: 'paused',
+            DROPPED: 'dropped',
+            PLANNING: 'planned'
+        };
+
+        const listEntries = [];
+        lists.forEach(l => {
+            if (l.entries) {
+                l.entries.forEach(e => listEntries.push(e));
+            }
+        });
+
+        if (listEntries.length === 0) {
+            return res.json({ success: true, message: 'No entries found in this AniList collection.', importedCount: 0, updatedCount: 0, xpGained: 0 });
+        }
+
+        // Loop over entries to sync
+        for (const entry of listEntries) {
+            const media = entry.media;
+            const externalId = media.idMal;
+            if (!externalId) continue; // Requires MAL ID mapping for parity
+
+            const title = media.title.english || media.title.romaji;
+            const status = statusMap[entry.status] || 'planned';
+            const progress = entry.progress || 0;
+            const score = entry.score || 0;
+
+            // Check if existing record exists
+            const existing = await AnimeEntry.findOne({
+                userId: req.user._id,
+                externalId,
+                type: mediaType
+            });
+
+            if (existing) {
+                // Update only if imported progress is higher/newer or cover is missing/broken
+                const progressKey = mediaType === 'manga' ? 'chaptersRead' : 'episodesWatched';
+                const currentProgress = existing[progressKey] || 0;
+                
+                let coverUpdated = false;
+                if (!existing.cover || existing.cover.includes('netimages') || existing.cover.includes('anilist.co')) {
+                    const cover = media.coverImage?.large || '';
+                    // Only update cover if it doesn't already have a standard MAL/Jikan cover
+                    if (cover && !existing.cover?.startsWith('https://cdn.myanimelist.net/') && cover !== existing.cover) {
+                        existing.cover = cover;
+                        coverUpdated = true;
+                    }
+                }
+
+                if (progress > currentProgress || existing.status !== status || (score > 0 && existing.rating !== score) || coverUpdated) {
+                    // Check if rating is being added for the first time
+                    const oldRating = existing.rating || 0;
+                    if (oldRating === 0 && score > 0) {
+                        xpGained += 1;
+                    }
+
+                    existing.status = status;
+                    if (mediaType === 'manga') {
+                        existing.chaptersRead = progress;
+                        existing.volumesRead = entry.progressVolumes || 0;
+                    } else {
+                        existing.episodesWatched = progress;
+                    }
+                    if (score > 0) existing.rating = score;
+                    
+                    await existing.save();
+                    updatedCount++;
+
+                    // Automatically recalculate global media average rating and stats!
+                    await syncMediaStats(externalId, mediaType);
+
+                    // Automatically clean up user's wishlist since they are now watching/reading/completed
+                    if (status !== 'planned') {
+                        await AnimeWishlist.deleteOne({ userId: req.user._id, externalId, type: mediaType });
+                    }
+                }
+            } else {
+                // Insert brand-new entry
+                const newEntry = new AnimeEntry({
+                    userId: req.user._id,
+                    externalId,
+                    type: mediaType,
+                    title,
+                    cover: media.coverImage?.large || '',
+                    status,
+                    rating: score,
+                    genre: media.genres?.[0] || (mediaType === 'manga' ? 'Manga' : 'Anime'),
+                    year: media.startDate?.year || new Date().getFullYear(),
+                    episodesWatched: mediaType === 'anime' ? progress : 0,
+                    totalEpisodes: mediaType === 'anime' ? (media.episodes || 0) : 0,
+                    chaptersRead: mediaType === 'manga' ? progress : 0,
+                    totalChapters: mediaType === 'manga' ? (media.chapters || 0) : 0,
+                    volumesRead: mediaType === 'manga' ? (entry.progressVolumes || 0) : 0,
+                    totalVolumes: mediaType === 'manga' ? (media.volumes || 0) : 0,
+                });
+                
+                await newEntry.save();
+                importedCount++;
+                
+                // +1 XP for logging new item
+                xpGained += 1;
+                // +1 XP for rating on first log
+                if (score > 0) {
+                    xpGained += 1;
+                }
+
+                // Automatically recalculate global media average rating and stats!
+                await syncMediaStats(externalId, mediaType);
+
+                // Automatically clean up user's wishlist since they are now watching/reading/completed
+                if (status !== 'planned') {
+                    await AnimeWishlist.deleteOne({ userId: req.user._id, externalId, type: mediaType });
+                }
+            }
+        }
+
+        // Atomically award XP in bulk based on new items logged
+        let updatedUser = req.user;
+        if (xpGained > 0) {
+            updatedUser = await awardXP(req.user._id, xpGained);
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully synchronized ${mediaType} from AniList!`,
+            importedCount,
+            updatedCount,
+            xpGained,
+            xp: updatedUser.xp,
+            level: updatedUser.level,
+            badge: updatedUser.badge
+        });
+
+    } catch (err) {
+        console.error('AniList Sync Error:', err);
+        const status = err.response?.status || 500;
+        let message = 'Sync failed. Please try again later.';
+
+        if (status === 404 || err.message?.includes('Not Found') || err.message?.includes('not found')) {
+            message = 'AniList profile not found. Please check your username spelling and ensure your profile list is public.';
+        } else if (err.response?.data?.errors?.[0]?.message) {
+            message = err.response.data.errors[0].message;
+        } else if (err.message) {
+            message = err.message;
+        }
+
+        res.status(status).json({ success: false, message });
+    }
+});
+
+// MyAnimeList Public Sync API (via Native MAL Load endpoint)
+router.post('/import/mal', protect, async (req, res) => {
+    try {
+        const { username, mediaType } = req.body;
+        if (!username) {
+            return res.status(400).json({ success: false, message: 'MAL username is required' });
+        }
+
+        let entries = [];
+        let offset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+            const url = `https://myanimelist.net/${mediaType}list/${username}/load.json?offset=${offset}&status=7`;
+            const response = await apiClient.get(url, {
+                headers: {
+                    'Accept': 'application/json, text/javascript, */*; q=0.01',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+
+            const chunk = response.data || [];
+            if (!Array.isArray(chunk) || chunk.length === 0) {
+                hasMore = false;
+            } else {
+                entries = entries.concat(chunk);
+                if (chunk.length < 300) {
+                    hasMore = false;
+                } else {
+                    offset += 300;
+                    // respect rate limit and cloudflare pacing
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            }
+        }
+
+        if (entries.length === 0) {
+            return res.json({ success: true, message: 'No entries found in this MyAnimeList collection.', importedCount: 0, updatedCount: 0, xpGained: 0 });
+        }
+
+        let importedCount = 0;
+        let updatedCount = 0;
+        let xpGained = 0;
+
+        // Status code mappings from MAL internal json
+        const statusMap = {
+            1: mediaType === 'manga' ? 'reading' : 'watching',
+            2: 'completed',
+            3: 'paused',
+            4: 'dropped',
+            6: 'planned'
+        };
+
+        const parseYear = (dateStr) => {
+            if (!dateStr) return new Date().getFullYear();
+            // dateStr could be YYYY-MM-DD or MM-DD-YY / MM-DD-YYYY
+            const parts = dateStr.split('-');
+            if (parts.length < 3) return new Date().getFullYear();
+            
+            // Check if first part is a 4 digit year (YYYY-MM-DD)
+            if (parts[0].length === 4) {
+                const yr = parseInt(parts[0]);
+                if (!isNaN(yr)) return yr;
+            }
+            
+            // Check if third part is a 4 digit year (MM-DD-YYYY)
+            if (parts[2].length === 4) {
+                const yr = parseInt(parts[2]);
+                if (!isNaN(yr)) return yr;
+            }
+            
+            // Otherwise, it might be 2 digit year at the end (MM-DD-YY)
+            let yr = parseInt(parts[2]);
+            if (isNaN(yr)) return new Date().getFullYear();
+            if (yr <= 50) yr += 2000;
+            else if (yr < 100) yr += 1900;
+            return yr;
+        };
+
+        for (const entry of entries) {
+            const externalId = mediaType === 'manga' ? entry.manga_id : entry.anime_id;
+            if (!externalId) continue;
+
+            const title = mediaType === 'manga' 
+                ? (entry.manga_english || entry.manga_title) 
+                : (entry.anime_title_eng || entry.anime_title);
+                
+            const status = statusMap[entry.status] || 'planned';
+            const progress = mediaType === 'manga' ? (entry.num_read_chapters || 0) : (entry.num_watched_episodes || 0);
+            const score = entry.score || 0;
+
+            const existing = await AnimeEntry.findOne({
+                userId: req.user._id,
+                externalId,
+                type: mediaType
+            });
+
+            if (existing) {
+                const progressKey = mediaType === 'manga' ? 'chaptersRead' : 'episodesWatched';
+                const currentProgress = existing[progressKey] || 0;
+
+                let coverUpdated = false;
+                if (!existing.cover || existing.cover.includes('netimages') || existing.cover.includes('?s=') || !existing.cover.startsWith('https://cdn.myanimelist.net/')) {
+                    const rawCover = mediaType === 'manga' ? entry.manga_image_path : entry.anime_image_path;
+                    const cover = cleanMALCover(rawCover);
+                    if (cover && cover !== existing.cover) {
+                        existing.cover = cover;
+                        coverUpdated = true;
+                    }
+                }
+
+                if (progress > currentProgress || existing.status !== status || (score > 0 && existing.rating !== score) || coverUpdated) {
+                    const oldRating = existing.rating || 0;
+                    if (oldRating === 0 && score > 0) {
+                        xpGained += 1;
+                    }
+
+                    existing.status = status;
+                    if (mediaType === 'manga') {
+                        existing.chaptersRead = progress;
+                        existing.volumesRead = entry.num_read_volumes || 0;
+                    } else {
+                        existing.episodesWatched = progress;
+                    }
+                    if (score > 0) existing.rating = score;
+
+                    await existing.save();
+                    updatedCount++;
+
+                    // Automatically recalculate global media average rating and stats!
+                    await syncMediaStats(externalId, mediaType);
+
+                    // Automatically clean up user's wishlist since they are now watching/reading/completed
+                    if (status !== 'planned') {
+                        await AnimeWishlist.deleteOne({ userId: req.user._id, externalId, type: mediaType });
+                    }
+                }
+            } else {
+                const rawCover = mediaType === 'manga' ? entry.manga_image_path : entry.anime_image_path;
+                const cover = cleanMALCover(rawCover);
+                
+                const genre = entry.genres?.[0]?.name || (mediaType === 'manga' ? 'Manga' : 'Anime');
+                const rawDateStr = mediaType === 'manga' ? entry.manga_start_date_string : entry.anime_start_date_string;
+                const year = parseYear(rawDateStr);
+
+                const newEntry = new AnimeEntry({
+                    userId: req.user._id,
+                    externalId,
+                    type: mediaType,
+                    title,
+                    cover,
+                    status,
+                    rating: score,
+                    genre,
+                    year,
+                    episodesWatched: mediaType === 'anime' ? progress : 0,
+                    totalEpisodes: mediaType === 'anime' ? (entry.anime_num_episodes || 0) : 0,
+                    chaptersRead: mediaType === 'manga' ? progress : 0,
+                    totalChapters: mediaType === 'manga' ? (entry.manga_num_chapters || 0) : 0,
+                    volumesRead: mediaType === 'manga' ? (entry.num_read_volumes || 0) : 0,
+                    totalVolumes: mediaType === 'manga' ? (entry.manga_num_volumes || 0) : 0,
+                });
+
+                await newEntry.save();
+                importedCount++;
+
+                xpGained += 1; // +1 XP for logging new item
+                if (score > 0) {
+                    xpGained += 1; // +1 XP for rating on first log
+                }
+
+                // Automatically recalculate global media average rating and stats!
+                await syncMediaStats(externalId, mediaType);
+
+                // Automatically clean up user's wishlist since they are now watching/reading/completed
+                if (status !== 'planned') {
+                    await AnimeWishlist.deleteOne({ userId: req.user._id, externalId, type: mediaType });
+                }
+            }
+        }
+
+        let updatedUser = req.user;
+        if (xpGained > 0) {
+            updatedUser = await awardXP(req.user._id, xpGained);
+        }
+
+        res.json({
+            success: true,
+            message: `Successfully synchronized ${mediaType} from MyAnimeList!`,
+            importedCount,
+            updatedCount,
+            xpGained,
+            xp: updatedUser.xp,
+            level: updatedUser.level,
+            badge: updatedUser.badge
+        });
+
+    } catch (err) {
+        console.error('MAL Sync Error:', err);
+        const status = err.response?.status || 500;
+        let message = 'Sync failed. Please try again later.';
+        
+        if (status === 404 || status === 400) {
+            message = 'MyAnimeList profile not found or list is private. Please check your username spelling and ensure your list is public.';
+        } else if (status === 403) {
+            message = 'This MyAnimeList profile is private. Please set your list settings to "Public" in your MAL options.';
+        } else if (err.response?.data?.message) {
+            message = err.response.data.message;
+        } else if (err.message) {
+            message = err.message;
+        }
+
+        res.status(status).json({ success: false, message });
     }
 });
 

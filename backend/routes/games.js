@@ -14,6 +14,7 @@ import { logEngagement } from '../utils/engagement.js'
 import mongoose from 'mongoose'
 import { getAccessToken } from '../utils/igdb.js'
 import apiClient from '../utils/apiClient.js'
+import { withRetryTransaction } from '../utils/transaction.js'
 
 const router = express.Router()
 
@@ -346,7 +347,7 @@ router.post('/stats/batch', async (req, res) => {
 // ── POST /api/games ── +1 XP for logging, +1 XP if rated on first log
 router.post('/', protect, async (req, res) => {
     try {
-        const { title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId, year } = req.body
+        const { title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId, year, loggedDate } = req.body
         if (!title) return res.status(400).json({ success: false, message: 'Title is required' })
         const session = await mongoose.startSession()
         session.startTransaction()
@@ -364,10 +365,25 @@ router.post('/', protect, async (req, res) => {
             const existing = await Game.findOne(query).session(session)
             const isNew = !existing
 
+            let finalLoggedDate = Date.now()
+            if (loggedDate) {
+                const parsed = new Date(loggedDate)
+                if (isNaN(parsed.getTime())) {
+                    return res.status(400).json({ success: false, message: 'Invalid logged date format' })
+                }
+                if (parsed.getTime() > Date.now()) {
+                    return res.status(400).json({ success: false, message: 'Logged date cannot be in the future' })
+                }
+                finalLoggedDate = parsed
+            } else if (existing && existing.loggedDate) {
+                finalLoggedDate = existing.loggedDate
+            }
+
             const updateData = {
                 userId: req.user._id,
                 title, genre, status, rating, hours, platforms, steamId, notes, cover, summary, igdbId: searchId,
-                year: year ? parseInt(year) : null
+                year: year ? parseInt(year) : null,
+                loggedDate: finalLoggedDate
             }
 
             const savedGame = await Game.findOneAndUpdate(
@@ -450,6 +466,16 @@ router.post('/', protect, async (req, res) => {
 
 router.put('/:id', protect, async (req, res) => {
     try {
+        if (req.body.loggedDate) {
+            const parsed = new Date(req.body.loggedDate)
+            if (isNaN(parsed.getTime())) {
+                return res.status(400).json({ success: false, message: 'Invalid logged date format' })
+            }
+            if (parsed.getTime() > Date.now()) {
+                return res.status(400).json({ success: false, message: 'Logged date cannot be in the future' })
+            }
+        }
+
         const existingGame = await Game.findOne({ _id: req.params.id, userId: req.user._id })
         if (!existingGame) return res.status(404).json({ success: false, message: 'Game not found or not authorized' })
         const oldRating = existingGame.rating || 0
@@ -507,7 +533,9 @@ router.put('/:id', protect, async (req, res) => {
                 success: true,
                 message: 'Game updated',
                 game,
-                ...(updatedUser && { xp: updatedUser.xp, level: updatedUser.level, badge: updatedUser.badge })
+                xp: updatedUser?.xp ?? req.user.xp,
+                level: updatedUser?.level ?? req.user.level,
+                badge: updatedUser?.badge ?? req.user.badge
             })
         } catch (innerErr) {
             await session.abortTransaction()

@@ -89,6 +89,16 @@ function Profile() {
             bg: 'bg-[#c8ff57]/15', 
             label: profileMediaType === 'manga' ? 'Reading' : (profileMediaType === 'game' ? 'Playing' : 'Watching') 
         },
+        watching: { 
+            color: 'text-[#c8ff57]', 
+            bg: 'bg-[#c8ff57]/15', 
+            label: 'Watching' 
+        },
+        reading: { 
+            color: 'text-[#c8ff57]', 
+            bg: 'bg-[#c8ff57]/15', 
+            label: 'Reading' 
+        },
         completed: { color: 'text-[#5c9fff]', bg: 'bg-[#5c9fff]/15', label: 'Completed' },
         planned: { color: 'text-[#ff9f5c]', bg: 'bg-[#ff9f5c]/15', label: 'Planned' },
         dropped: { color: 'text-[#ff5c5c]', bg: 'bg-[#ff5c5c]/15', label: 'Dropped' },
@@ -175,7 +185,7 @@ function Profile() {
         // even if the backend counters get out of sync.
         const total = games.length;
         const completed = games.filter(g => g.status === 'completed').length;
-        const playing = games.filter(g => g.status === 'playing').length;
+        const playing = games.filter(g => g.status === 'playing' || g.status === 'watching' || g.status === 'reading').length;
         const planned = games.filter(g => g.status === 'planned').length;
         const dropped = games.filter(g => g.status === 'dropped').length;
         const paused = games.filter(g => g.status === 'paused').length;

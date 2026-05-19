@@ -8,6 +8,8 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { GamesProvider } from './context/GamesContext.jsx'
+import { AnimeProvider } from './context/AnimeContext.jsx'
+import { MoviesProvider } from './context/MoviesContext.jsx'
 import { DealsProvider } from './context/DealsContext.jsx'
 import { FollowProvider } from './context/FollowContext.jsx'
 import { LeaderboardProvider } from './context/LeaderboardContext.jsx'
@@ -37,6 +39,8 @@ createRoot(document.getElementById('root')).render(
                     <AuthProvider>
                     <SectionProvider>
                         <GamesProvider>
+                        <AnimeProvider>
+                        <MoviesProvider>
                             <DealsProvider>
                                 <FollowProvider>
                                     <LeaderboardProvider>
@@ -44,6 +48,8 @@ createRoot(document.getElementById('root')).render(
                                     </LeaderboardProvider>
                                 </FollowProvider>
                             </DealsProvider>
+                        </MoviesProvider>
+                        </AnimeProvider>
                         </GamesProvider>
                     </SectionProvider>
                     </AuthProvider>
@@ -52,6 +58,8 @@ createRoot(document.getElementById('root')).render(
                 <AuthProvider>
                 <SectionProvider>
                     <GamesProvider>
+                    <AnimeProvider>
+                    <MoviesProvider>
                         <DealsProvider>
                             <FollowProvider>
                                 <LeaderboardProvider>
@@ -59,6 +67,8 @@ createRoot(document.getElementById('root')).render(
                                 </LeaderboardProvider>
                             </FollowProvider>
                         </DealsProvider>
+                    </MoviesProvider>
+                    </AnimeProvider>
                     </GamesProvider>
                 </SectionProvider>
                 </AuthProvider>

@@ -13,6 +13,7 @@ import Avatar from '../../components/ui/Avatar'
 import { useLeaderboard } from '../../context/LeaderboardContext'
 import AvatarFrame from '../../components/ui/AvatarFrame'
 import GifPicker from '../../components/ui/GifPicker'
+import { useMoviesContext } from '../../context/MoviesContext'
 
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 
@@ -391,7 +392,7 @@ function TVDetail() {
     const [activeTab, setActiveTab] = useState('overview')
     const [expanded, setExpanded] = useState(false)
     const [showAddModal, setShowAddModal] = useState(false)
-    const [userLibrary, setUserLibrary] = useState([])
+    const { moviesList: userLibrary, logMovie } = useMoviesContext()
     const [liked, setLiked] = useState(false)
     const [watchlisted, setWatchlisted] = useState(false)
     const [liking, setLiking] = useState(false)
@@ -419,13 +420,6 @@ function TVDetail() {
             setLiked(contextData.userStatus.liked)
             setWatchlisted(contextData.userStatus.wishlisted)
         }
-        const fetchLib = async () => {
-            if (user) {
-                const res = await api.get('/movies/library')
-                setUserLibrary(res.data.library || [])
-            }
-        }
-        fetchLib()
     }, [contextData, user])
 
     const { data: commentsData, refetch: refetchComments } = useCachedFetch(
@@ -1197,18 +1191,16 @@ function TVDetail() {
                     onClose={() => setShowAddModal(false)}
                     onAdd={async (formData) => {
                         try {
-                            const res = await api.post('/movies/log', formData)
-                            if (res.data.xp) {
-                                updateUser({ xp: res.data.xp, level: res.data.level, badge: res.data.badge })
+                            const res = await logMovie(formData)
+                            if (res.success) {
+                                setShowAddModal(false)
+                                refetchContext(true)
+                                return { success: true }
                             }
-                            setShowAddModal(false)
-                            refetchContext(true)
-                            const libRes = await api.get('/movies/library')
-                            setUserLibrary(libRes.data.library || [])
-                            return { success: true }
-                        } catch (err) { 
+                            return { success: false }
+                        } catch (err) {
                             console.error('Log error:', err)
-                            return { success: false } 
+                            return { success: false }
                         }
                     }}
                     preselectedMovie={movie}

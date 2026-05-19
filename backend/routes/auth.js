@@ -11,6 +11,7 @@ import FollowRequest from '../models/FollowRequest.js'
 import protect, { protectOptional } from '../middleware/auth.js'
 import Game from '../models/Game.js'
 import { awardXP, deductXP } from '../utils/xp.js'
+import { withRetryTransaction } from '../utils/transaction.js'
 import { syncUserStats } from '../utils/userStats.js'
 import { 
     sendVerificationEmail, 

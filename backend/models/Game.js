@@ -60,6 +60,10 @@ const gameSchema = new mongoose.Schema(
         igdbId: {
             type: Number,
             default: null
+        },
+        loggedDate: {
+            type: Date,
+            default: Date.now
         }
     },
     {

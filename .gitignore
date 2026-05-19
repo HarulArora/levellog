@@ -17,4 +17,6 @@ backend/scratch/
 frontend/scratch/
 .gemini/
 .vscode/
-.idea/
+.idea/
+backend/data/
+

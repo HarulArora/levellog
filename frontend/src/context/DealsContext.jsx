@@ -15,13 +15,14 @@ export function DealsProvider({ children }) {
         try {
             // Check loading state without being a dependency
             const res = await api.get(`/deals?storeFilter=${storeFilter}&freeOnly=${freeOnly}`)
-            const { success, deals: cleaned } = res.data
+            const { success, deals } = res.data
             
             if (!success) return
+            const cleaned = Array.isArray(deals) ? deals : []
 
             // Detection logic for new deals (for the badge and notifications)
-            const fresh = cleaned.filter(d => prevIds.current.size > 0 && !prevIds.current.has(d.dealID))
-            prevIds.current = new Set(cleaned.map(d => d.dealID))
+            const fresh = cleaned.filter(d => d && d.dealID && prevIds.current.size > 0 && !prevIds.current.has(d.dealID))
+            prevIds.current = new Set(cleaned.map(d => d ? d.dealID : '').filter(Boolean))
 
             if (fresh.length > 0) {
                 setNewDealsCount(prev => prev + fresh.length)
