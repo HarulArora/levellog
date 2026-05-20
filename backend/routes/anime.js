@@ -14,6 +14,7 @@ import { awardXP, deductXP } from '../utils/xp.js';
 import { updateMediaStats, getBulkStats, syncMediaStats } from '../utils/stats.js';
 import { logEngagement } from '../utils/engagement.js';
 import { withRetryTransaction } from '../utils/transaction.js';
+import { getMediaDetail } from '../utils/mediaDetailCache.js';
 
 const router = express.Router();
 const JIKAN_BASE_URL = 'https://api.jikan.moe/v4';
@@ -560,125 +561,9 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
         const { type = 'anime' } = req.query;
         const userId = req.user?._id;
 
-        const cacheKey = `detail-v14-${type}-${id}`; // Bumped version to v14
-        let anime = jikanCache.get(cacheKey);
-
-        if (!anime) {
-            // ── TRY ANILIST FIRST ──
-            anime = await fetchAnilistFullDetail(id, type);
-
-            if (!anime) {
-                console.log(`AniList missed for ${type} ${id}, falling back to Jikan...`);
-                const requestConfig = { retry: 3, retryDelay: 1000 };
-                const [mainRes, picsRes, recsRes, videoRes, charRes, staffRes, streamingRes, externalRes] = await Promise.all([
-                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/full`, requestConfig),
-                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/pictures`, requestConfig).catch(() => ({ data: { data: [] } })),
-                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/recommendations`, requestConfig).catch(() => ({ data: { data: [] } })),
-                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/videos`, requestConfig).catch(() => ({ data: { data: {} } })),
-                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/characters`, requestConfig).catch(() => ({ data: { data: [] } })),
-                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/staff`, requestConfig).catch(() => ({ data: { data: [] } })),
-                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/streaming`, requestConfig).catch(() => ({ data: { data: [] } })),
-                    apiClient.get(`${JIKAN_BASE_URL}/${type}/${id}/external`, requestConfig).catch(() => ({ data: { data: [] } }))
-                ]);
-
-                const rawData = mainRes.data.data;
-                anime = formatJikanItem(rawData, type);
-                anime.streamingLinks = streamingRes.data.data || [];
-                anime.externalLinks = externalRes.data.data || [];
-                
-                // Extract Relations
-                anime.relations = rawData.relations?.map(rel => ({
-                    relation: rel.relation,
-                    items: rel.entry.map(e => ({
-                        id: e.mal_id,
-                        name: e.name,
-                        type: e.type
-                    }))
-                })) || [];
-
-                // Extract Staff
-                anime.staff = staffRes.data.data?.slice(0, 8).map(s => ({
-                    name: s.person.name,
-                    positions: s.positions,
-                    image: s.person.images?.jpg?.image_url
-                })) || [];
-
-                anime.screenshots = picsRes.data.data?.map(p => p.webp?.large_image_url || p.jpg?.large_image_url).slice(0, 8) || [];
-                
-                anime.cast = charRes.data.data?.slice(0, 24).map(c => {
-                    const va = c.voice_actors?.find(v => v.language === 'Japanese');
-                    return {
-                        name: c.character.name,
-                        role: c.role,
-                        image: c.character.images?.webp?.image_url || c.character.images?.jpg?.image_url,
-                        favorites: c.character.favorites,
-                        va: va ? { name: va.person.name, image: va.person.images?.jpg?.image_url } : null
-                    };
-                }) || [];
-
-                anime.similar = recsRes.data.data?.slice(0, 6).map(r => ({
-                    id: r.entry.mal_id,
-                    title: r.entry.title,
-                    cover: r.entry.images?.webp?.large_image_url || r.entry.images?.jpg?.large_image_url
-                })) || [];
-            }
-
-            // ── TMDB WATCH PROVIDER INTEGRATION (Always run for regional data) ──
-            try {
-                const animeTitle = anime.title;
-                const tmdbSearch = await apiClient.get(`${TMDB_BASE_URL}/search/multi`, {
-                    params: { 
-                        api_key: process.env.TMDB_API_KEY,
-                        query: animeTitle, 
-                        include_adult: false 
-                    },
-                    retry: 2
-                });
-
-                const bestMatch = tmdbSearch.data.results?.find(r => 
-                    (r.media_type === 'tv' || r.media_type === 'movie') && 
-                    (r.original_language === 'ja' || r.name === animeTitle || r.title === animeTitle)
-                );
-
-                if (bestMatch) {
-                    const providersRes = await apiClient.get(`${TMDB_BASE_URL}/${bestMatch.media_type}/${bestMatch.id}/watch/providers`, {
-                        params: { api_key: process.env.TMDB_API_KEY }
-                    });
-                    anime.watchProviders = providersRes.data.results || {};
-                }
-            } catch (tmdbErr) {
-                console.error('TMDB Provider Fetch Failed:', tmdbErr.message);
-                anime.watchProviders = {};
-            }
-
-            // Resolve English titles for relations/similar if they were fetched from Jikan or just to be safe
-            const relatedIds = [];
-            anime.relations.forEach(r => r.items.forEach(i => relatedIds.push(i.id)));
-            anime.similar.forEach(i => relatedIds.push(i.id));
-            
-            const relatedEnglish = await fetchAnilistEnglishTitles(relatedIds, type);
-            anime.relations.forEach(r => r.items.forEach(i => {
-                if (relatedEnglish[i.id]) {
-                    i.name = relatedEnglish[i.id].title;
-                    i.cover = relatedEnglish[i.id].cover;
-                }
-            }));
-            anime.similar.forEach(i => {
-                if (relatedEnglish[i.id]) {
-                    i.title = relatedEnglish[i.id].title;
-                    i.cover = relatedEnglish[i.id].cover;
-                }
-            });
-
-            jikanCache.set(cacheKey, anime);
-        }
-
-        // Migration/Force update: If cached anime is missing trailer but mainRes had it (not easily available here)
-        // For now, just ensure the field exists for the frontend check
-        if (anime && !anime.trailer && anime.synopsis) {
-            // If it's a detail object but missing trailer, it might be an old cache.
-            // We can't easily re-fetch without performance hit, but we can ensure the property is defined.
-        }
+        // Retrieve fully optimized persistent cached media detail
+        const anime = await getMediaDetail(id, type);
+        if (!anime) return res.status(404).json({ success: false, message: 'Detail not found' });
 
         const [mediaStats, like, wishlist] = await Promise.all([
             MediaStats.findOne({ externalId: parseInt(id), type }),

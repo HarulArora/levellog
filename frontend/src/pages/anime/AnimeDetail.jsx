@@ -81,16 +81,12 @@ const RANK_TITLES = {
 }
 
 const RelationItem = memo(({ item, label, colorClass, icon }) => {
-    // Priority 1: Use pre-bundled cover if available
-    // Priority 2: Fetch via useCachedFetch as fallback
-    const { data: coverData } = useCachedFetch(
-        !item.cover ? `anime_cover_${item.type}_${item.id}` : null,
-        !item.cover ? `/anime/cover/${item.type}/${item.id}` : null,
-        { ttl: 24 * 60 * 60 * 1000, enabled: !item.cover } 
-    )
-
-    const coverUrl = item.cover || coverData?.cover
-    const route = item.type === 'manga' ? `/manga/${item.id}?type=manga` : `/anime/${item.id}?type=anime`
+    const coverUrl = item.cover
+    const route = item.type === 'manga'
+        ? `/manga/${item.id}?type=manga`
+        : item.type === 'game'
+            ? `/game/resolve?name=${encodeURIComponent(item.name)}`
+            : `/anime/${item.id}?type=anime`
 
     return (
         <Link to={route} className={`flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-${colorClass}/30 transition-all group overflow-hidden`}>
@@ -849,7 +845,20 @@ function AnimeDetail() {
                                     const sequel = sequelItems.find(i => i.type?.toLowerCase() === 'tv') || sequelItems[0];
                                     const source = relations.find(r => r.relation?.toUpperCase() === 'SOURCE')?.items?.[0];
 
-                                    if (!prequel && !sequel && !source) return null;
+                                    // Extract game relations
+                                    const gameRelations = [];
+                                    relations.forEach(r => {
+                                        r.items?.forEach(i => {
+                                            if (i.type?.toLowerCase() === 'game') {
+                                                gameRelations.push({
+                                                    ...i,
+                                                    relationName: r.relation
+                                                });
+                                            }
+                                        });
+                                    });
+
+                                    if (!prequel && !sequel && !source && gameRelations.length === 0) return null;
 
                                     return (
                                         <div className="bg-[#111118] border border-[#2a2a35] rounded-lg p-6 shadow-sm">
@@ -864,6 +873,9 @@ function AnimeDetail() {
                                                 {sequel && (
                                                     <RelationItem item={sequel} label="Story Sequel" colorClass="[#c8ff57]" icon="⏩" />
                                                 )}
+                                                {gameRelations.map((gr, idx) => (
+                                                    <RelationItem key={`game-${idx}`} item={gr} label={gr.relationName || "Related Game"} colorClass="[#c8ff57]" icon="🎮" />
+                                                ))}
                                             </div>
                                         </div>
                                     );

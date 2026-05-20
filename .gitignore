@@ -19,4 +19,6 @@ frontend/scratch/
 .vscode/
 .idea/
 backend/data/
+backend/scripts/
+**/scripts/
 

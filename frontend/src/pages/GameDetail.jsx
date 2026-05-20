@@ -545,6 +545,10 @@ function GameDetail() {
     const [loadingMoreComments, setLoadingMoreComments] = useState(false)
     const location = useLocation()
 
+    // ── Name-based IGDB ID Resolver State ──
+    const isResolving = igdbId === 'resolve'
+    const [resolveError, setResolveError] = useState(null)
+
     // ── Deep Linking for Tabs ──
     useEffect(() => {
         const params = new URLSearchParams(location.search)
@@ -554,12 +558,46 @@ function GameDetail() {
         }
     }, [location.search])
 
+    // ── Name-based IGDB ID Resolver Effect ──
+    useEffect(() => {
+        if (!isResolving) return
+        const nameParam = new URLSearchParams(location.search).get('name')
+        if (!nameParam) {
+            setResolveError('No game name provided for resolution.')
+            return
+        }
+        let isMounted = true
+        const resolveGame = async () => {
+            try {
+                const res = await api.get(`/igdb/search?q=${encodeURIComponent(nameParam)}&limit=1`)
+                if (!isMounted) return
+                const firstMatch = res.data?.games?.[0]
+                if (firstMatch && firstMatch.id) {
+                    navigate(`/game/${firstMatch.id}`, { replace: true })
+                } else {
+                    setResolveError(`Could not find a matching game for "${nameParam}" on IGDB.`)
+                }
+            } catch (err) {
+                console.error('[Resolve Game] Failed:', err)
+                if (isMounted) {
+                    setResolveError(`Failed to resolve game details: ${err.message}`)
+                }
+            }
+        }
+        resolveGame()
+        return () => { isMounted = false }
+    }, [isResolving, location.search, navigate])
+
     // ── CACHED CONTEXT FETCH (Optimized) ──
     // Combines: Game Info + Global Stats + User Like/Wishlist status in ONE request
     const { data: contextData, loading: loadingContext, error: contextError, refetch: refetchContext, setData: setContextData } = useCachedFetch(
         `game_context_${user?.id || user?._id || 'anon'}_${igdbId}`,
         `/games/context/${igdbId}`,
-        { deps: [igdbId, user?.id || user?._id], ttl: 5 * 60 * 1000 }
+        { 
+            enabled: igdbId !== 'resolve' && !isNaN(Number(igdbId)),
+            deps: [igdbId, user?.id || user?._id], 
+            ttl: 5 * 60 * 1000 
+        }
     )
 
     useEffect(() => {
@@ -572,7 +610,11 @@ function GameDetail() {
     const { data: commentsData, loading: loadingComments, refetch: refetchComments } = useCachedFetch(
         `game_comments_${igdbId}_${commentPage}`,
         `/comments/${igdbId}?page=${commentPage}&limit=10`,
-        { ttl: 1 * 60 * 1000, deps: [igdbId, commentPage] } 
+        { 
+            enabled: igdbId !== 'resolve' && !isNaN(Number(igdbId)),
+            ttl: 1 * 60 * 1000, 
+            deps: [igdbId, commentPage] 
+        } 
     )
 
     useEffect(() => {
@@ -594,8 +636,8 @@ function GameDetail() {
 
     const game = contextData?.game
     const stats = contextData?.stats
-    const loading = loadingContext && !game
-    const error = contextError
+    const loading = (loadingContext || isResolving) && !game
+    const error = contextError || resolveError
     const comments = allComments
 
     const [similarStats, setSimilarStats] = useState({})

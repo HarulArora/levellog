@@ -3,6 +3,7 @@ import { LRUCache } from 'lru-cache'
 import { searchGames, getAccessToken } from '../utils/igdb.js'
 import Game from '../models/Game.js'
 import GameLike from '../models/GameLike.js'
+import Wishlist from '../models/Wishlist.js'
 import logger from '../utils/logger.js'
 import apiClient from '../utils/apiClient.js'
 import { shortPlatform, normalizeCover } from '../utils/helpers.js'
@@ -11,6 +12,7 @@ import Ranking from '../models/Ranking.js'
 import GlobalStats from '../models/GlobalStats.js'
 import { syncIGDBLists } from '../tasks/igdbSync.js'
 import { protectOptional } from '../middleware/auth.js'
+import { getMediaDetail } from '../utils/mediaDetailCache.js'
 
 const router = express.Router()
 
@@ -210,120 +212,23 @@ export const fetchGameDetailById = async (gameId) => {
         return null
     }
     try {
-        const cacheKey = `game-detail-${gameId}`
+        const finalGame = await getMediaDetail(gameId, 'game');
+        if (!finalGame) return null;
 
-        if (igdbCache.has(cacheKey)) {
-            return igdbCache.get(cacheKey)
-        }
+        // Clone details and enrich with community stats for compatibility
+        const enrichedGame = { ...finalGame };
 
-        if (inFlightRequests.has(cacheKey)) {
-            return await inFlightRequests.get(cacheKey)
-        }
+        const [wishlistCount, likeCount, loggedCount] = await Promise.all([
+            Wishlist.countDocuments({ igdbId: parseInt(gameId) }),
+            GameLike.countDocuments({ igdbId: parseInt(gameId) }),
+            Game.countDocuments({ igdbId: parseInt(gameId) })
+        ]);
 
-        const performFetch = async () => {
-            const token = await getAccessToken()
-            const response = await apiClient.post('https://api.igdb.com/v4/games', `
-            fields name, cover.url, summary, genres.name,
-                   platforms.name, first_release_date,
-                   rating, rating_count, aggregated_rating,
-                   involved_companies.company.name,
-                   involved_companies.developer,
-                   involved_companies.publisher,
-                   game_engines.name,
-                   game_modes.name,
-                   age_ratings.rating, age_ratings.category,
-                   keywords.name,
-                   similar_games.name, similar_games.cover.url,
-                   similar_games.rating,
-                   similar_games.genres.name,
-                   videos.video_id, screenshots.url;
-            where id = ${gameId};
-            `, {
-                headers: {
-                    'Client-ID': process.env.IGDB_CLIENT_ID,
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'text/plain'
-                },
-                retry: 3,
-                retryDelay: 1000
-            })
+        enrichedGame.communityWishlist = wishlistCount;
+        enrichedGame.communityLikes = likeCount;
+        enrichedGame.communityLogged = loggedCount;
 
-            const data = response.data
-            if (!data || data.length === 0) return null
-
-            const g = data[0]
-
-            const developer = g.involved_companies?.find(c => c.developer)?.company?.name || null
-            const publisher = g.involved_companies?.find(c => c.publisher)?.company?.name || null
-
-            const ageRatingMap = {
-                1: 'RP', 2: 'EC', 3: 'E', 4: 'E10+',
-                5: 'T', 6: 'M', 7: 'AO',
-                8: '3', 9: '7', 10: '12', 11: '16', 12: '18'
-            }
-            const ageRating = g.age_ratings?.[0]
-                ? ageRatingMap[g.age_ratings[0].rating] || null
-                : null
-
-            const cover = normalizeCover(g.cover?.url, 't_cover_big_2x')
-
-            const screenshots = g.screenshots?.map(s => normalizeCover(s.url, 't_screenshot_big')) || []
-
-            const similarGames = g.similar_games?.slice(0, 6).map(sg => ({
-                id: sg.id,
-                title: sg.name,
-                cover: normalizeCover(sg.cover?.url),
-                rating: sg.rating ? (sg.rating / 10).toFixed(1) : null
-            })) || []
-
-            const platforms = g.platforms?.map(p => shortPlatform(p.name) || p.name) || []
-
-            // ── Community Stats Fetching ──
-            const [wishlistCount, likeCount, loggedCount] = await Promise.all([
-                import('../models/Wishlist.js').then(m => m.default.countDocuments({ igdbId: parseInt(gameId) })),
-                import('../models/GameLike.js').then(m => m.default.countDocuments({ igdbId: parseInt(gameId) })),
-                import('../models/Game.js').then(m => m.default.countDocuments({ igdbId: parseInt(gameId) }))
-            ])
-
-            const game = {
-                id: g.id,
-                title: g.name,
-                cover,
-                summary: g.summary || '',
-                storyline: g.storyline || '',
-                genre: g.genres?.[0]?.name || 'Unknown',
-                genres: g.genres?.map(x => x.name) || [],
-                platforms,
-                releaseYear: g.first_release_date
-                    ? new Date(g.first_release_date * 1000).getFullYear()
-                    : null,
-                criticScore: g.aggregated_rating ? Math.round(g.aggregated_rating) : null,
-                userScore: g.rating ? (g.rating / 10).toFixed(1) : null,
-                ratingCount: g.rating_count || 0,
-                developer,
-                publisher,
-                engine: g.game_engines?.[0]?.name || null,
-                modes: g.game_modes?.map(m => m.name).join(', ') || null,
-                ageRating,
-                keywords: g.keywords?.slice(0, 10).map(k => k.name) || [],
-                themes: g.themes?.map(t => t.name) || [],
-                similarGames,
-                screenshots,
-                videoId: g.videos?.[0]?.video_id || null,
-                communityWishlist: wishlistCount,
-                communityLikes: likeCount,
-                communityLogged: loggedCount
-            }
-
-            igdbCache.set(cacheKey, game)
-            return game
-        }
-
-        const fetchPromise = performFetch()
-        inFlightRequests.set(cacheKey, fetchPromise)
-        const finalGame = await fetchPromise
-        inFlightRequests.delete(cacheKey)
-        return finalGame
+        return enrichedGame;
     } catch (error) {
         logger.error('Failed internal game fetch:', error)
         throw error
@@ -333,13 +238,29 @@ export const fetchGameDetailById = async (gameId) => {
 // ── GET /api/igdb/game/:id ──
 router.get('/game/:id', async (req, res) => {
     try {
-        const finalGame = await fetchGameDetailById(req.params.id)
-        if (!finalGame) return res.status(404).json({ success: false, message: 'Game not found' })
-        res.json({ success: true, game: finalGame })
+        const gameId = req.params.id;
+        const finalGame = await getMediaDetail(gameId, 'game');
+        if (!finalGame) return res.status(404).json({ success: false, message: 'Game not found' });
+
+        // Clone details to prevent mutating cached object in memory
+        const enrichedGame = { ...finalGame };
+
+        // Fetch dynamic community stats counts fresh from DB (very fast indexed count queries)
+        const [wishlistCount, likeCount, loggedCount] = await Promise.all([
+            Wishlist.countDocuments({ igdbId: parseInt(gameId) }),
+            GameLike.countDocuments({ igdbId: parseInt(gameId) }),
+            Game.countDocuments({ igdbId: parseInt(gameId) })
+        ]);
+
+        enrichedGame.communityWishlist = wishlistCount;
+        enrichedGame.communityLikes = likeCount;
+        enrichedGame.communityLogged = loggedCount;
+
+        res.json({ success: true, game: enrichedGame });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to fetch game details', error: error.message })
+        res.status(500).json({ success: false, message: 'Failed to fetch game details', error: error.message });
     }
-})
+});
 
 // ── GET /api/igdb/trending ──
 router.get('/trending', async (req, res) => {

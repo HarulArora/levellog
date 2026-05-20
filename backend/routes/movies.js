@@ -14,6 +14,7 @@ import { awardXP, deductXP } from '../utils/xp.js';
 import { updateMediaStats, getBulkStats } from '../utils/stats.js';
 import { logEngagement } from '../utils/engagement.js';
 import { withRetryTransaction } from '../utils/transaction.js';
+import { getMediaDetail } from '../utils/mediaDetailCache.js';
 
 const router = express.Router();
 const TMDB_BASE_URL = 'https://api.tmdb.org/3';
@@ -314,39 +315,9 @@ router.get('/detail/:id', protectOptional, async (req, res) => {
         const { type = 'movie' } = req.query;
         const userId = req.user?._id;
 
-        const cacheKey = `movie-detail-v3-${type}-${id}`;
-        let movie = movieCache.get(cacheKey);
-
-        if (!movie) {
-            const params = { api_key: process.env.TMDB_API_KEY, append_to_response: 'videos,images,recommendations,credits,watch/providers' };
-            const response = await apiClient.get(`${TMDB_BASE_URL}/${type}/${id}`, { params, retry: 3, retryDelay: 1000 });
-            movie = formatMovieItem(response.data, type);
-            movie.watchProviders = response.data['watch/providers']?.results || {};
-            movie.genres = response.data.genres?.map(g => g.name) || [];
-            movie.runtime = response.data.runtime;
-            movie.totalSeasons = response.data.number_of_seasons || 0;
-            movie.totalEpisodes = response.data.number_of_episodes || 0;
-            movie.seasonsCount = movie.totalSeasons;
-            movie.trailer = response.data.videos?.results?.find(v => v.type === 'Trailer')?.key || 
-                            response.data.videos?.results?.find(v => v.type === 'Teaser')?.key ||
-                            response.data.videos?.results?.[0]?.key;
-            movie.screenshots = response.data.images?.backdrops?.slice(0, 8).map(img => `https://image.tmdb.org/t/p/original${img.file_path}`) || [];
-            movie.cast = response.data.credits?.cast?.slice(0, 24).map(c => ({
-                name: c.name,
-                role: c.character,
-                image: c.profile_path ? `https://image.tmdb.org/t/p/w185${c.profile_path}` : null,
-                popularity: c.popularity
-            })) || [];
-            movie.similar = response.data.recommendations?.results
-                ?.filter(item => !isAnime(item))
-                ?.slice(0, 6).map(r => ({
-                id: r.id,
-                title: r.title || r.name,
-                cover: r.poster_path ? `https://image.tmdb.org/t/p/w500${r.poster_path}` : null
-            })) || [];
-            
-            movieCache.set(cacheKey, movie);
-        }
+        // Retrieve fully optimized persistent cached media detail
+        const movie = await getMediaDetail(id, type);
+        if (!movie) return res.status(404).json({ success: false, message: 'Detail not found' });
 
         const [mediaStats, like, wishlist] = await Promise.all([
             MediaStats.findOne({ externalId: parseInt(id), type }),
